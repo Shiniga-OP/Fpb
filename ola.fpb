@@ -1,0 +1,42 @@
+dobro calcular(dobro a, dobro b, flu pi) {
+    dobro res = a * b + pi;
+    retornar res;
+}
+
+int soma(int a, int b) {
+escrever("\nvalor a: ", a);
+escrever("\nvalor b: ", b);
+   int res = a + b;
+   retornar res;
+}
+
+vazio inicio() {
+    car letra = 'A';
+    int numero = 42;
+    flu pi = 3.1415;
+    bool flag = 1;
+    dobro grande = 123456789.123456;
+
+    escrever("testando tipos básicos:\n");
+    escrever("\nchar: ", letra);
+    escrever("\nint: ", numero);
+    escrever("\nfloat: ", pi);
+    escrever("\nbool: ", flag);
+    escrever("\ndouble: ", grande);
+    
+    escrever("\n\nTestando função soma:");
+    int s = soma(5, 7);
+    escrever("soma com retorno 5 + 7 = esperando 12, veio: ", s);
+    s = 5 + 7;
+    escrever("\nsoma comum 5 + 7 = esperando 12, veio: ", s);
+    
+    escrever("\nTestando atribuições:");
+    numero = 100;
+    letra = 'Z';
+    flag = 0;
+    escrever("\nnovo int: ", numero);
+    escrever("\nnovo char: ", letra);
+    escrever("\nnovo bool: ", flag);
+    
+    fim();
+}

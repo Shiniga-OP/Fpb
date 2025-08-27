@@ -51,3 +51,19 @@ vazio inicio() {
     fim();
 }
 ```
+## como compilar
+para compilar, você deve usar
+```Bash
+fpb ola
+```
+não precisa da extensão, o compilador gera o binário com o nome específico automaticamente, por isso não a extensão.
+
+## configuração extra
+caso você queira o código assembly intermediário, utilize:
+```Bash
+fpb ola -asm
+```
+assim o arquivo .s será gerado sem ser apagado.
+
+## requisitos:
+para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.

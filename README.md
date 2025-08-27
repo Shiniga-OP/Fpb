@@ -67,3 +67,5 @@ assim o arquivo .s será gerado sem ser apagado.
 
 ## requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
+
+o compilador do gera binários válidos para a arquitetura ARM64 Linux (Android)

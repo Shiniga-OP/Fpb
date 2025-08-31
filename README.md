@@ -65,6 +65,12 @@ fpb ola -asm
 ```
 assim o arquivo .s será gerado sem ser apagado.
 
+para ver a versão:
+```Bash
+fpb -v
+```
+
+caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador, ele soltará um aviso, mas compilará normalmente.
 ## requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
 

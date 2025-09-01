@@ -1,55 +1,65 @@
 .section .text
     .align 2
 
+.global _escrever_int
+// [INTEIRO]
 _escrever_int:
-    stp     x29, x30, [sp, -32]!
-    mov     x29, sp
-    adr     x1, .Lint_buffer
-    mov     x2, 0
-    cmp     w0, 0
-    b.ge    .Lpos
-    neg     w0, w0
-    mov     w3, '-'
-    strb    w3, [x1], 1
-    mov     x2, 1
+    stp x29, x30, [sp, -32]!
+    mov x29, sp
+    str x19, [sp, 16] // preserva x19
 
-.Lpos:
-    .align 2
-    mov     x3, x1
+    mov w1, w0 // w1 = número
+    ldr x0, = buffer_int // x0 = buffer
+    mov x19, 0 // x19 = contador de caracteres
+    
+    cmp w1, 0
+    b.ge .LpositivoInt
+    neg w1, w1 // torna positivo
+    mov w2, '-'
+    strb w2, [x0], 1 // escreve sinal
+    mov x19, 1 // contador = 1
 
+.LpositivoInt:
+    // escreve dígitos em ordem reversa
+    mov x2, x0 // x2: aponta pra posição atual
 .Lloop:
-    .align 2
-    mov     w4, 10
-    udiv    w5, w0, w4
-    msub    w6, w5, w4, w0
-    add     w6, w6, '0'
-    strb    w6, [x3], 1
-    add     x2, x2, 1
-    mov     w0, w5
-    cbnz    w0, .Lloop
+    mov w3, 10
+    udiv w4, w1, w3 // w4 = quociente
+    msub w5, w4, w3, w1 // w5 = resto
+    add w5, w5, '0' // caractere
+    strb w5, [x2], 1 // armazena
+    add x19, x19, 1 // incrementa contador
+    mov w1, w4
+    cbnz w1, .Lloop
+    // inverte a string de dígitos(a parte após o sinal, se existir)
+    // x0: aponta pro início dos dígitos(pode ser buffer_int ou buffer_int+1)
+    // x2-1: é o último dígito
+    sub x2, x2, 1 // x2 aponta para o último dígito
+    mov x3, x0 // x3 aponta para o primeiro dígito
+.LreversoInt:
+    cmp x3, x2
+    b.ge .LescreverInt
+    ldrb w4, [x3]
+    ldrb w5, [x2]
+    strb w5, [x3], 1
+    strb w4, [x2], -1
+    b .LreversoInt
 
-.Lrev:
-    .align 2
-    cmp     x1, x3
-    b.ge    .Lfim
-    ldrb    w5, [x1]
-    ldrb    w6, [x3]
-    strb    w5, [x3], -1
-    strb    w6, [x1], 1
-    b       .Lrev
+.LescreverInt:
+    ldr x1, = buffer_int
+    mov x0, 1
+    mov x2, x19 // x19: o número de caracteres
+    mov x8, 64
+    svc 0
 
-.Lfim:
-    .align 2
-    adr     x1, .Lint_buffer
-    mov     x0, 1
-    mov     x8, 64
-    svc     0
-    ldp     x29, x30, [sp], 32
+    ldr x19, [sp, 16]
+    ldp x29, x30, [sp], 32
     ret
 
-.Lint_buffer:
+.section .data
+buffer_int:
     .fill   32, 1, 0
-
+//[FLUTUANTE]
 _escrever_flu:
     stp x29, x30, [sp, -64]!
     mov x29, sp
@@ -58,13 +68,13 @@ _escrever_flu:
     mov x6, x1 // salva início do buffer
     // verifica se é negativo
     fcmp s0, 0.0
-    b.ge .Lpositivo
+    b.ge .LpositivoFlu
     mov w2, '-' // sinal negativo
     strb w2, [x1], 1
     fneg s0, s0 // torna positivo para conversão
     b .Lconverter
     
-.Lpositivo:
+.LpositivoFlu:
     mov     w2, ' ' // espaço para positivo
     strb    w2, [x1], 1
     

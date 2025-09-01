@@ -14,10 +14,9 @@ dobro calcular(dobro a, dobro b, flu pi) {
 }
 
 int soma(int a, int b) {
-escrever("\nvalor a: ", a);
-escrever("\nvalor b: ", b);
-   int res = a + b;
-   retornar res;
+    escrever("\nvalor a: ", a);
+    escrever("\nvalor b: ", b);
+    retornar a + b;
 }
 
 vazio inicio() {

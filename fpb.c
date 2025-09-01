@@ -801,11 +801,11 @@ void gerar_constantes(FILE *s) {
 }
 
 int main(int argc, char **argv) {
-    if(argc < 2) {
+    if(argc < 1) {
         printf("sem arquivos de entrada\n");
         return 1;
     }
-    if(strcmp(argv[2], "-v") == 0) {
+    if(strcmp(argv[1], "-v") == 0) {
         printf("[FOCA-DO ESTÚDIOS]\nFPB - v0.0.1 (alpha)\n");
         return 0;
     }

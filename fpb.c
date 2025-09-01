@@ -523,13 +523,11 @@ void verificar_retorno(FILE *s, int escopo) {
     
     expressao(s, escopo);
     
-    Funcao* f = &funcs[fn_cnt-1];
-    fprintf(s, "  mov sp, x29\n");
-    fprintf(s, "  ldp x29, x30, [sp], %d\n", f->tamanho_frame);
-    fprintf(s, "  ret\n");
+    fprintf(s, "  b .epilogo_%d\n", fn_cnt-1);
     
     excessao(T_PONTO_VIRGULA);
 }
+
 
 void escrever_valor(FILE *s, TipoToken tipo) {
     if(tipo == T_pFLU) fprintf(s, "  bl _escrever_flu\n");
@@ -756,7 +754,7 @@ void verificar_fn(FILE *s) {
     
     antes = 0;
     while(L.tk.tipo != T_COL_DIR) verificar_stmt(s, &antes, 0);
-    
+    fprintf(s, ".epilogo_%d:\n", fn_cnt-1);
     fprintf(s, "  mov sp, x29\n");
     fprintf(s, "  ldp x29, x30, [sp], %d\n", frame_tam);
     fprintf(s, "  ret\n");
@@ -781,11 +779,11 @@ void gerar_constantes(FILE *s) {
 
 int main(int argc, char **argv) {
     if(argc < 2) {
-        printf("sem arquivos de entrada");
+        printf("sem arquivos de entrada\n");
         return 1;
     }
     if(strcmp(argv[2], "-v") == 0) {
-        printf("[FOCA-DO ESTÚDIOS]\nFPB - v0.0.1 (alpha)");
+        printf("[FOCA-DO ESTÚDIOS]\nFPB - v0.0.1 (alpha)\n");
         return 0;
     }
     arquivoAtual = argv[1];
@@ -797,7 +795,7 @@ int main(int argc, char **argv) {
     snprintf(nomeArquivo, sizeof(nomeArquivo), "%s.fpb", argv[1]);
     FILE* en = fopen(nomeArquivo, "r");
     if(!en) {
-        printf("não foi possível abrir %s.fpb", argv[1]);
+        printf("não foi possível abrir %s.fpb\n", argv[1]);
         return 2;
 	}
     
@@ -820,7 +818,7 @@ int main(int argc, char **argv) {
     gerar_constantes(s);
 	FILE* bibli = fopen("biblis/impressao.asm", "r");
 	if(!bibli) {
-	    printf("fpb [AVISO]: biblioteca \"biblis/impressao.asm\" não achada");
+	    printf("fpb [AVISO]: biblioteca \"biblis/impressao.asm\" não achada\n");
 	    return 3;
 	}
     char linha[512];

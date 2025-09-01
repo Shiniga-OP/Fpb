@@ -52,7 +52,7 @@ vazio inicio() {
 }
 ```
 ## como compilar
-para compilar, você deve usar
+para compilar, você deve usar:
 ```Bash
 fpb ola
 ```
@@ -74,4 +74,7 @@ caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador,
 ## requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
 
-o compilador do gera binários válidos para a arquitetura ARM64 Linux (Android)
+o compilador do gera binários válidos para a arquitetura ARM64 Linux (Android).
+
+## extra:
+o compilador é auto suficiente, sem a necessidade de libc.so para binários **gerados pelo compilador**, o compilador em si, por ser escrito em C, ainda precisa de libc.so pra funcionar.

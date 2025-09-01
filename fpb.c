@@ -511,7 +511,7 @@ void declaracao_var(FILE* s, int *antes, int escopo, int eh_parametro) {
     var->eh_parametro = eh_parametro;
     f->var_conta++;
     
-    if(eh_parametro) *antes += 8;
+    if(eh_parametro) *antes += 16;
     
     proximoToken();
     
@@ -659,8 +659,31 @@ void verificar_stmt(FILE *s, int *antes, int escopo) {
         
         Funcao* fn = buscar_fn(idn);
         if(!fn) fatal("função não declarada");
-        
+        // conta argumentos
+        Lexer salvo = L;
         int arg_cnt = 0;
+        excessao(T_PAREN_ESQ);
+        while(L.tk.tipo != T_PAREN_DIR) {
+            arg_cnt++;
+            if(L.tk.tipo == T_VIRGULA) proximoToken();
+        }
+        L = salvo;
+        // reserva espaço na pilha
+        if(arg_cnt > 0) fprintf(s, "  sub sp, sp, %d\n", arg_cnt * 16);
+        
+        int antes = 0;
+        excessao(T_PAREN_ESQ);
+        while(L.tk.tipo != T_PAREN_DIR) {
+            expressao(s, escopo);
+            fprintf(s, "  str w0, [sp, %d]\n", antes);
+            antes += 16;
+            if(L.tk.tipo == T_VIRGULA) proximoToken();
+        }
+        excessao(T_PAREN_DIR);
+        fprintf(s, "  bl %s\n", idn);
+        // libera a memoria
+        if(arg_cnt > 0) fprintf(s, "  add sp, sp, %d\n", arg_cnt * 16);
+    
         while(L.tk.tipo != T_PAREN_DIR) {
             expressao(s, escopo);
             fprintf(s, "  str w0, [sp, -16]!\n");

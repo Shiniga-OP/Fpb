@@ -8,34 +8,42 @@ por mais que a linguagem funcione por simplicidade, você pode notar alguns prob
 a sintaxe é simples, é difícil achar algo estável, mas este é o teste que usei para sintaxe:
 
 ```Fpb
-dobro calcular(dobro a, dobro b, flu pi) {
-    dobro res = a * b + pi;
-    retornar res;
-}
+/*
+comentarios
+multi linhas
+suportados
+*/
+#incluir "biblis/teste.asm"; // incluí uma biblioteca asm
 
-int soma(int a, int b) {
-    escrever("\nvalor a: ", a);
-    escrever("\nvalor b: ", b);
-    retornar a + b;
+// pré definição
+vazio testeAlteracoes(int s, int numero, car letra, bool flag);
+vazio teste();
+
+int somar(int a, int b) {
+   escrever("\nvalor a: ", a);
+   escrever("\nvalor b: ", b);
+   retornar a + b;
 }
 
 vazio inicio() {
-    car letra = 'A';
-    int numero = 42;
-    flu pi = 3.1415;
-    bool flag = 1;
-    dobro grande = 123456789.123456;
-
     escrever("testando tipos básicos:\n");
-    escrever("\nchar: ", letra);
-    escrever("\nint: ", numero);
-    escrever("\nfloat: ", pi);
-    escrever("\nbool: ", flag);
-    escrever("\ndouble: ", grande);
+    car letra = 'A';
+    escrever("\ncaractere: ", letra);
+    int numero = 42;
+    escrever("\ninteiro: ", numero);
+    flu pi = 3.14;
+    escrever("\nflutuante: ", pi);
+    bool flag = 1;
+    escrever("\nbooleano: ", flag);
     
-    escrever("\n\nTestando função soma:");
-    int s = soma(5, 7);
-    escrever("soma com retorno 5 + 7 = esperando 12, veio: ", s);
+    escrever("\nTestando função soma:");
+    int s = somar(5, 7);
+    escrever("\nsoma com retorno 5 + 7 = esperando 12, veio: ", s);
+    testeAlteracoes(s, numero, letra, flag);
+    fim();
+}
+
+vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
     s = 5 + 7;
     escrever("\nsoma comum 5 + 7 = esperando 12, veio: ", s);
     
@@ -43,11 +51,11 @@ vazio inicio() {
     numero = 100;
     letra = 'Z';
     flag = 0;
-    escrever("\nnovo int: ", numero);
-    escrever("\nnovo char: ", letra);
-    escrever("\nnovo bool: ", flag);
-    
-    fim();
+    escrever("\nnovo inteiro: ", numero);
+    escrever("\nnovo caractere: ", letra);
+    escrever("\nnovo booleano: ", flag, "\n");
+    // teste da biblioteca
+    teste();
 }
 ```
 ## como compilar
@@ -62,7 +70,7 @@ caso você queira o código assembly intermediário, utilize:
 ```Bash
 fpb ola -asm
 ```
-assim o arquivo .s será gerado sem ser apagado.
+assim o arquivo .asm será gerado sem ser apagado.
 
 para ver a versão:
 ```Bash

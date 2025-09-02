@@ -1,7 +1,5 @@
 .section .text
-    .align 2
-
-.global _escrever_int
+.align 2
 // [INTEIRO]
 _escrever_int:
     stp x29, x30, [sp, -32]!
@@ -60,6 +58,7 @@ _escrever_int:
 buffer_int:
     .fill   32, 1, 0
 //[FLUTUANTE]
+.align 2
 _escrever_flu:
     stp x29, x30, [sp, -64]!
     mov x29, sp
@@ -130,7 +129,6 @@ _escrever_flu:
     // finaliza string
     mov w2, 0
     strb w2, [x1]
-    // imprimir - CALCULAR TAMANHO CORRETAMENTE
     mov x0, 1 // saida de impressão
     mov x1, x6 // início do buffer
     // calcula tamanho: x1 aponta para início, x1+... para final
@@ -158,22 +156,23 @@ _escrever_flu:
     .align 2
 .Lfloat_buffer:
     .fill   32, 1, 0
-    
+.align 2
 _escrever_double:
-    stp     x29, x30, [sp, #-32]!
-    mov     x29, sp
-    adr     x1, .Ldouble_buffer
-    mov     x0, 1
-    mov     x2, 12
-    mov     x8, 64
-    svc     0
-    ldp     x29, x30, [sp], #32
+    stp x29, x30, [sp, -32]!
+    mov x29, sp
+    adr x1, .Ldouble_buffer
+    mov x0, 1
+    mov x2, 12
+    mov x8, 64
+    svc 0
+    ldp x29, x30, [sp], 32
     ret
 
 .Ldouble_buffer:
     .asciz  "[double]"
-
-_escrever_char:
+// [CARACTERE]:
+.align 2
+_escrever_car:
     stp x29, x30, [sp, -16]!
     mov x29, sp
     strb w0, [sp, -1]!
@@ -185,28 +184,25 @@ _escrever_char:
     add sp, sp, 1
     ldp x29, x30, [sp], 16
     ret
-
+.align 2
 _escrever_bool:
     stp x29, x30, [sp, -16]!
     mov x29, sp
     cmp w0, 0
-    adr x1, .Lfalso
-    adr x2, .Lverdade
-    csel x1, x1, x2, eq
-    mov x0, 1
+    b.eq .Lfalso_caso
+    adr x1, .LverdadeBool
     mov x2, 7
-    cbnz w0, .Limpr
+    b .LimprimirBool
+.Lfalso_caso:
+    adr x1, .LfalsoBool
     mov x2, 5
-
-.Limpr:
-    .align 2
+.LimprimirBool:
+    mov x0, 1
     mov x8, 64
     svc 0
     ldp x29, x30, [sp], 16
     ret
-
-.Lverdade:
-    .asciz  "verdade"
-    .align 2
-.Lfalso:
-    .asciz  "falso"
+.LverdadeBool:
+    .asciz "verdade"
+.LfalsoBool:
+    .asciz "falso"

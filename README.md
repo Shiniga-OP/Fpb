@@ -1,9 +1,6 @@
 ## sobre
 essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível, a implementação usa assembly aarch64 para traduzir código .fpb e assim usar **as** para compilar para .o, usando **ld** para linkagem e execução do binário compilado.
 
-## problemas
-por mais que a linguagem funcione por simplicidade, você pode notar alguns problemas de funções, ou operações matemáticas, isso se deve porque eu fui meio burro e não pesquisei sobre como implementar bibliotecas em binários. então as bibliotecas para imprimir são escritas em assembly e coladas no topo do arquivo do código .fpb no processo de tradução, eu sei, foi uma solução de gambiarra.
-
 ## sintaxe
 a sintaxe é simples, é difícil achar algo estável, mas este é o teste que usei para sintaxe:
 
@@ -13,10 +10,13 @@ comentarios
 multi linhas
 suportados
 */
-#incluir "biblis/teste.asm"; // incluí uma biblioteca asm
+#incluir "biblis/teste.asm";
 
-// pré definição
+/* incluí uma biblioteca asm */
+
+/* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);
+vazio testeOperacoes();
 vazio teste();
 
 int somar(int a, int b) {
@@ -54,8 +54,20 @@ vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
     escrever("\nnovo inteiro: ", numero);
     escrever("\nnovo caractere: ", letra);
     escrever("\nnovo booleano: ", flag, "\n");
+    // teste operações:
+    testeOperacoes();
+    escrever("\nTeste de biblioteca:\n");
     // teste da biblioteca
     teste();
+}
+
+vazio testeOperacoes() {
+    escrever("\nTeste de operações matematicas:\n");
+    // testando ordem de precedencia:
+    int x = 5 + 5 * 5;
+    escrever("operação 5 + 5 * 5, esperado: 30, veio: ", x, "\n");
+    x = (5 + 5) * 5;
+    escrever("operação (5 + 5) * 5, esperado: 50, veio: ", x, "\n");
 }
 ```
 ## como compilar
@@ -77,6 +89,11 @@ para ver a versão:
 fpb -v
 ```
 
+em caso de erro, você poderá ver algo como:
+```Bash
+ola.fpb [ERRO] linha: 1 coluna: 1, próximo de ""
+```
+
 caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador, ele soltará um aviso, mas compilará normalmente.
 ## requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
@@ -84,4 +101,6 @@ para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua
 o compilador do gera binários válidos para a arquitetura ARM64 Linux (Android).
 
 ## extra:
+as bibliotecas incluidas com **#incluir** não são linkadas, o assembly é colado ao final do arquivo intermediário ASM antes de ser compilado.
+
 o compilador é auto suficiente, sem a necessidade de libc.so para binários **gerados pelo compilador**, o compilador em si, por ser escrito em C, ainda precisa de libc.so pra funcionar.

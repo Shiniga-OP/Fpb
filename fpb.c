@@ -1009,10 +1009,8 @@ int main(int argc, char** argv) {
     L.pos = 0;
     proximoToken();
 
-    if(argc >= 4 && strcmp(argv[2], "-s") == 0)
-        snprintf(asm_s, sizeof(asm_s), "%s.asm", argv[3]);
-    else
-        snprintf(asm_s, sizeof(asm_s), "%s.asm", argv[1]);
+    if(argc >= 4 && strcmp(argv[2], "-s") == 0) snprintf(asm_s, sizeof(asm_s), "%s.asm", argv[3]);
+    else snprintf(asm_s, sizeof(asm_s), "%s.asm", argv[1]);
 
     FILE* s = fopen(asm_s, "w");
     gerar_prelude(s);
@@ -1046,7 +1044,8 @@ int main(int argc, char** argv) {
     snprintf(cmd, sizeof(cmd), "as %s -o %s", asm_s, asm_o);
     if(system(cmd)) return 3;
 
-    snprintf(cmd, sizeof(cmd), "ld %s -o %s", asm_o, argv[3]);
+    if(argc >= 4 && strcmp(argv[2], "-s") == 0) snprintf(cmd, sizeof(cmd), "ld %s -o %s", asm_o, argv[3]);
+    else snprintf(cmd, sizeof(cmd), "ld %s -o %s", asm_o, argv[1]);
     if(system(cmd)) return 4;
 
     if(!manter_asm) remove(asm_s);

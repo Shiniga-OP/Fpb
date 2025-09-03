@@ -3,10 +3,13 @@ comentarios
 multi linhas
 suportados
 */
-#incluir "biblis/teste.asm"; // incluí uma biblioteca asm
+#incluir "biblis/teste.asm";
 
-// pré definição
+/* incluí uma biblioteca asm */
+
+/* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);
+vazio testeOperacoes();
 vazio teste();
 
 int somar(int a, int b) {
@@ -44,6 +47,18 @@ vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
     escrever("\nnovo inteiro: ", numero);
     escrever("\nnovo caractere: ", letra);
     escrever("\nnovo booleano: ", flag, "\n");
+    // teste operações:
+    testeOperacoes();
+    escrever("\nTeste de biblioteca:\n");
     // teste da biblioteca
     teste();
+}
+
+vazio testeOperacoes() {
+    escrever("\nTeste de operações matematicas:\n");
+    // testando ordem de precedencia:
+    int x = 5 + 5 * 5;
+    escrever("operação 5 + 5 * 5, esperado: 30, veio: ", x, "\n");
+    x = (5 + 5) * 5;
+    escrever("operação (5 + 5) * 5, esperado: 50, veio: ", x, "\n");
 }

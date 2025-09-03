@@ -73,7 +73,6 @@ vazio testeOperacoes() {
 ## como compilar
 para compilar, você deve usar:
 ```Bash
-# TEMPORARIAMENTE INATIVA
 fpb ola
 ```
 ou:

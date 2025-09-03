@@ -104,3 +104,5 @@ o compilador do gera binários válidos para a arquitetura ARM64 Linux (Android)
 as bibliotecas incluidas com **#incluir** não são linkadas, o assembly é colado ao final do arquivo intermediário ASM antes de ser compilado.
 
 o compilador é auto suficiente, sem a necessidade de libc.so para binários **gerados pelo compilador**, o compilador em si, por ser escrito em C, ainda precisa de libc.so pra funcionar.
+
+(f.sh é o shell de compilação que uso pra testar o compilador mais rápido.)

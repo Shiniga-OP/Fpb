@@ -543,6 +543,16 @@ TipoToken tratar_id(FILE* s, int escopo) {
     return var->tipo;
 }
 
+void coletar_parametros(FILE* s, Funcao* f) {
+    f->param_antes = 32;
+    while(L.tk.tipo != T_PAREN_DIR) {
+        declaracao_var(s, &f->param_antes, 0, 1);
+        
+        if(L.tk.tipo == T_VIRGULA) proximoToken();
+        else break;
+    }
+}
+
 TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* fn) {
     proximoToken();
     excessao(T_PAREN_ESQ);
@@ -552,7 +562,6 @@ TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* f
     while(L.tk.tipo != T_PAREN_DIR) {
         TipoToken param_tipo = expressao(s, escopo);
         
-        // conversão de tipos se precisar
         if(param_tipo == T_pFLU && fn->retorno == T_pDOBRO) fprintf(s, "  fcvt d0, s0\n");
         else if(param_tipo == T_pDOBRO && fn->retorno == T_pFLU) fprintf(s, "  fcvt s0, d0\n");
         
@@ -697,7 +706,6 @@ void verificar_retorno(FILE* s, int escopo) {
     fprintf(s, "  b .epilogo_%d\n", fn_cnt-1);
     excessao(T_PONTO_VIRGULA);
 }
-
 
 void escrever_valor(FILE* s, TipoToken tipo) {
     if(tipo == T_pFLU) fprintf(s, "  bl _escrever_flu\n");
@@ -885,16 +893,6 @@ void verificar_stmt(FILE* s, int* antes, int escopo) {
     fatal("declaração inválida");
 }
 
-void coletar_parametros(FILE* s, Funcao* f) {
-    f->param_antes = 16;
-    while(L.tk.tipo != T_PAREN_DIR) {
-        declaracao_var(s, &f->param_antes, 0, 1);
-        
-        if(L.tk.tipo == T_VIRGULA) proximoToken();
-        else break;
-    }
-}
-
 void verificar_fn(FILE* s) {
     TipoToken rt = L.tk.tipo;
     proximoToken();
@@ -972,58 +970,70 @@ void verificar_fn(FILE* s) {
 }
 
 int main(int argc, char** argv) {
-    if(argc < 1) {
-        printf("sem arquivos de entrada\n");
+    if(argc < 2) {
+        printf("FPB: sem arquivos de entrada\n");
         return 1;
     }
     if(strcmp(argv[1], "-v") == 0) {
         printf("[FOCA-DO ESTÚDIOS]\nFPB - v0.0.1 (alpha)\n");
         return 0;
     }
+    if(strcmp(argv[1], "-c") == 0) {
+        printf("[configuração]:\n");
+        printf("max codigo: %i\n", MAX_CODIGO);
+        printf("max variaveis: %i\n", MAX_VAR);
+        printf("max constantes: %i\n", MAX_CONST);
+        printf("max funcoes: %i\n", MAX_FN);
+        printf("max parametros: %i\n", MAX_PARAMS);
+        return 0;
+    }
+
+    char asm_s[128], asm_o[128], cmd[256], nomeArquivo[256];
     arquivoAtual = argv[1];
     
-    int manter_asm = (argc >= 3 && strcmp(argv[2], "-asm") == 0);
-    
-    char* buf = malloc(MAX_CODIGO);
-    char nomeArquivo[256];
+    int manter_asm = ((argc >= 3 && strcmp(argv[2], "-asm") == 0) || (argc >= 5 && strcmp(argv[4], "-asm") == 0));
+
     snprintf(nomeArquivo, sizeof(nomeArquivo), "%s.fpb", argv[1]);
     FILE* en = fopen(nomeArquivo, "r");
     if(!en) {
-        printf("não foi possível abrir %s.fpb\n", argv[1]);
+        printf("FPB: [ERRO] não foi possível abrir %s\n", nomeArquivo);
         return 2;
-	}
-    
+    }
+
+    char* buf = malloc(MAX_CODIGO);
     size_t n = fread(buf, 1, MAX_CODIGO, en);
-    buf[n] = 0; 
+    buf[n] = 0;
     fclose(en);
-    
+
     L.fonte = buf;
     L.pos = 0;
     proximoToken();
-    
-    char asm_s[128], asm_o[128], cmd[256];
-    snprintf(asm_s, 128, "%s.asm", argv[1]);
+
+    if(argc >= 4 && strcmp(argv[2], "-s") == 0)
+        snprintf(asm_s, sizeof(asm_s), "%s.asm", argv[3]);
+    else
+        snprintf(asm_s, sizeof(asm_s), "%s.asm", argv[1]);
+
     FILE* s = fopen(asm_s, "w");
-    
     gerar_prelude(s);
-    
+
     while(L.tk.tipo != T_FIM) {
         if(L.tk.tipo == T_INCLUIR) {
-            int antes_dummy = 0;
-            verificar_stmt(s, &antes_dummy, 0);
+            int antes = 0;
+            verificar_stmt(s, &antes, 0);
         } else verificar_fn(s);
     }
-    
     gerar_consts(s);
-	FILE* bibli = fopen("biblis/impressao.asm", "r");
-	if(!bibli) {
-	    printf("fpb [AVISO]: biblioteca \"biblis/impressao.asm\" não achada\n");
-	    return 3;
-	}
+
+    FILE* bibli = fopen("biblis/impressao.asm", "r");
+    if(!bibli) {
+        printf("FPB: [AVISO] biblioteca \"biblis/impressao.asm\" não achada\n");
+        return 3;
+    }
     char linha[512];
     while(fgets(linha, sizeof(linha), bibli)) {
         size_t tam = strlen(linha);
-        if(tam > 0 && linha[tam-1] != '\n') {
+        if(tam > 0 && linha[tam - 1] != '\n') {
             linha[tam]   = '\n';
             linha[tam+1] = '\0';
         }
@@ -1031,18 +1041,16 @@ int main(int argc, char** argv) {
     }
     fclose(bibli);
     fclose(s);
-    
-    snprintf(asm_o, 128, "%s.o", argv[1]);
-    
-    snprintf(cmd, 256, "as %s -o %s", asm_s, asm_o);
+
+    snprintf(asm_o, sizeof(asm_o), "%s.o", argv[1]);
+    snprintf(cmd, sizeof(cmd), "as %s -o %s", asm_s, asm_o);
     if(system(cmd)) return 3;
-    
-    snprintf(cmd, 256, "ld %s -o %s", asm_o, argv[1]);
+
+    snprintf(cmd, sizeof(cmd), "ld %s -o %s", asm_o, argv[3]);
     if(system(cmd)) return 4;
-    
+
     if(!manter_asm) remove(asm_s);
     remove(asm_o);
-    
     free(buf);
     return 0;
 }

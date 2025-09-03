@@ -73,20 +73,30 @@ vazio testeOperacoes() {
 ## como compilar
 para compilar, você deve usar:
 ```Bash
+# TEMPORARIAMENTE INATIVA
 fpb ola
+```
+ou:
+```Bash
+fpb ola -s /caminho/arquivo
 ```
 não precisa da extensão, o compilador gera o binário com o nome específico automaticamente, por isso não a extensão.
 
 ## configuração extra
 caso você queira o código assembly intermediário, utilize:
 ```Bash
-fpb ola -asm
+fpb ola -s ola -asm
 ```
 assim o arquivo .asm será gerado sem ser apagado.
 
 para ver a versão:
 ```Bash
 fpb -v
+```
+
+as configurações:
+```Bash
+fpb -c
 ```
 
 em caso de erro, você poderá ver algo como:
@@ -105,4 +115,4 @@ as bibliotecas incluidas com **#incluir** não são linkadas, o assembly é cola
 
 o compilador é auto suficiente, sem a necessidade de libc.so para binários **gerados pelo compilador**, o compilador em si, por ser escrito em C, ainda precisa de libc.so pra funcionar.
 
-(f.sh é o shell de compilação que uso pra testar o compilador mais rápido.)
+(f.sh é o shell de compilação que uso pra testar o compilador mais rápido).

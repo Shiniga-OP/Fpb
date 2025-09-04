@@ -17,10 +17,14 @@ typedef enum {
     T_ID, T_INT, T_TEX, T_CAR, T_FLU, T_DOBRO, T_COMENTARIO,
     // simbolos:
     T_PAREN_ESQ, T_PAREN_DIR,  
-    T_COL_ESQ, T_COL_DIR,  
+    T_CHAVE_ESQ, T_CHAVE_DIR,
+    T_COL_ESQ, T_COL_DIR,
     T_PONTO_VIRGULA, T_VIRGULA,  
     // operadores:
     T_IGUAL, T_MAIS, T_MENOS, T_VEZES, T_DIV,
+    // condicionais:
+    T_SE, T_SENAO, T_IGUAL_IGUAL, T_DIFERENTE,
+    T_MAIOR, T_MENOR, T_MAIOR_IGUAL, T_MENOR_IGUAL,
     // retornos:
     T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO,
     T_pLONGO, T_pVAZIO,
@@ -92,39 +96,46 @@ static Tex texs[MAX_TEX];
 static int tex_cnt = 0;
 static char* arquivoAtual;
 
-void proximoToken();
-void verificar_fn(FILE* s);
-void excessao(TipoToken t);
-void fatal(const char* m);
-int tam_tipo(TipoToken t);
+// buscar
 Variavel* buscar_var(const char* nome, int escopo);
 Funcao* buscar_fn(const char* nome);
-int add_const(TipoToken tipo, const char* lex, double d_val, long l_val);
-void gerar_prelude(FILE* s);
-void fim(FILE* s);
+// carregar
 void carregar_valor(FILE* s, Variavel* var);
-void armazenar_valor(FILE* s, Variavel* var);
 void carregar_const(FILE* s, int titulo);
-TipoToken expressao(FILE* s, int escopo);
-void verificar_atribuicao(FILE* s, const char* id, int escopo);
+// declaracao
 void declaracao_var(FILE* s, int* antes, int escopo, int eh_parametro);
-void verificar_retorno(FILE* s, int escopo);
-void escrever_valor(FILE* s, TipoToken tipo);
-void verificar_stmt(FILE* s, int* antes, int escopo);
-char* limpar(const char* s);
-TipoToken termo(FILE* s, int escopo);
+// tratar
 TipoToken tratar_id(FILE* s, int escopo);
 TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* fn);
 TipoToken tratar_inteiro(FILE* s);
 TipoToken tratar_flutuante(FILE* s);
 TipoToken tratar_caractere(FILE* s);
 TipoToken tratar_texto(FILE* s);
+// verificar
+void verificar_fn(FILE* s);
+void verificar_parenteses_extras();
+void verificar_stmt(FILE* s, int* antes, int escopo);
+void verificar_retorno(FILE* s, int escopo);
+void verificar_atribuicao(FILE* s, const char* id, int escopo);
+// add
+int add_tex(const char* valor);
+int add_const(TipoToken tipo, const char* lex, double d_val, long l_val);
+// gerar
+void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo);
 void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo);
-TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual);
+void gerar_prelude(FILE* s);
+// etc
+TipoToken expressao(FILE* s, int escopo);
 TipoToken termo(FILE* s, int escopo);
 TipoToken fator(FILE* s, int escopo);
-void verificar_parenteses_extras();
-int add_tex(const char* valor);
+TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual);
+void excessao(TipoToken t);
+void fatal(const char* m);
+void proximoToken();
+int tam_tipo(TipoToken t);
+void fim(FILE* s);
+void armazenar_valor(FILE* s, Variavel* var);
+void escrever_valor(FILE* s, TipoToken tipo);
 
 // [DEBUG]:
 const char* token_str(TipoToken t) {
@@ -138,8 +149,10 @@ const char* token_str(TipoToken t) {
         case T_COMENTARIO: return "comentário";
         case T_PAREN_ESQ: return "(";
         case T_PAREN_DIR: return ")";
-        case T_COL_ESQ: return "{";
-        case T_COL_DIR: return "}";
+        case T_CHAVE_ESQ: return "{";
+        case T_CHAVE_DIR: return "}";
+        case T_COL_ESQ: return "[";
+        case T_COL_DIR: return "]";
         case T_PONTO_VIRGULA: return ";";
         case T_VIRGULA: return ",";
         case T_IGUAL: return "=";
@@ -147,6 +160,12 @@ const char* token_str(TipoToken t) {
         case T_MENOS: return "-";
         case T_VEZES: return "*";
         case T_DIV: return "/";
+        case T_IGUAL_IGUAL: return "==";
+        case T_DIFERENTE: return "!=";
+        case T_MAIOR: return ">";
+        case T_MENOR: return "<";
+        case T_MAIOR_IGUAL: return ">=";
+        case T_MENOR_IGUAL: return "<=";
         case T_pCAR: return "car";
         case T_pINT: return "int";
         case T_pFLU: return "flu";
@@ -256,7 +275,7 @@ void proximoToken() {
             c = L.fonte[L.pos];
         }
         while(c && isalpha((unsigned char)c)) {
-            if(i < MAX_TOK-1) L.tk.lex[i++] = c;
+            if(i < MAX_TOK - 1) L.tk.lex[i++] = c;
             L.pos++; L.coluna_atual++;
             c = L.fonte[L.pos];
         }
@@ -267,17 +286,20 @@ void proximoToken() {
     if(isalpha((unsigned char)c) || c == '_') {
         i = 0;
         while((c = L.fonte[L.pos]) && (isalnum((unsigned char)c) || c == '_')) {
-            if(i < MAX_TOK-1) L.tk.lex[i++] = c;
+            if(i < MAX_TOK - 1) L.tk.lex[i++] = c;
             L.pos++; L.coluna_atual++;
         }
         L.tk.lex[i] = 0;
-        if (strcmp(L.tk.lex, "car") == 0) L.tk.tipo = T_pCAR;
+        // reconhece tipos
+        if(strcmp(L.tk.lex, "car") == 0) L.tk.tipo = T_pCAR;
         else if(strcmp(L.tk.lex, "int") == 0) L.tk.tipo = T_pINT;
         else if(strcmp(L.tk.lex, "flu") == 0) L.tk.tipo = T_pFLU;
         else if(strcmp(L.tk.lex, "bool") == 0) L.tk.tipo = T_pBOOL;
         else if(strcmp(L.tk.lex, "dobro") == 0) L.tk.tipo = T_pDOBRO;
         else if(strcmp(L.tk.lex, "longo") == 0) L.tk.tipo = T_pLONGO;
         else if(strcmp(L.tk.lex, "vazio") == 0) L.tk.tipo = T_pVAZIO;
+        else if(strcmp(L.tk.lex, "se") == 0) L.tk.tipo = T_SE;
+        else if(strcmp(L.tk.lex, "senao") == 0) L.tk.tipo = T_SENAO;
         else if(strcmp(L.tk.lex, "retorne") == 0) L.tk.tipo = T_RETORNAR;
         else if(strcmp(L.tk.lex, "retornar") == 0) L.tk.tipo = T_RETORNAR;
         else L.tk.tipo = T_ID;
@@ -291,36 +313,43 @@ void proximoToken() {
                 if(ponto) fatal("numero invalido");
                 ponto = 1;
             }
-            if(i < MAX_TOK-1) L.tk.lex[i++] = c;
+            if(i < MAX_TOK - 1) L.tk.lex[i++] = c;
             L.pos++; L.coluna_atual++;
         }
         L.tk.lex[i] = 0;
-        if(ponto) { L.tk.tipo = T_FLU; L.tk.valor_d = atof(L.tk.lex); }
-        else { L.tk.tipo = T_INT; L.tk.valor_l = atol(L.tk.lex); }
+        if(ponto) {
+            L.tk.tipo = T_FLU;
+            L.tk.valor_d = atof(L.tk.lex);
+        } else {
+            L.tk.tipo = T_INT;
+            L.tk.valor_l = atol(L.tk.lex);
+        }
         return;
     }
-
     if(c == '"') {
         L.pos++; L.coluna_atual++;
         i = 0;
         c = L.fonte[L.pos];
         while(c && c != '"') {
-            if(c == '\n') fatal("string mal formada");
+            if(c == '\n') fatal("tex mal formado");
             if(c == '\\') {
                 char n = L.fonte[L.pos + 1];
-                if(!n) fatal("string mal formada");
+                if(!n) fatal("tex mal formado");
                 if(i < MAX_TOK-2) { L.tk.lex[i++] = '\\'; L.tk.lex[i++] = n; }
                 L.pos += 2; L.coluna_atual += 2;
                 c = L.fonte[L.pos];
                 continue;
             }
-            if (i < MAX_TOK-1) L.tk.lex[i++] = c;
+            if(i < MAX_TOK - 1) L.tk.lex[i++] = c;
             L.pos++; L.coluna_atual++;
             c = L.fonte[L.pos];
         }
         L.tk.lex[i] = 0;
-        if(L.fonte[L.pos] == '"') { L.pos++; L.coluna_atual++; }
-        else fatal("string nao fechada");
+        if(L.fonte[L.pos] == '"') {
+            L.pos++;
+            L.coluna_atual++;
+        }
+        else fatal("tex nao fechado");
         L.tk.tipo = T_TEX;
         return;
     }
@@ -344,18 +373,48 @@ void proximoToken() {
         L.tk.tipo = T_CAR;
         return;
     }
-    switch (c) {
+    // caracteres simples:
+    switch(c) {
         case '(': L.tk.tipo = T_PAREN_ESQ; break;
         case ')': L.tk.tipo = T_PAREN_DIR; break;
-        case '{': L.tk.tipo = T_COL_ESQ; break;
-        case '}': L.tk.tipo = T_COL_DIR; break;
+        case '{': L.tk.tipo = T_CHAVE_ESQ; break;
+        case '}': L.tk.tipo = T_CHAVE_DIR; break;
+        case '[': L.tk.tipo = T_COL_ESQ; break;
+        case ']': L.tk.tipo = T_COL_DIR; break;
         case ';': L.tk.tipo = T_PONTO_VIRGULA; break;
         case ',': L.tk.tipo = T_VIRGULA; break;
-        case '=': L.tk.tipo = T_IGUAL; break;
+        case '=':
+            if(L.fonte[L.pos + 1] == '=') {
+                L.tk.tipo = T_IGUAL_IGUAL;
+                L.pos++;
+                L.coluna_atual++;
+            } else L.tk.tipo = T_IGUAL;
+        break;
         case '+': L.tk.tipo = T_MAIS; break;
         case '-': L.tk.tipo = T_MENOS; break;
         case '*': L.tk.tipo = T_VEZES; break;
         case '/': L.tk.tipo = T_DIV; break;
+        case '>':
+            if(L.fonte[L.pos + 1] == '=') {
+                L.tk.tipo = T_MAIOR_IGUAL;
+                L.pos++;
+                L.coluna_atual++;
+            } else L.tk.tipo = T_MAIOR;
+        break;
+        case '<':
+            if(L.fonte[L.pos + 1] == '=') {
+                L.tk.tipo = T_MENOR_IGUAL;
+                L.pos++;
+                L.coluna_atual++;
+            } else L.tk.tipo = T_MENOR;
+        break;
+        case '!':
+            if(L.fonte[L.pos + 1] == '=') {
+                L.tk.tipo = T_DIFERENTE;
+                L.pos++;
+                L.coluna_atual++;
+            }
+        break;
         default: fatal("simbolo invalido"); break;
     }
     L.tk.lex[0] = c;
@@ -490,11 +549,50 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
     armazenar_valor(s, var);
 }
 
+void verificar_se(FILE* s, int escopo) {
+    excessao(T_SE);
+    excessao(T_PAREN_ESQ);
+    
+    TipoToken tipo_cond = expressao(s, escopo);
+    
+    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) fatal("condição deve ser inteiro ou booleano");
+    
+    excessao(T_PAREN_DIR);
+    
+    int rotulo_falso = escopo_global++;
+    fprintf(s, "  cmp w0, 0\n");
+    fprintf(s, "  beq .L%d\n", rotulo_falso);
+    
+    if(L.tk.tipo == T_CHAVE_ESQ) {
+        proximoToken();
+        while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &funcs[fn_cnt-1].tamanho_frame, escopo + 1);
+        excessao(T_CHAVE_DIR);
+    } else verificar_stmt(s, &funcs[fn_cnt-1].tamanho_frame, escopo + 1);
+    
+    int rotulo_fim = escopo_global++;
+    fprintf(s, "  b .L%d\n", rotulo_fim);
+    fprintf(s, ".L%d:\n", rotulo_falso);
+    
+    if(L.tk.tipo == T_SENAO) {
+        proximoToken();
+        if(L.tk.tipo == T_CHAVE_ESQ) {
+            proximoToken();
+            while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &funcs[fn_cnt-1].tamanho_frame, escopo + 1);
+            excessao(T_CHAVE_DIR);
+        } else verificar_stmt(s, &funcs[fn_cnt-1].tamanho_frame, escopo + 1);
+    }
+    fprintf(s, ".L%d:\n", rotulo_fim);
+}
+
 void verificar_stmt(FILE* s, int* antes, int escopo) {
     if(escopo == 0) escopo = escopo_global;
     
     while(L.tk.tipo == T_COMENTARIO) proximoToken();
     
+    if(L.tk.tipo == T_SE) {
+        verificar_se(s, escopo);
+        return;
+    }
     if(L.tk.tipo == T_INCLUIR) {
         proximoToken();
         
@@ -621,15 +719,14 @@ void verificar_stmt(FILE* s, int* antes, int escopo) {
         fprintf(s, "  add sp, sp, %d\n", arg_cnt * 16);
         return;
     }
-    if(L.tk.tipo == T_COL_ESQ) {
+    if(L.tk.tipo == T_CHAVE_ESQ) {
         proximoToken();
         int novo_escopo = ++escopo_global;
         
-        while(L.tk.tipo != T_COL_DIR) verificar_stmt(s, antes, novo_escopo);
+        while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, antes, novo_escopo);
         proximoToken();
         return;
     }
-    
     fatal("declaração inválida");
 }
 
@@ -660,13 +757,13 @@ void verificar_fn(FILE* s) {
     if(L.tk.tipo == T_PONTO_VIRGULA) {
         eh_prototipo = 1;
         proximoToken();
-    } else excessao(T_COL_ESQ);
+    } else excessao(T_CHAVE_ESQ);
 
     if(!eh_prototipo) {
     // calcula tamanho do frame antes de gerar prólogo
     int antes = 0;
     Lexer salvo = L;
-    while(L.tk.tipo != T_COL_DIR) {
+    while(L.tk.tipo != T_CHAVE_DIR) {
         if(L.tk.tipo == T_pCAR || L.tk.tipo == T_pINT || L.tk.tipo == T_pFLU || 
             L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO || L.tk.tipo == T_pLONGO) {
             TipoToken tipo = L.tk.tipo;
@@ -699,7 +796,7 @@ void verificar_fn(FILE* s) {
     fprintf(s, "  stp x19, x20, [sp, -16]!\n");
     
     antes = 0;
-    while(L.tk.tipo != T_COL_DIR) verificar_stmt(s, &antes, 0);
+    while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &antes, 0);
     fprintf(s, ".epilogo_%d:\n", fn_cnt-1);
     fprintf(s, "  ldp x19, x20, [sp], 16\n");
     fprintf(s, "  mov sp, x29\n");
@@ -718,6 +815,16 @@ void gerar_prelude(FILE* s) {
          ".align 2\n"
         "_start:\n"
         "  bl inicio\n\n");
+}
+
+void gerar_texs(FILE* s) {
+    if(tex_cnt == 0) return;
+    fprintf(s, "  .section .rodata\n");
+    for(int i = 0; i < tex_cnt; i++) {
+        fprintf(s, "  .align 2\n");
+        fprintf(s, "%s: .asciz \"%s\"\n", texs[i].nome, texs[i].valor);
+    }
+    fprintf(s, "  .section .text\n\n");
 }
 
 void gerar_consts(FILE* s) {
@@ -759,6 +866,42 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
             else fprintf(s, "  sdiv w0, w1, w0\n");
         break;
         default: fatal("operador inválido");
+    }
+}
+
+void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo) {
+    switch(op) {
+        case T_IGUAL_IGUAL:
+            if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, eq\n");
+            else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, eq\n");
+            else fprintf(s, "  cmp w1, w0\n  cset w0, eq\n");
+        break;
+        case T_DIFERENTE:
+            if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, ne\n");
+            else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, ne\n");
+            else fprintf(s, "  cmp w1, w0\n  cset w0, ne\n");
+        break;
+        case T_MAIOR:
+            if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, gt\n");
+            else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, gt\n");
+            else fprintf(s, "  cmp w1, w0\n  cset w0, gt\n");
+        break;
+        case T_MENOR:
+            if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, lt\n");
+            else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, lt\n");
+            else fprintf(s, "  cmp w1, w0\n  cset w0, lt\n");
+        break;
+        case T_MAIOR_IGUAL:
+            if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, ge\n");
+            else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, ge\n");
+            else fprintf(s, "  cmp w1, w0\n  cset w0, ge\n");
+        break;
+        case T_MENOR_IGUAL:
+            if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, le\n");
+            else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, le\n");
+            else fprintf(s, "  cmp w1, w0\n  cset w0, le\n");
+        break;
+        default: fatal("operador de comparação inválido");
     }
 }
 
@@ -888,16 +1031,6 @@ int add_tex(const char* valor) {
     return tex_cnt - 1;
 }
 
-void gerar_texs(FILE* s) {
-    if(tex_cnt == 0) return;
-    fprintf(s, "  .section .rodata\n");
-    for(int i = 0; i < tex_cnt; i++) {
-        fprintf(s, "  .align 2\n");
-        fprintf(s, "%s: .asciz \"%s\"\n", texs[i].nome, texs[i].valor);
-    }
-    fprintf(s, "  .section .text\n\n");
-}
-
 TipoToken fator(FILE* s, int escopo) {
     if(L.tk.tipo == T_PAREN_ESQ) {
         proximoToken();
@@ -957,6 +1090,31 @@ TipoToken expressao(FILE* s, int escopo) {
         gerar_operacao(s, op, tipo);
     }
     
+    // Operadores de comparação - CORREÇÃO DA SINTAXE
+    if(L.tk.tipo == T_IGUAL_IGUAL || L.tk.tipo == T_DIFERENTE || 
+        L.tk.tipo == T_MAIOR || L.tk.tipo == T_MENOR ||
+        L.tk.tipo == T_MAIOR_IGUAL || L.tk.tipo == T_MENOR_IGUAL) {
+        
+        TipoToken op = L.tk.tipo;
+        proximoToken();
+        
+        // Salvar primeiro operando
+        if (tipo == T_pFLU) fprintf(s, "  fmov s1, s0\n");
+        else if (tipo == T_pDOBRO) fprintf(s, "  fmov d1, d0\n");
+        else fprintf(s, "  mov w1, w0\n");
+        
+        // Avaliar segundo operando
+        TipoToken tipo_dir = termo(s, escopo);
+        
+        // Converter tipos se necessário
+        tipo = converter_tipos(s, tipo, tipo_dir);
+        
+        // Gerar comparação
+        gerar_comparacao(s, op, tipo);
+        
+        tipo = T_pBOOL;  // Resultado é booleano
+    }
+    
     return tipo;
 }
 
@@ -1005,6 +1163,7 @@ int main(int argc, char** argv) {
         printf("max codigo: %i\n", MAX_CODIGO);
         printf("max variaveis: %i\n", MAX_VAR);
         printf("max constantes: %i\n", MAX_CONST);
+        printf("max texs: %i\n", MAX_TEX);
         printf("max funcoes: %i\n", MAX_FN);
         printf("max parametros: %i\n", MAX_PARAMS);
         return 0;
@@ -1046,22 +1205,7 @@ int main(int argc, char** argv) {
     
     gerar_consts(s);
     gerar_texs(s);
-    
-    FILE* bibli = fopen("biblis/impressao.asm", "r");
-    if(!bibli) {
-        printf("FPB: [AVISO] biblioteca \"biblis/impressao.asm\" não achada\n");
-        return 3;
-    }
-    char linha[512];
-    while(fgets(linha, sizeof(linha), bibli)) {
-        size_t tam = strlen(linha);
-        if(tam > 0 && linha[tam - 1] != '\n') {
-            linha[tam]   = '\n';
-            linha[tam+1] = '\0';
-        }
-        fputs(linha, s);
-    }
-    fclose(bibli);
+
     fclose(s);
 
     snprintf(asm_o, sizeof(asm_o), "%s.o", argv[1]);

@@ -3,6 +3,7 @@ comentarios
 multi linhas
 suportados
 */
+#incluir "biblis/impressao.asm"; // agora obrigatorio
 #incluir "biblis/teste.asm";
 
 /* incluí uma biblioteca asm */
@@ -10,16 +11,17 @@ suportados
 /* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);
 vazio testeOperacoes();
+vazio testeComparacoes();
 vazio teste();
 
 int somar(int a, int b) {
-   escrever("\nvalor a: ", a);
-   escrever("\nvalor b: ", b);
+   escrever("valor a: ", a, "\n");
+   escrever("valor b: ", b, "\n");
    retornar a + b;
 }
 
 vazio inicio() {
-    escrever("testando tipos básicos:\n");
+    escrever("Testando tipos básicos:\n");
     car letra = 'A';
     escrever("\ncaractere: ", letra);
     int numero = 42;
@@ -29,18 +31,18 @@ vazio inicio() {
     bool flag = 1;
     escrever("\nbooleano: ", flag);
     
-    escrever("\nTestando função soma:");
+    escrever("\n\nTestando função soma:\n");
     int s = somar(5, 7);
     escrever("\nsoma com retorno 5 + 7 = esperando 12, veio: ", s);
     testeAlteracoes(s, numero, letra, flag);
-    fim();
+    fim(); // encerra o programa
 }
 
 vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
     s = 5 + 7;
     escrever("\nsoma comum 5 + 7 = esperando 12, veio: ", s);
     
-    escrever("\nTestando atribuições:");
+    escrever("\n\nTestando atribuições:\n");
     numero = 100;
     letra = 'Z';
     flag = 0;
@@ -49,16 +51,31 @@ vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
     escrever("\nnovo booleano: ", flag, "\n");
     // teste operações:
     testeOperacoes();
-    escrever("\nTeste de biblioteca:\n");
+    testeComparacoes();
+    escrever("\n\nTeste de biblioteca:\n");
     // teste da biblioteca
     teste();
 }
 
 vazio testeOperacoes() {
-    escrever("\nTeste de operações matematicas:\n");
+    escrever("\n\nTeste de operações matematicas:\n");
     // testando ordem de precedencia:
-    int x = 5 + 5 * 5;
-    escrever("operação 5 + 5 * 5, esperado: 30, veio: ", x, "\n");
-    x = (5 + 5) * 5;
-    escrever("operação (5 + 5) * 5, esperado: 50, veio: ", x, "\n");
+    escrever("operação 5 + 5 * 5, esperado: 30, veio: ", 5 + 5 * 5, "\n");
+    escrever("operação (5 + 5) * 5, esperado: 50, veio: ", (5 + 5) * 5, "\n");
+    
+    escrever(5 + 5, "\n"); // expressão direta
+    escrever(somar(5, 5), "\n"); // retorno passado direto
+}
+
+vazio testeComparacoes() {
+    escrever("\nTeste comparações:\n\n");
+    int x = 6;
+    
+    se(x > 5) {
+        escrever("x é maior que 5\n");
+    } senao se(x >= 5) {
+        escrever("x é maior ou igual a 5\n");
+    } senao {
+        escrever("x não é maior nem igual a 5");
+    }
 }

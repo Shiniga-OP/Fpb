@@ -1,5 +1,30 @@
 .section .text
 .align 2
+// [TEXTO]
+_escrever_tex:
+    stp x29, x30, [sp, -32]!
+    mov x29, sp
+    str x19, [sp, 16]
+    
+    mov x19, x0 // x19 = texto
+    mov x2, 0
+    
+.LTexContar_tam:
+    ldrb w1, [x19, x2]
+    cbz w1, .LTexFim_conta
+    add x2, x2, 1
+    b .LTexContar_tam
+    
+.LTexFim_conta:
+    mov x0, 1
+    mov x1, x19
+    mov x8, 64
+    svc 0
+    
+    ldr x19, [sp, 16]
+    ldp x29, x30, [sp], 32
+    ret
+.align 2
 // [INTEIRO]
 _escrever_int:
     stp x29, x30, [sp, -32]!

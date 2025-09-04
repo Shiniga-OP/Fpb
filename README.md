@@ -10,6 +10,7 @@ comentarios
 multi linhas
 suportados
 */
+#incluir "biblis/impressao.asm"; // agora obrigatorio
 #incluir "biblis/teste.asm";
 
 /* incluí uma biblioteca asm */
@@ -17,6 +18,7 @@ suportados
 /* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);
 vazio testeOperacoes();
+vazio testeComparacoes();
 vazio teste();
 
 int somar(int a, int b) {
@@ -56,6 +58,7 @@ vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
     escrever("\nnovo booleano: ", flag, "\n");
     // teste operações:
     testeOperacoes();
+    testeComparacoes();
     escrever("\n\nTeste de biblioteca:\n");
     // teste da biblioteca
     teste();
@@ -69,6 +72,19 @@ vazio testeOperacoes() {
     
     escrever(5 + 5, "\n"); // expressão direta
     escrever(somar(5, 5), "\n"); // retorno passado direto
+}
+
+vazio testeComparacoes() {
+    escrever("\nTeste comparações:\n\n");
+    int x = 6;
+    
+    se(x > 5) {
+        escrever("x é maior que 5\n");
+    } senao se(x >= 5) {
+        escrever("x é maior ou igual a 5\n");
+    } senao {
+        escrever("x não é maior nem igual a 5");
+    }
 }
 ```
 ## como compilar

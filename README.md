@@ -13,6 +13,7 @@ suportados
 #incluir "biblis/impressao.asm"; // agora obrigatorio
 #incluir "biblis/texs.asm";
 #incluir "biblis/teste.asm";
+#incluir "biblis/mem.asm";
 
 /* incluí uma biblioteca asm */
 
@@ -24,6 +25,7 @@ vazio testeMemoria();
 vazio teste();
 int textam(car* texto);
 int texcar(car* texto, car alvo);
+car[] memcp(car[] array, car* p, int tam);
 
 int somar(int a, int b) {
    escrever("valor a: ", a, "\n");
@@ -103,15 +105,20 @@ vazio testeMemoria() {
 
     se(i >= 0) escrever("\no ponteiro tem t no indice: ", i);
     senao escrever("\no ponteiro não tem t\n");
+    
+    escrever("\nTeste de manipulação da memoria:\n");
+    car[] array = "exemplo";
+    escrever("\nArray padrão: ", array);
+    car* p = "XxXmplo maior";
+    memcp(array, p, textam(p));
+    escrever("\nArray copiado da memoria: ", array);
 }
 ```
 ## como compilar
 para compilar, você deve usar:
 ```Bash
 fpb ola
-```
-ou:
-```Bash
+# ou
 fpb ola -s /caminho/arquivo
 ```
 não precisa da extensão, o compilador gera o binário com o nome específico automaticamente, por isso não a extensão.
@@ -119,6 +126,8 @@ não precisa da extensão, o compilador gera o binário com o nome específico a
 ## configuração extra
 caso você queira o código assembly intermediário, utilize:
 ```Bash
+fpb ola -asm
+# ou
 fpb ola -s ola -asm
 ```
 assim o arquivo .asm será gerado sem ser apagado.
@@ -150,3 +159,5 @@ as bibliotecas incluidas com **#incluir** não são linkadas, o assembly é cola
 o compilador é auto suficiente, sem a necessidade de libc.so para binários **gerados pelo compilador**, o compilador em si, por ser escrito em C, ainda precisa de libc.so pra funcionar.
 
 (f.sh é o shell de compilação que uso pra testar o compilador mais rápido).
+
+use *fpb -ajuda* para visualizar todos comandos.

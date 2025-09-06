@@ -560,8 +560,15 @@ Funcao* buscar_fn(const char* nome) {
 
 void verificar_retorno(FILE* s, int escopo) {
     excessao(T_RETORNAR);
-    expressao(s, escopo);
-    
+    TipoToken tipo_exp = expressao(s, escopo);
+    // em funções que retornam ponteiro/array espera T_pLONGO
+    if(funcs[fn_cnt-1].retorno == T_pLONGO) {
+        if(tipo_exp != T_pLONGO) fatal("retorno deve ser ponteiro ou endereço");
+    } else if (!tipos_compativeis(funcs[fn_cnt-1].retorno, tipo_exp)) {
+        char msg[100];
+        sprintf(msg, "tipo de retorno incompatível");
+        fatal(msg);
+    }
     fprintf(s, "  b .epilogo_%d\n", fn_cnt-1);
     excessao(T_PONTO_VIRGULA);
 }
@@ -802,15 +809,28 @@ void verificar_fn(FILE* s) {
     TipoToken rt = L.tk.tipo;
     proximoToken();
 
+    int eh_ponteiro = 0;
+    int eh_array = 0;
+    int eh_prototipo = 0;
+    
+    if (L.tk.tipo == T_VEZES) {
+        eh_ponteiro = 1;
+        proximoToken();
+    } else if (L.tk.tipo == T_COL_ESQ) {
+        eh_array = 1;
+        proximoToken();
+        excessao(T_COL_DIR);
+    }
+
     if(L.tk.tipo != T_ID) fatal("nome de função esperado");
 
     char fnome[32];
     strcpy(fnome, L.tk.lex);
-    
-    int eh_prototipo = 0;
+    // se é ponteiro ou array, o tipo é T_pLONGO(endereço)
+    TipoToken tipo_real = (eh_ponteiro || eh_array) ? T_pLONGO : rt;
     
     funcs[fn_cnt].var_conta = 0;
-    funcs[fn_cnt].retorno = rt;
+    funcs[fn_cnt].retorno = tipo_real;
     funcs[fn_cnt].escopo_atual = 0;
     funcs[fn_cnt].tamanho_frame = 0;
     funcs[fn_cnt].param_pos = 16;
@@ -820,7 +840,6 @@ void verificar_fn(FILE* s) {
     excessao(T_PAREN_ESQ);
     coletar_args(s, &funcs[fn_cnt - 1]);
     excessao(T_PAREN_DIR);
-
     // pré definição
     if(L.tk.tipo == T_PONTO_VIRGULA) {
         eh_prototipo = 1;
@@ -1310,8 +1329,19 @@ int main(int argc, char** argv) {
         printf("FPB: sem arquivos de entrada\n");
         return 1;
     }
+    if(strcmp(argv[1], "-ajuda") == 0) {
+        printf("[informação]:\n");
+        printf("fpb -v : versão e o distribuidor\n");
+        printf("fpb -c : configurações do compilador\n");
+        printf("[compilação]:\n");
+        printf("fpb exemplo : compila um arquivo.fpb e gera o binário na pasta atual\n");
+        printf("fpb exemplo -s pasta/exemplo : compila um arquivo.fpb e cria um arquivo em um caminho personalizavel\n");
+        printf("fpb exemplo -asm : compila mantendo o ASM intermediario na pasta atual\n");
+        printf("fpb exemplo -s pasta/exemplo -asm : compila mantendo o ASM intermediario na pasta do binário\n");
+        return 0;
+    }
     if(strcmp(argv[1], "-v") == 0) {
-        printf("[FOCA-DO ESTÚDIOS]\nFPB - v0.0.1 (alpha)\n");
+        printf("[FOCA-DO ESTÚDIOS]\nFPB (Fácil Programação Baixo nivel) - v0.0.1 (alpha)\n");
         return 0;
     }
     if(strcmp(argv[1], "-c") == 0) {

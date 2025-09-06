@@ -2,27 +2,24 @@
 .align 2
 // [TEXTO]
 _escrever_tex:
-    stp x29, x30, [sp, -32]!
+    stp x29, x30, [sp, -16]!
     mov x29, sp
-    str x19, [sp, 16]
     
-    mov x19, x0 // x19 = texto
-    mov x2, 0
-    
-.LTexContar_tam:
-    ldrb w1, [x19, x2]
-    cbz w1, .LTexFim_conta
+    mov x1, x0 // x1 = texto
+    mov x2, 0 // x2 = contador
+    // conta caracteres até encontrar null
+1:
+    ldrb w3, [x1, x2]
+    cbz w3, 2f
     add x2, x2, 1
-    b .LTexContar_tam
+    b 1b
     
-.LTexFim_conta:
+2:
     mov x0, 1
-    mov x1, x19
     mov x8, 64
     svc 0
     
-    ldr x19, [sp, 16]
-    ldp x29, x30, [sp], 32
+    ldp x29, x30, [sp], 16
     ret
 .align 2
 // [INTEIRO]
@@ -32,20 +29,20 @@ _escrever_int:
     str x19, [sp, 16] // preserva x19
 
     mov w1, w0 // w1 = número
-    ldr x0, = buffer_int // x0 = buffer
+    ldr x0, = 5f // x0 = buffer
     mov x19, 0 // x19 = contador de caracteres
     
     cmp w1, 0
-    b.ge .LpositivoInt
+    b.ge 1f
     neg w1, w1 // torna positivo
     mov w2, '-'
     strb w2, [x0], 1 // escreve sinal
     mov x19, 1 // contador = 1
 
-.LpositivoInt:
+1:
     // escreve dígitos em ordem reversa
     mov x2, x0 // x2: aponta pra posição atual
-.Lloop:
+2:
     mov w3, 10
     udiv w4, w1, w3 // w4 = quociente
     msub w5, w4, w3, w1 // w5 = resto
@@ -53,23 +50,23 @@ _escrever_int:
     strb w5, [x2], 1 // armazena
     add x19, x19, 1 // incrementa contador
     mov w1, w4
-    cbnz w1, .Lloop
+    cbnz w1, 2b
     // inverte a string de dígitos(a parte após o sinal, se existir)
     // x0: aponta pro início dos dígitos(pode ser buffer_int ou buffer_int+1)
     // x2-1: é o último dígito
     sub x2, x2, 1 // x2 aponta para o último dígito
     mov x3, x0 // x3 aponta para o primeiro dígito
-.LreversoInt:
+3:
     cmp x3, x2
-    b.ge .LescreverInt
+    b.ge 4f
     ldrb w4, [x3]
     ldrb w5, [x2]
     strb w5, [x3], 1
     strb w4, [x2], -1
-    b .LreversoInt
+    b 3b
 
-.LescreverInt:
-    ldr x1, = buffer_int
+4:
+    ldr x1, = 5f
     mov x0, 1
     mov x2, x19 // x19: o número de caracteres
     mov x8, 64
@@ -80,7 +77,7 @@ _escrever_int:
     ret
 
 .section .data
-buffer_int:
+5: // buffer do inteiro
     .fill   32, 1, 0
 //[FLUTUANTE]
 .align 2
@@ -88,48 +85,48 @@ _escrever_flu:
     stp x29, x30, [sp, -64]!
     mov x29, sp
     // s0 contém o valor flutuante
-    adr x1, .Lfloat_buffer // buffer de saída
+    adr x1, 8f // buffer de saída
     mov x6, x1 // salva início do buffer
     // verifica se é negativo
     fcmp s0, 0.0
-    b.ge .LpositivoFlu
+    b.ge 1f
     mov w2, '-' // sinal negativo
     strb w2, [x1], 1
     fneg s0, s0 // torna positivo para conversão
-    b .Lconverter
+    b 2f
     
-.LpositivoFlu:
+1:
     mov     w2, ' ' // espaço para positivo
     strb    w2, [x1], 1
     
-.Lconverter:
+2:
     // parte inteira
     fcvtzs  w2, s0 // converte flutuante para inteiro(trunca)
     mov w3, 10
     mov w4, 0 // contador de dígitos
-    mov x5, sp // usa stack para empilhar dígitos
+    mov x5, sp // usa pilha para empilhar dígitos
     // se parte inteira for zero
-    cbz w2, .Lzero_int
+    cbz w2, 4f
     // converte parte inteira
-.Lloop_int:
+3:
     udiv w7, w2, w3
     msub w8, w7, w3, w2
     add w8, w8, '0'
     strb w8, [x5, -1]! // empilha dígitos
     add w4, w4, 1
     mov w2, w7
-    cbnz w2, .Lloop_int
-    b .Ldesempilha
+    cbnz w2, 3b
+    b 5f
     
-.Lzero_int:
+4:
     mov w7, '0'
     strb w7, [x1], 1
     // desempilha dígitos inteiros
-.Ldesempilha:
+5:
     ldrb w7, [x5], 1
     strb w7, [x1], 1
     subs w4, w4, 1
-    b.ne .Ldesempilha
+    b.ne 5b
     // ponto decimal
     mov w2, '.'
     strb w2, [x1], 1
@@ -157,29 +154,29 @@ _escrever_flu:
     mov x0, 1 // saida de impressão
     mov x1, x6 // início do buffer
     // calcula tamanho: x1 aponta para início, x1+... para final
-    adr x2, .Lfloat_buffer
+    adr x2, 8f
     sub x3, x1, x2 // deslocamento atual
     add x2, x2, x3 // x2 = posição atual
     sub x2, x1, x6 // ERRADO - vamos fazer diferente
-    // estratégia simples: vamos contar até encontrar o null
+    // vamos contar até encontrar o null
     mov x2, 0 // contador
     mov x3, x6 // ponteiro
-.Lcontar:
+6:
     ldrb w4, [x3], 1
-    cbz w4, .Lfim_contagem
+    cbz w4, 7f
     add x2, x2, 1
-    b .Lcontar
+    b 6b
     
-.Lfim_contagem:
+7:
     mov x1, x6 // string do flutuante
-    mov x8, 64 // syscall write
+    mov x8, 64
     svc 0
     
     ldp x29, x30, [sp], 64
     ret
-    .section .data
-    .align 2
-.Lfloat_buffer:
+.section .data
+.align 2
+8: // buffer do flutuante
     .fill   32, 1, 0
 .align 2
 _escrever_double:
@@ -214,20 +211,21 @@ _escrever_bool:
     stp x29, x30, [sp, -16]!
     mov x29, sp
     cmp w0, 0
-    b.eq .Lfalso_caso
-    adr x1, .LverdadeBool
+    b.eq 1f
+    adr x1, 3f
     mov x2, 7
-    b .LimprimirBool
-.Lfalso_caso:
-    adr x1, .LfalsoBool
+    b 2f
+1:
+    adr x1, 4f
     mov x2, 5
-.LimprimirBool:
+2:
     mov x0, 1
     mov x8, 64
     svc 0
     ldp x29, x30, [sp], 16
     ret
-.LverdadeBool:
+// buffers do booleano
+3:
     .asciz "verdade"
-.LfalsoBool:
+4:
     .asciz "falso"

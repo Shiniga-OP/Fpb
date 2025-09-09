@@ -164,6 +164,9 @@ ola.fpb [ERRO] linha: 1 coluna: 1, próximo de ""
 ```
 
 caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador, ele soltará um aviso, mas compilará normalmente.
+# otimizações:
+1. reutilização de constantes.
+2. reutilização de texs.
 # requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
 

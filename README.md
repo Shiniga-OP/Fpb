@@ -180,6 +180,3 @@ o compilador é auto suficiente, sem a necessidade de libc.so para binários **g
 (f.sh é o shell de compilação que uso pra testar o compilador mais rápido).
 
 use *fpb -ajuda* para visualizar todos comandos.
-
-# aviso
-todos os argumentos ainda são passados na pilha.

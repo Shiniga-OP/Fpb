@@ -119,6 +119,26 @@ typedef struct {
     int ultimo_uso;
 } Registrador;
 
+typedef struct {
+    float pesos[8];
+    float bias;
+    float taxa_aprendizado;
+} Perceptron;
+
+/*
+* dados do registrador pra IA:
+* [0] ultimo_uso(normalizado)
+* [1] eh_preservado(0 ou 1)
+* [2] eh_sujo(0 ou 1) 
+* [3] eh_flutuante(0 ou 1)
+* [4] eh_constante(0 ou 1)
+* [5] proximo_uso_estimado(0-1)
+* [6] custo_derramamento(0-1)
+* [7] prioridade_tipo(0-1)
+*/
+
+static Perceptron p;
+
 static Lexer L;
 static Funcao funcs[MAX_FN];
 static int fn_cnt = 0;
@@ -200,6 +220,66 @@ const char* alocar_reg(FILE* s, TipoToken tipo);
 void liberar_reg(const char* reg);
 void derrame(FILE* s, const char* reg_nome);
 const char* achar_pra_derrame();
+
+// [IA]:
+int degrau(float x) {
+    return x > 0 ? 1 : 0;
+}
+
+int prever(float entrada[]) {
+    float soma = p.bias;
+    for(int i = 0; i < 8; i++) soma += p.pesos[i] * entrada[i];
+    return degrau(soma); // 1 = derramar, 0 = manter
+}
+
+void treinar(float entrada[], int saidaEsperada) {
+    int saida = prever(entrada);
+    int erro = saidaEsperada - saida;
+    // ajusta pesos
+    for(int i = 0; i < 8; i++) p.pesos[i] += p.taxa_aprendizado * erro * entrada[i];
+    // ajusta o bias
+    p.bias += p.taxa_aprendizado * erro;
+}
+
+// cada array tem 8 características
+float dados[][8] = {
+    // registradores ruins para derramar(deve derramar = 1)
+    {0.9, 0, 1, 0, 0, 0.1, 0.2, 0.3}, // ultimo uso alto, não preservado, sujo
+    {0.8, 0, 0, 0, 0, 0.2, 0.1, 0.4}, // ultimo uso alto, não preservado
+    {0.7, 0, 1, 1, 0, 0.3, 0.4, 0.2}, // sujo, flutuante, baixa prioridade
+    {0.6, 0, 0, 0, 1, 0.4, 0.3, 0.1}, // constante, próximo uso baixo
+    
+    // registradores bons para manter(deve manter = 0)
+    {0.1, 1, 0, 1, 1, 0.9, 0.8, 0.7}, // preservado, constante, alto próximo uso
+    {0.2, 1, 0, 0, 0, 0.8, 0.7, 0.6}, // preservado, limpo
+    {0.3, 0, 0, 1, 0, 0.7, 0.6, 0.8}, // flutuante, alto próximo uso
+    {0.4, 1, 0, 0, 1, 0.6, 0.5, 0.9} // preservado, constante, alta prioridade
+};
+int saidas_esperadas[] = {1, 1, 1, 1, 0, 0, 0, 0};
+
+int iniciarPerceptron() {
+    // inicializa a IA:
+    for(int i = 0; i < 8; i++) p.pesos[i] = 0;
+    p.bias = 0;
+    p.taxa_aprendizado = 0.1f;
+    // treinamento:
+    for(int epoca = 0; epoca < 500; epoca++) {
+        for(int i = 0; i < 8; i++) treinar(dados[i], saidas_esperadas[i]);
+    }
+    // teste de treino:
+    printf("\n=== Teste do perceptron ===\n");
+    for(int i = 0; i < 8; i++) {
+        int decisao = prever(dados[i]);
+        printf("exemplo %d: Esperado %d -> Decidiu %d [%s]\n", 
+        i, saidas_esperadas[i], decisao, 
+        (decisao == saidas_esperadas[i]) ? "✓" : "✗");
+    }
+    // testa com um novo caso:
+    float novo_reg[] = {0.85, 0, 1, 0, 0, 0.15, 0.25, 0.35};
+    printf("\nnovo registro: Decisão = %d(deve ser 1)\n", prever(novo_reg));
+    
+    return 0;
+}
 
 // [OTIMIZAÇÃO]:
 const char* alocar_reg(FILE* s, TipoToken tipo) {
@@ -772,7 +852,6 @@ void verificar_retorno(FILE* s, int escopo) {
         sprintf(msg, "tipo de retorno incompatível");
         fatal(msg);
     }
-    fprintf(s, "  b .epilogo_%d\n", fn_cnt-1);
     excessao(T_PONTO_VIRGULA);
 }
 
@@ -799,7 +878,7 @@ void verificar_se(FILE* s, int escopo) {
     
     int rotulo_falso = escopo_global++;
     fprintf(s, "  cmp w0, 0\n");
-    fprintf(s, "  beq .L%d\n", rotulo_falso);
+    fprintf(s, "  beq .B%d\n", rotulo_falso);
     
     if(L.tk.tipo == T_CHAVE_ESQ) {
         proximoToken();
@@ -808,8 +887,8 @@ void verificar_se(FILE* s, int escopo) {
     } else verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
     
     int rotulo_fim = escopo_global++;
-    fprintf(s, "  b .L%d\n", rotulo_fim);
-    fprintf(s, ".L%d:\n", rotulo_falso);
+    fprintf(s, "  b .B%d\n", rotulo_fim);
+    fprintf(s, ".B%d:\n", rotulo_falso);
     
     if(L.tk.tipo == T_SENAO) {
         proximoToken();
@@ -819,7 +898,7 @@ void verificar_se(FILE* s, int escopo) {
             excessao(T_CHAVE_DIR);
         } else verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
     }
-    fprintf(s, ".L%d:\n", rotulo_fim);
+    fprintf(s, ".B%d:\n", rotulo_fim);
 }
 
 void verificar_por(FILE* s, int escopo) {
@@ -851,13 +930,13 @@ void verificar_por(FILE* s, int escopo) {
     int rotulo_inicio = escopo_global++;
     int rotulo_fim = escopo_global++;
     
-    fprintf(s, ".L%d:\n", rotulo_inicio);
+    fprintf(s, ".B%d:\n", rotulo_inicio);
     TipoToken tipo_cond = expressao(s, novo_escopo);
     if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
         fatal("condição do loop deve ser inteiro ou booleano");
     }
     fprintf(s, "  cmp w0, 0\n");
-    fprintf(s, "  beq .L%d\n", rotulo_fim);
+    fprintf(s, "  beq .B%d\n", rotulo_fim);
     
     excessao(T_PONTO_VIRGULA);
     
@@ -898,8 +977,8 @@ void verificar_por(FILE* s, int escopo) {
     }
     L = estado_original;
     
-    fprintf(s, "  b .L%d\n", rotulo_inicio);
-    fprintf(s, ".L%d:\n", rotulo_fim);
+    fprintf(s, "  b .N%d\n", rotulo_inicio);
+    fprintf(s, ".B%d:\n", rotulo_fim);
 }
 
 void verificar_enq(FILE* s, int escopo) {
@@ -909,13 +988,13 @@ void verificar_enq(FILE* s, int escopo) {
     int rotulo_inicio = escopo_global++;
     int rotulo_fim = escopo_global++;
     
-    fprintf(s, ".L%d:\n", rotulo_inicio);
+    fprintf(s, ".B%d:\n", rotulo_inicio);
     TipoToken tipo_cond = expressao(s, escopo);
     
     if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) fatal("condição do loop deve ser inteiro ou booleano");
     
     fprintf(s, "  cmp w0, 0\n");
-    fprintf(s, "  beq .L%d\n", rotulo_fim);
+    fprintf(s, "  beq .B%d\n", rotulo_fim);
     
     excessao(T_PAREN_DIR);
     
@@ -927,8 +1006,8 @@ void verificar_enq(FILE* s, int escopo) {
         excessao(T_CHAVE_DIR);
     } else verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
     
-    fprintf(s, "  b .L%d\n", rotulo_inicio);
-    fprintf(s, ".L%d:\n", rotulo_fim);
+    fprintf(s, "  b .B%d\n", rotulo_inicio);
+    fprintf(s, ".B%d:\n", rotulo_fim);
 }
 
 void verificar_stmt(FILE* s, int* pos, int escopo) {
@@ -1144,13 +1223,12 @@ void verificar_fn(FILE* s) {
     if(L.tk.tipo == T_PONTO_VIRGULA) {
         eh_prototipo = 1;
         proximoToken();
-        return; // pré definição não gera código
+        return; // pré definição não gera codigo
     } else excessao(T_CHAVE_ESQ);
 
     if(!eh_prototipo) {
         int pos = -16; // começa apos registros salvos
         Lexer salvo = L;
-        
         // calcular espaço pra variáveis locais
         while(L.tk.tipo != T_CHAVE_DIR) {
             if(L.tk.tipo == T_pCAR || L.tk.tipo == T_pINT || L.tk.tipo == T_pFLU || L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO || L.tk.tipo == T_pLONGO) {
@@ -1175,16 +1253,19 @@ void verificar_fn(FILE* s) {
         }
         L = salvo;
         // calcula o tamanho do frame
-        int frame_tam = ((-pos + 15) & ~15); // alinhado para 16 bytes
-        // espaço para registros salvos (x19-x20, x29-x30) = 32 bytes
-        frame_tam += 32;
+        int frame_tam = ((-pos + 15) & ~15); // alinhado pra 16 bytes
+        
+        // so adiciona espaço para registros se não for função vazio
+        if(tipo_real != T_pVAZIO) frame_tam += 32; // espaço pra registros salvos(x19-x22)
+        
         // espaço para parametros que podem ser salvos
         for(int i = 0; i < funcs[fn_cnt-1].var_conta; i++) {
             Variavel* var = &funcs[fn_cnt-1].vars[i];
             if(var->eh_parametro && var->reg[0] != '\0') frame_tam += 8; // 8 bytes por parâmetro salvo
         }
-        // garante mínimo de 64 bytes e alinhamento de 16
-        frame_tam = (frame_tam < 64) ? 64 : frame_tam;
+        
+        // garante mínimo de 16 bytes e alinhamento de 16
+        frame_tam = (frame_tam < 16) ? 16 : frame_tam;
         frame_tam = (frame_tam + 15) & ~15;
         
         funcs[fn_cnt - 1].frame_tam = frame_tam;
@@ -1192,13 +1273,21 @@ void verificar_fn(FILE* s) {
         // >>>>>>PROLOGO DA FUNÇÃO<<<<<<
         fprintf(s, ".align 2\n");
         fprintf(s, "%s:\n", fnome);
-        fprintf(s, "  stp x29, x30, [sp, -%d]!\n", frame_tam);
-        fprintf(s, "  mov x29, sp\n");
-        fprintf(s, "  stp x19, x20, [x29, 16]\n");
-        fprintf(s, "  stp x21, x22, [x29, 32]\n"); // salva mais registros
+        fprintf(s, "  // [prologo]\n");
+        
+        // prologo diferente para funções vazio
+        if(tipo_real == T_pVAZIO) {
+            fprintf(s, "  stp x29, x30, [sp, -%d]!\n", frame_tam);
+            fprintf(s, "  mov x29, sp\n");
+        } else {
+            fprintf(s, "  stp x29, x30, [sp, -%d]!\n", frame_tam);
+            fprintf(s, "  mov x29, sp\n");
+            fprintf(s, "  stp x19, x20, [x29, 16]\n");
+            fprintf(s, "  stp x21, x22, [x29, 32]\n"); // salva mais registros
+        }
 
-        // SALVAR PARAMETROS QUE ESTÃO EM REGISTRADORES
-        int param_pos = 48; // depois de x19-x22
+        // salva parametros que tão nos registradores
+        int param_pos = (tipo_real == T_pVAZIO) ? 16 : 48; // posição diferente para vazio
         for(int i = 0; i < funcs[fn_cnt-1].var_conta; i++) {
             Variavel* var = &funcs[fn_cnt-1].vars[i];
             if(var->eh_parametro && var->reg[0] != '\0') {
@@ -1208,21 +1297,21 @@ void verificar_fn(FILE* s) {
                 param_pos += 8;
             }
         }
-        // GERA CORPO DA FUNÇÃO
+        // gera o corpo da função
         while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &pos, 0);
         // >>>>>>EPÍLOGO DA FUNÇÃO<<<<<<
-        if(funcs[fn_cnt - 1].retorno == T_pVAZIO) fprintf(s, "  mov x0, 0\n");
-        
-        fprintf(s, "  b .epilogo_%d\n", fn_cnt - 1);
-        fprintf(s, ".epilogo_%d:\n", fn_cnt - 1);
-        
-        // restaura registros
-        fprintf(s, "  ldp x19, x20, [x29, 16]\n");
-        fprintf(s, "  ldp x21, x22, [x29, 32]\n");
-        fprintf(s, "  mov sp, x29\n");
-        fprintf(s, "  ldp x29, x30, [sp], %d\n", frame_tam);
+        fprintf(s, "  // [epilogo]\n");
+        // epilogo diferente para funções vazio
+        if(tipo_real == T_pVAZIO) {
+            fprintf(s, "  mov sp, x29\n");
+            fprintf(s, "  ldp x29, x30, [sp], %d\n", frame_tam);
+        } else {
+            fprintf(s, "  ldp x19, x20, [x29, 16]\n");
+            fprintf(s, "  ldp x21, x22, [x29, 32]\n");
+            fprintf(s, "  mov sp, x29\n");
+            fprintf(s, "  ldp x29, x30, [sp], %d\n", frame_tam);
+        }
         fprintf(s, "  ret\n");
-        
         proximoToken(); // consome }
     }
 }

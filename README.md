@@ -1,3 +1,9 @@
+## AVISO:
+atualmente há um problma na passagem de argumentos arrays entre funções, então evite passar conteudos de arrays por enquanto.
+
+## atualização mais recente:
+em compensassão, o acesso a itens de arrays foi corrigido e agora retornos funcionam perfeitamente em funções de retorno vazio. houve uma otimização de memoria na pilha e no salvamento de registradores. mais atualizações em breve.
+
 ## sobre
 essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível, a implementação usa assembly aarch64 para traduzir código .fpb e assim usar **as** para compilar para .o, usando **ld** para linkagem e execução do binário compilado.
 
@@ -167,6 +173,7 @@ caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador,
 # otimizações:
 1. reutilização de constantes.
 2. reutilização de texs.
+3. primeiros 8 parametros sendo passados por registradores.
 # requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
 

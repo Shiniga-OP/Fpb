@@ -434,8 +434,8 @@ testeAlteracoes:
   bl _escrever_tex
   bl testeOperacoes
   bl testeComparacoes
-  bl testeMemoria
   bl testeLoops
+  bl testeMemoria
   ldr x0, =.tex_15
   bl _escrever_tex
   bl teste
@@ -673,6 +673,20 @@ testeMemoria:
   bl _escrever_tex
   add x0, x29, -80
   bl _escrever_tex
+  ldr x0, =.tex_37
+  bl _escrever_tex
+  mov w0, 0
+  mov w1, w0
+  add x2, x29, -80
+  mov x3, 1
+  mul w1, w1, w3
+  add x2, x2, x1
+  ldrb w0, [x2]
+  strb w0, [x29, -112]
+  ldr x0, =.tex_38
+  bl _escrever_tex
+  ldrb w0, [x29, -112]
+  bl _escrever_car
   // [epilogo]
   mov sp, x29
   ldp x29, x30, [sp], 32
@@ -682,9 +696,9 @@ testeLoops:
   // [prologo]
   stp x29, x30, [sp, -32]!
   mov x29, sp
-  ldr x0, =.tex_37
+  ldr x0, =.tex_39
   bl _escrever_tex
-  ldr x0, =.tex_38
+  ldr x0, =.tex_40
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -32]
@@ -696,7 +710,7 @@ testeLoops:
   cset w0, lt
   cmp w0, 0
   beq .B7
-  ldr x0, =.tex_39
+  ldr x0, =.tex_41
   bl _escrever_tex
   ldr w0, [x29, -32]
   bl _escrever_int
@@ -756,8 +770,10 @@ const_0:
 .tex_34: .asciz "XxXmplo maior"
 .tex_35: .asciz "\nArray copiado da memoria: "
 .tex_36: .asciz "\nArray usando subscar(array, 'X', 'e'): "
-.tex_37: .asciz "\n\nTeste de loops"
-.tex_38: .asciz "\nEnquanto:"
-.tex_39: .asciz "\nvalor de i: "
+.tex_37: .asciz "\nTeste de acesso a itens array:\n"
+.tex_38: .asciz "item do indice 0 do array: "
+.tex_39: .asciz "\n\nTeste de loops"
+.tex_40: .asciz "\nEnquanto:"
+.tex_41: .asciz "\nvalor de i: "
 .section .text
 

@@ -1,5 +1,18 @@
-#incluir "tmp/texint.asm";
+#incluir "biblis/impressao.asm";
+#incluir "biblis/texs.asm";
+
+int textam(car[] arr);
+vazio memadd(car[] arr, car[] arr2);
+
+vazio olhar(car* arr) {
+    escrever("\nesse foi o array recebido: ", arr);
+}
 
 vazio inicio() {
-    escrever("olá mundo");
+    car[] arr = "exemplo array";
+    car[] arr2 = " maior teste";
+    escrever("\nArray: ", arr);
+    se(arr[0] == 'e') retorne;
+    olhar(arr);
+    escrever("\nArray2: ", arr2);
 }

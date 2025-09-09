@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 09/09/2025.
+* [ATUAL]: 08/09/2025.
 * [NOTA]: Implementar otimização de registradores.
 */
 #include <stdio.h>
@@ -868,27 +868,23 @@ void coletar_args(FILE* s, Funcao* f) {
 // [VERIFICAÇÃO]:
 void verificar_retorno(FILE* s, int escopo) {
     excessao(T_RETORNAR);
-    if(L.tk.tipo == T_PONTO_VIRGULA) {
-        fprintf(s, "  b .epilogo_%d\n", fn_cnt - 1);
-        excessao(T_PONTO_VIRGULA);
-        return;
-    }
     TipoToken tipo_exp = expressao(s, escopo);
     // em funções que retornam ponteiro/array espera T_pLONGO
-    if(funcs[fn_cnt - 1].retorno == T_pLONGO) {
-        if(tipo_exp != T_pLONGO) fatal("[verificar_retorno] retorno deve ser ponteiro ou endereço");
-    } else if(!tipos_compativeis(funcs[fn_cnt - 1].retorno, tipo_exp)) {
-        fatal("[verificar_retorno] tipo de retorno incompatível");
+    if(funcs[fn_cnt-1].retorno == T_pLONGO) {
+        if(tipo_exp != T_pLONGO) fatal("retorno deve ser ponteiro ou endereço");
+    } else if(!tipos_compativeis(funcs[fn_cnt-1].retorno, tipo_exp)) {
+        char msg[100];
+        sprintf(msg, "tipo de retorno incompatível");
+        fatal(msg);
     }
-    fprintf(s, "  b .epilogo_%d\n", fn_cnt - 1);
     excessao(T_PONTO_VIRGULA);
 }
 
 void verificar_atribuicao(FILE* s, const char* id, int escopo) {
     Variavel* var = buscar_var(id, escopo);
-    if(!var) fatal("[verificar_atribuicao] variável não declarada");
+    if(!var) fatal("variável não declarada");
     
-    if(var->eh_array) fatal("[verificar_atribuicao] não é possível armazenar valor direto em array");
+    if(var->eh_array) fatal("não é possível armazenar valor direto em array");
     
     excessao(T_IGUAL);
     TipoToken tipo_exp = expressao(s, escopo);
@@ -901,7 +897,7 @@ void verificar_se(FILE* s, int escopo) {
     
     TipoToken tipo_cond = expressao(s, escopo);
     
-    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) fatal("[verificar_se] condição deve ser inteiro ou booleano");
+    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) fatal("condição deve ser inteiro ou booleano");
     
     excessao(T_PAREN_DIR);
     
@@ -911,9 +907,9 @@ void verificar_se(FILE* s, int escopo) {
     
     if(L.tk.tipo == T_CHAVE_ESQ) {
         proximoToken();
-        while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &funcs[fn_cnt - 1].frame_tam, escopo + 1);
+        while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
         excessao(T_CHAVE_DIR);
-    } else verificar_stmt(s, &funcs[fn_cnt - 1].frame_tam, escopo + 1);
+    } else verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
     
     int rotulo_fim = escopo_global++;
     fprintf(s, "  b .B%d\n", rotulo_fim);
@@ -923,9 +919,9 @@ void verificar_se(FILE* s, int escopo) {
         proximoToken();
         if(L.tk.tipo == T_CHAVE_ESQ) {
             proximoToken();
-            while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &funcs[fn_cnt - 1].frame_tam, escopo + 1);
+            while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
             excessao(T_CHAVE_DIR);
-        } else verificar_stmt(s, &funcs[fn_cnt - 1].frame_tam, escopo + 1);
+        } else verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
     }
     fprintf(s, ".B%d:\n", rotulo_fim);
 }
@@ -937,14 +933,14 @@ void verificar_por(FILE* s, int escopo) {
     int novo_escopo = ++escopo_global;
     // declaração da variavel de controle
     if(L.tk.tipo == T_pINT) {
-        declaracao_var(s, &funcs[fn_cnt - 1].frame_tam, novo_escopo, 0);
+        declaracao_var(s, &funcs[fn_cnt-1].frame_tam, novo_escopo, 0);
         excessao(T_PONTO_VIRGULA);
     } else if(L.tk.tipo == T_ID) {
         // atribuição a variavel que existe
         char id[32];
         strcpy(id, L.tk.lex);
         Variavel* var = buscar_var(id, escopo);
-        if(!var) fatal("[verificar_por] variável não declarada");
+        if(!var) fatal("variável não declarada");
         
         proximoToken();
         if(L.tk.tipo == T_IGUAL) verificar_atribuicao(s, id, escopo);
@@ -961,7 +957,7 @@ void verificar_por(FILE* s, int escopo) {
     fprintf(s, ".B%d:\n", rotulo_inicio);
     TipoToken tipo_cond = expressao(s, novo_escopo);
     if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
-        fatal("[verificar_por] condição do loop deve ser inteiro ou booleano");
+        fatal("condição do loop deve ser inteiro ou booleano");
     }
     fprintf(s, "  cmp w0, 0\n");
     fprintf(s, "  beq .B%d\n", rotulo_fim);
@@ -1016,7 +1012,7 @@ void verificar_enq(FILE* s, int escopo) {
     fprintf(s, ".B%d:\n", rotulo_inicio);
     TipoToken tipo_cond = expressao(s, escopo);
     
-    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) fatal("[verificar_enq] condição do loop deve ser inteiro ou booleano");
+    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) fatal("condição do loop deve ser inteiro ou booleano");
     
     fprintf(s, "  cmp w0, 0\n");
     fprintf(s, "  beq .B%d\n", rotulo_fim);
@@ -1053,20 +1049,20 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
     if(L.tk.tipo == T_INCLUIR) {
         proximoToken();
         
-        if(L.tk.tipo != T_TEX) fatal("[verificar_stmt] caminho do arquivo esperado entre aspas");
+        if(L.tk.tipo != T_TEX) fatal("caminho do arquivo esperado entre aspas");
         
         char caminho[256];
         strcpy(caminho, L.tk.lex);
         proximoToken();
         
-        if(L.tk.tipo != T_PONTO_VIRGULA) fatal("[verificar_stmt] ponto e vírgula esperado após o caminho do arquivo");
+        if(L.tk.tipo != T_PONTO_VIRGULA) fatal("ponto e vírgula esperado após o caminho do arquivo");
         
         proximoToken();
         
         FILE* arquivo_include = fopen(caminho, "r");
         if(!arquivo_include) {
             char mensagem_erro[300];
-            snprintf(mensagem_erro, sizeof(mensagem_erro), "[verificar_stmt] não foi possível abrir: %s", caminho);
+            snprintf(mensagem_erro, sizeof(mensagem_erro), "não foi possível abrir: %s", caminho);
             fatal(mensagem_erro);
         }
         fprintf(s, "\n// início de %s\n", caminho);
@@ -1086,11 +1082,11 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
     }
     if(L.tk.tipo == T_DEF) {
         proximoToken();
-        if(L.tk.tipo != T_REG) fatal("[verificar_stmt] registrador esperado");
+        if(L.tk.tipo != T_REG) fatal("registrador esperado");
         char reg[16]; strcpy(reg, L.tk.lex);
         proximoToken(); excessao(T_IGUAL);
         if(L.tk.tipo != T_INT && L.tk.tipo != T_CAR) 
-            fatal("[verificar_stmt] valor inteiro ou caractere esperado");
+            fatal("valor inteiro ou caractere esperado");
         char val[16]; strcpy(val, L.tk.lex);
         proximoToken(); excessao(T_PONTO_VIRGULA);
         fprintf(s, "  mov %s, %s\n", reg, val);
@@ -1125,7 +1121,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         } else if(L.tk.tipo == T_COL_ESQ) {
             // >>>>>>ACESSO A ELEMENTO DE ARRAY<<<<<<
             Variavel* var = buscar_var(idn, escopo);
-            if(!var || !var->eh_array) fatal("[verificar_stmt] não é um array");
+            if(!var || !var->eh_array) fatal("não é um array");
             
             excessao(T_COL_ESQ);
             expressao(s, escopo); // indice(resultado em w0)
@@ -1139,7 +1135,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                 
                 if(!tipos_compativeis(var->tipo_base, tipo_valor)) {
                     char msg[100];
-                    sprintf(msg, "[verificar_stmt] tipo incompatível: esperado %s, encontrado %s", 
+                    sprintf(msg, "tipo incompatível: esperado %s, encontrado %s", 
                             token_str(var->tipo_base), token_str(tipo_valor));
                     fatal(msg);
                 }
@@ -1332,9 +1328,8 @@ void verificar_fn(FILE* s) {
         }
         // gera o corpo da função
         while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &pos, 0);
-        fprintf(s, "  b .epilogo_%d\n", fn_cnt - 1);
         // >>>>>>EPÍLOGO DA FUNÇÃO<<<<<<
-        fprintf(s, ".epilogo_%d:\n", fn_cnt - 1);
+        fprintf(s, "  // [epilogo]\n");
         // epilogo diferente para funções vazio
         if(tipo_real == T_pVAZIO) {
             fprintf(s, "  mov sp, x29\n");

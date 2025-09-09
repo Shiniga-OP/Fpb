@@ -1,0 +1,5 @@
+#incluir "tmp/texint.asm";
+
+vazio inicio() {
+    escrever("Olá mundo\n");
+}

@@ -1,0 +1,24 @@
+#incluir "biblis/texint.asm";
+
+vazio contar(int max) {
+    int i = 0;
+    enq(i < max) {
+        escrever("Contagem: ");
+        escrever(i);
+        escrever("\n");
+        i = i + 1;
+    }
+}
+
+vazio inicio() {
+    contar(5);
+    
+    // Loop for simplificado - sem incremento complexo
+    int j = 0;
+    por(; j < 10;) {
+        escrever("j: ");
+        escrever(j);
+        escrever("\n");
+        j = j + 1; // Incremento dentro do corpo
+    }
+}

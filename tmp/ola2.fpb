@@ -5,7 +5,6 @@ suportados
 */
 #incluir "biblis/impressao.asm";
 #incluir "biblis/texs.asm";
-#incluir "biblis/teste.asm";
 #incluir "biblis/mem.asm";
 
 /* pré definição */
@@ -14,7 +13,6 @@ vazio testeOperacoes();
 vazio testeComparacoes();
 vazio testeMemoria();
 vazio testeLoops();
-vazio teste();
 int textam(car* texto);
 int texcar(car* texto, car alvo);
 vazio subscar(car[] array, car alvo, car novo);
@@ -59,9 +57,6 @@ vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
     testeComparacoes();
     testeLoops();
     testeMemoria();
-    escrever("\n\nTeste de biblioteca:\n");
-    // teste da biblioteca
-    teste();
 }
 
 vazio testeOperacoes() {

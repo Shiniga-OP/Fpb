@@ -1,3 +1,12 @@
+# sobre CFF (Compilador Foca-do em FPB):
+
+compilador de FPB escrito em C++ focado em legibilidade e facilidade.
+
+## estado:
+em desenvolvimento.
+
+# sobre FPB (compilador)
+
 ## AVISO:
 atualmente há um problma na passagem de argumentos arrays entre funções, então evite passar conteudos de arrays por enquanto.
 

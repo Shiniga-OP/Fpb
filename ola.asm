@@ -1,4 +1,3 @@
-.section .data
 .section .text
 .global _start
 .align 2
@@ -81,88 +80,40 @@ _escrever_int:
     .fill   32, 1, 0// fim de tmp/texint.asm
 
 .align 2
-olhar:
-  // [prologo]
-  stp x0, x1, [sp, -32]!
-  mov x0, sp
-  mov x0, x0
-  str x0, [x29, 16]  // salvar param arr
-  mov x0, x1
-  str x0, [x29, 24]  // salvar param teste
-  ldr x0, =.tex_0
-  mov x0, x0
+inicio:
+  stp x29, x30, [sp, -32]!
+  mov x29, sp
+  add x0, x29, 32
+  mov w1, 111
+  strb w1, [x0, 0]
+  mov w1, 108
+  strb w1, [x0, 1]
+  mov w1, 195
+  strb w1, [x0, 2]
+  mov w1, 161
+  strb w1, [x0, 3]
+  mov w1, 32
+  strb w1, [x0, 4]
+  mov w1, 109
+  strb w1, [x0, 5]
+  mov w1, 117
+  strb w1, [x0, 6]
+  mov w1, 110
+  strb w1, [x0, 7]
+  mov w1, 100
+  strb w1, [x0, 8]
+  mov w1, 111
+  strb w1, [x0, 9]
+  mov w1, 92
+  strb w1, [x0, 10]
+  mov w1, 110
+  strb w1, [x0, 11]
+  mov w1, 0
+  strb w1, [x0, 12]
+  add x0, x29, 32
   bl _escrever_tex
-  add x0, x29, 16
-  mov x0, x0
-  bl _escrever_tex
-  ldr x0, =.tex_1
-  mov x0, x0
-  bl _escrever_tex
-  ldr x0, [x29, 24]
-  mov w0, x0
-  bl _escrever_int
   b .epilogo_0
 .epilogo_0:
-  mov sp, x0
-  ldp x0, x1, [sp], 32
+  mov sp, x29
+  ldp x29, x30, [sp], 32
   ret
-.align 2
-inicio:
-  // [prologo]
-  stp x0, x1, [sp, -16]!
-  mov x0, sp
-  add x0, x29, -32
-  mov x1, 101
-  strb x1, [x0, 0]
-  mov x1, 120
-  strb x1, [x0, 1]
-  mov x1, 101
-  strb x1, [x0, 2]
-  mov x1, 109
-  strb x1, [x0, 3]
-  mov x1, 112
-  strb x1, [x0, 4]
-  mov x1, 108
-  strb x1, [x0, 5]
-  mov x1, 111
-  strb x1, [x0, 6]
-  mov x1, 0
-  strb x1, [x0, 7]
-  ldr x0, =.tex_2
-  mov x0, x0
-  bl _escrever_tex
-  add x0, x29, -32
-  mov x0, x0
-  bl _escrever_tex
-  add x0, x29, -32
-  mov x0, x0
-  mov x0, x0
-  str x0, [sp, -16]!
-  mov x0, 5
-  mov w0, x0
-  mov x0, w0
-  str x0, [sp, -16]!
-  ldr x0, [sp, 16]
-  mov x0, x0
-  ldr x0, [sp, 0]
-  mov x1, x0
-  add sp, sp, 32
-  bl olhar
-  ldr x0, =.tex_2
-  mov x0, x0
-  bl _escrever_tex
-  add x0, x29, -32
-  mov x0, x0
-  bl _escrever_tex
-  b .epilogo_1
-.epilogo_1:
-  mov sp, x0
-  ldp x0, x1, [sp], 16
-  ret
-.section .rodata
-.align 2
-.tex_0: .asciz "\nesse foi o array recebido: "
-.tex_1: .asciz " teste: "
-.tex_2: .asciz "\nArray: "
-.section .text
-

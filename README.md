@@ -5,13 +5,13 @@ compilador de FPB escrito em C++ focado em legibilidade e facilidade.
 ## estado:
 em desenvolvimento.
 
-# sobre FPB (compilador)
+# sobre FPB (compilador):
 
 ## AVISO:
-atualmente há um problma na passagem de argumentos arrays entre funções, então evite passar conteudos de arrays por enquanto.
+ainda há problemas de calculo de memoria, não utilize muito arrays dentro de 1 função.
 
 ## atualização mais recente:
-em compensassão, o acesso a itens de arrays foi corrigido e agora retornos funcionam perfeitamente em funções de retorno vazio. houve uma otimização de memoria na pilha e no salvamento de registradores. mais atualizações em breve.
+correção temporaria do uso de arrays.
 
 ## sobre
 essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível, a implementação usa assembly aarch64 para traduzir código .fpb e assim usar **as** para compilar para .o, usando **ld** para linkagem e execução do binário compilado.
@@ -19,15 +19,13 @@ essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível
 ## sintaxe
 a sintaxe é simples, é difícil achar algo estável, mas este é o teste que usei para sintaxe:
 
-```Fpb
-/*
+```Fpb/*
 comentarios
 multi linhas
 suportados
 */
 #incluir "biblis/impressao.asm";
 #incluir "biblis/texs.asm";
-#incluir "biblis/teste.asm";
 #incluir "biblis/mem.asm";
 
 /* pré definição */
@@ -36,7 +34,6 @@ vazio testeOperacoes();
 vazio testeComparacoes();
 vazio testeMemoria();
 vazio testeLoops();
-vazio teste();
 int textam(car* texto);
 int texcar(car* texto, car alvo);
 vazio subscar(car[] array, car alvo, car novo);
@@ -79,11 +76,8 @@ vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
     // teste operações:
     testeOperacoes();
     testeComparacoes();
-    testeMemoria();
     testeLoops();
-    escrever("\n\nTeste de biblioteca:\n");
-    // teste da biblioteca
-    teste();
+    testeMemoria();
 }
 
 vazio testeOperacoes() {
@@ -116,7 +110,9 @@ vazio testeMemoria() {
 
     escrever("\n\nTeste de ponteiro:\n");
     car* ponteiro = "exemplo de ponteiro";
+    
     escrever("\nponteiro texto, valor: ", ponteiro, "\ntamamho em bytes: ", textam(ponteiro));
+    
     int i = texcar(ponteiro, 't');
 
     se(i >= 0) escrever("\no ponteiro tem t no indice: ", i);
@@ -125,6 +121,7 @@ vazio testeMemoria() {
     escrever("\nTeste de manipulação da memoria:\n");
     car[] array = "exemplo";
     escrever("\nArray padrão: ", array);
+    
     car* p = "XxXmplo maior";
     
     memcp(array, p, textam(p));
@@ -133,6 +130,10 @@ vazio testeMemoria() {
     subscar(array, 'X', 'e');
     
     escrever("\nArray usando subscar(array, 'X', 'e'): ", array);
+    
+    escrever("\nTeste de acesso a itens array:\n");
+    car ca = array[0];
+    escrever("item do indice 0 do array: ", ca);
 }
 
 vazio testeLoops() {

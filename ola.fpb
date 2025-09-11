@@ -1,12 +1,6 @@
 #incluir "tmp/texint.asm";
 
-vazio olhar(car[] arr, int teste) {
-    escrever("\nesse foi o array recebido: ", arr, " teste: ", teste);
-}
-
 vazio inicio() {
-    car[] arr = "exemplo";
-    escrever("\nArray: ", arr);
-    olhar(arr, 5);
-    escrever("\nArray: ", arr);
+    car[] ola = "olá mundo\n";
+    escrever(ola);
 }

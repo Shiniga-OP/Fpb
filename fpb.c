@@ -6,8 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 09/09/2025.
-* [NOTA]: Implementar otimização de registradores.
+* [ATUAL]: 11/09/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,13 +18,13 @@
 #define MAX_CODIGO 8192 // maximo de codhgk
 #define MAX_FN 64 // maximo de funções
 #define MAX_VAR 128 // maximo de variaveis
-#define MAX_CONST 128 // maxmio de constpos
+#define MAX_CONST 128 // maxmio de constantes
 #define MAX_PARAMS 8 // maximo de parametros
 #define MAX_TEX 128 // mqximo de textos
 
 typedef enum {
     // tipos:
-    T_ID, T_INT, T_TEX, T_CAR, T_FLU, T_DOBRO, T_LONGO,
+    T_ID, T_INT, T_TEX, T_CAR, T_FLU, T_BOOL, T_DOBRO, T_LONGO,
     T_COMENTARIO,
     // simbolos:
     T_PAREN_ESQ, T_PAREN_DIR,  
@@ -56,8 +55,8 @@ typedef struct {
 typedef struct {
     TipoToken tipo;
     char lex[MAX_TOK];
-    double valor_d; // para constpos de ponto flutuante
-    long valor_l; // para constpos inteiras grandes
+    double valor_d; // pra constantes de ponto flutuante
+    long valor_l; // pra constantes inteiras grandes
     Posicao pos;
 } Token;
 
@@ -66,8 +65,9 @@ typedef struct {
     TipoToken tipo_base;
     int eh_ponteiro;
     int eh_array;
-    int tam_array;
     int eh_parametro;
+    int tam_array;
+    int bytes;
     int pos;
     int escopo;
     char reg[8];
@@ -104,74 +104,15 @@ typedef struct {
     char valor[MAX_TOK];
 } Tex;
 
-typedef struct {
-    char nome[4];
-    int livre;
-    int eh_flu;
-    int eh_dobro;
-    int preservado;
-    int sujo;
-    int constante;
-    union {
-        long valor_int;
-        double valor_flu;
-    };
-    int ultimo_uso;
-} Registrador;
-
-typedef struct {
-    float pesos[8];
-    float bias;
-    float taxa_aprendizado;
-} Perceptron;
-
-/*
-* dados do registrador pra IA:
-* [0] ultimo_uso(normalizado)
-* [1] eh_preservado(0 ou 1)
-* [2] eh_sujo(0 ou 1) 
-* [3] eh_flutuante(0 ou 1)
-* [4] eh_constante(0 ou 1)
-* [5] proximo_uso_estimado(0-1)
-* [6] custo_derramamento(0-1)
-* [7] prioridade_tipo(0-1)
-*/
-
-static Perceptron p;
-
 static Lexer L;
 static Funcao funcs[MAX_FN];
 static int fn_cnt = 0;
 static int escopo_global = 0;
-static Constante constpos[MAX_CONST];
+static Constante constantes[MAX_CONST];
 static int const_cnt = 0;
 static Tex texs[MAX_TEX];
 static int tex_cnt = 0;
 static char* arquivoAtual;
-static int reg_cnt = 0;
-static Registrador regs[] = {
-    // parametros:
-    {"x0", 1, 0, 0, 0, 0, 0, 0},{"x1", 1, 0, 0, 0, 0, 0, 0},
-    {"x2", 1, 0, 0, 0, 0, 0, 0},{"x3", 1, 0, 0, 0, 0, 0, 0},
-    {"x4", 1, 0, 0, 0, 0, 0, 0},{"x5", 1, 0, 0, 0, 0, 0, 0},
-    {"x6", 1, 0, 0, 0, 0, 0, 0},{"x7", 1, 0, 0, 0, 0, 0, 0},
-    // flutuante:
-    {"s0", 1, 1, 0, 0, 0, 0, 0},{"s1", 1, 1, 0, 0, 0, 0, 0},
-    {"s2", 1, 1, 0, 0, 0, 0, 0},{"s3", 1, 1, 0, 0, 0, 0, 0},
-    {"s4", 1, 1, 0, 0, 0, 0, 0},{"s5", 1, 1, 0, 0, 0, 0, 0},
-    {"s6", 1, 1, 0, 0, 0, 0, 0},{"s7", 1, 1, 0, 0, 0, 0, 0},
-    // dobro:
-    {"d0", 1, 0, 1, 0, 0, 0, 0},{"d1", 1, 0, 1, 0, 0, 0, 0},
-    {"d2", 1, 0, 1, 0, 0, 0, 0},{"d3", 1, 0, 1, 0, 0, 0, 0},
-    {"d4", 1, 0, 1, 0, 0, 0, 0},{"d5", 1, 0, 1, 0, 0, 0, 0},
-    {"d6", 1, 0, 1, 0, 0, 0, 0},{"d7", 1, 0, 1, 0, 0, 0, 0},
-    // preservados:
-    {"x19", 1, 0, 0, 1, 0, 0, 0, 0},{"x20", 1, 0, 0, 1, 0, 0, 0, 0},
-    {"x21", 1, 0, 0, 1, 0, 0, 0, 0},{"x22", 1, 0, 0, 1, 0, 0, 0, 0},
-    {"x23", 1, 0, 0, 1, 0, 0, 0, 0},{"x24", 1, 0, 0, 1, 0, 0, 0, 0},
-    {"x25", 1, 0, 0, 1, 0, 0, 0, 0},{"x26", 1, 0, 0, 1, 0, 0, 0, 0},
-    {"x27", 1, 0, 0, 1, 0, 0, 0, 0},{"x28", 1, 0, 0, 1, 0, 0, 0, 0}
-};
 
 // buscar
 Variavel* buscar_var(const char* nome, int escopo);
@@ -190,7 +131,6 @@ TipoToken tratar_caractere(FILE* s);
 TipoToken tratar_texto(FILE* s);
 // verificar
 void verificar_fn(FILE* s);
-void verificar_parenteses_extras();
 void verificar_stmt(FILE* s, int* pos, int escopo);
 void verificar_retorno(FILE* s, int escopo);
 void verificar_atribuicao(FILE* s, const char* id, int escopo);
@@ -212,152 +152,8 @@ void excessao(TipoToken t);
 void fatal(const char* m);
 void proximoToken();
 int tam_tipo(TipoToken t);
-void fim(FILE* s);
 void armazenar_valor(FILE* s, Variavel* var);
 void escrever_valor(FILE* s, TipoToken tipo);
-// registradores:
-const char* alocar_reg(FILE* s, TipoToken tipo);
-void liberar_reg(const char* reg);
-void derrame(FILE* s, const char* reg_nome);
-const char* achar_pra_derrame();
-
-// [IA]:
-int degrau(float x) {
-    return x > 0 ? 1 : 0;
-}
-
-int prever(float entrada[]) {
-    float soma = p.bias;
-    for(int i = 0; i < 8; i++) soma += p.pesos[i] * entrada[i];
-    return degrau(soma); // 1 = derramar, 0 = manter
-}
-
-void treinar(float entrada[], int saidaEsperada) {
-    int saida = prever(entrada);
-    int erro = saidaEsperada - saida;
-    // ajusta pesos
-    for(int i = 0; i < 8; i++) p.pesos[i] += p.taxa_aprendizado * erro * entrada[i];
-    // ajusta o bias
-    p.bias += p.taxa_aprendizado * erro;
-}
-
-// cada array tem 8 características
-float dados[][8] = {
-    // registradores ruins para derramar(deve derramar = 1)
-    {0.9, 0, 1, 0, 0, 0.1, 0.2, 0.3}, // ultimo uso alto, não preservado, sujo
-    {0.8, 0, 0, 0, 0, 0.2, 0.1, 0.4}, // ultimo uso alto, não preservado
-    {0.7, 0, 1, 1, 0, 0.3, 0.4, 0.2}, // sujo, flutuante, baixa prioridade
-    {0.6, 0, 0, 0, 1, 0.4, 0.3, 0.1}, // constante, próximo uso baixo
-    
-    // registradores bons para manter(deve manter = 0)
-    {0.1, 1, 0, 1, 1, 0.9, 0.8, 0.7}, // preservado, constante, alto próximo uso
-    {0.2, 1, 0, 0, 0, 0.8, 0.7, 0.6}, // preservado, limpo
-    {0.3, 0, 0, 1, 0, 0.7, 0.6, 0.8}, // flutuante, alto próximo uso
-    {0.4, 1, 0, 0, 1, 0.6, 0.5, 0.9} // preservado, constante, alta prioridade
-};
-int saidas_esperadas[] = {1, 1, 1, 1, 0, 0, 0, 0};
-
-int iniciarPerceptron() {
-    // inicializa a IA:
-    for(int i = 0; i < 8; i++) p.pesos[i] = 0;
-    p.bias = 0;
-    p.taxa_aprendizado = 0.1f;
-    // treinamento:
-    for(int epoca = 0; epoca < 500; epoca++) {
-        for(int i = 0; i < 8; i++) treinar(dados[i], saidas_esperadas[i]);
-    }
-    // teste de treino:
-    printf("\n=== Teste do perceptron ===\n");
-    for(int i = 0; i < 8; i++) {
-        int decisao = prever(dados[i]);
-        printf("exemplo %d: Esperado %d -> Decidiu %d [%s]\n", 
-        i, saidas_esperadas[i], decisao, 
-        (decisao == saidas_esperadas[i]) ? "✓" : "✗");
-    }
-    // testa com um novo caso:
-    float novo_reg[] = {0.85, 0, 1, 0, 0, 0.15, 0.25, 0.35};
-    printf("\nnovo registro: Decisão = %d(deve ser 1)\n", prever(novo_reg));
-    
-    return 0;
-}
-
-// [OTIMIZAÇÃO]:
-const char* alocar_reg(FILE* s, TipoToken tipo) {
-    reg_cnt++;
-    // tenta achar registrador livre do tipo certo
-    for(int i = 0; i < 32; i++) {
-        if(!regs[i].livre) continue;
-        
-        if(tipo == T_pFLU && regs[i].eh_flu) {
-            regs[i].livre = 0;
-            regs[i].sujo = 1;
-            regs[i].ultimo_uso = reg_cnt;
-            return regs[i].nome;
-        }
-        if(tipo == T_pDOBRO && regs[i].eh_dobro) {
-            regs[i].livre = 0;
-            regs[i].sujo = 1;
-            regs[i].ultimo_uso = reg_cnt;
-            return regs[i].nome;
-        }
-        if((tipo == T_pINT || tipo == T_pCAR) && !regs[i].eh_flu && !regs[i].eh_dobro) {
-            regs[i].livre = 0;
-            regs[i].sujo = 1;
-            regs[i].ultimo_uso = reg_cnt;
-            return regs[i].nome;
-        }
-    }
-    // derrame: acha o registrador menos usado recentemente
-    int menos_usado = -1;
-    int min_uso = INT_MAX;
-    
-    for(int i = 0; i < 32; i++) {
-        if(regs[i].preservado) continue; // evita derrame de preservados primeiro
-        if(regs[i].ultimo_uso < min_uso) {
-            min_uso = regs[i].ultimo_uso;
-            menos_usado = i;
-        }
-    }
-    if(menos_usado == -1) {
-        // usa preservado
-        for(int i = 0; i < 32; i++) {
-            if(regs[i].ultimo_uso < min_uso) {
-                min_uso = regs[i].ultimo_uso;
-                menos_usado = i;
-            }
-        }
-    }
-    derrame(s, regs[menos_usado].nome);
-    regs[menos_usado].livre = 1;
-    return alocar_reg(s, tipo);
-}
-
-void liberar_reg(const char* nome_reg) {
-    for(int i = 0; i < 32; i++) {
-        if(strcmp(regs[i].nome, nome_reg) == 0) {
-            regs[i].livre = 1;
-            regs[i].sujo = 0;
-            regs[i].constante = 0;
-            break;
-        }
-    }
-}
-
-void derrame(FILE* s, const char* reg_nome) {
-    // acha o registrador na lista
-    for(int i = 0; i < 32; i++) {
-        if(strcmp(regs[i].nome, reg_nome) == 0) {
-            // se tá sujo salva na pilha
-            if(regs[i].sujo) {
-                fprintf(s, "  str %s, [sp, -16]!  // [DERRAME] de %s\n", 
-                        reg_nome, reg_nome);
-                regs[i].sujo = 0;
-            }
-            regs[i].livre = 1;
-            break;
-        }
-    }
-}
 
 // [DEBUG]:
 const char* token_str(TipoToken t) {
@@ -367,6 +163,7 @@ const char* token_str(TipoToken t) {
         case T_TEX: return "texto";
         case T_CAR: return "caractere";
         case T_FLU: return "flutuante";
+        case T_BOOL: return "booleano";
         case T_DOBRO: return "dobro";
         case T_COMENTARIO: return "comentário";
         case T_PAREN_ESQ: return "(";
@@ -419,10 +216,6 @@ void excessao(TipoToken t) {
     }
     proximoToken();
 }
-
-void verificar_parenteses_extras() {
-    if(L.tk.tipo == T_PAREN_DIR) fatal("Parêntese extra encontrado");
-}
 // [UTIL]:
 int tam_tipo(TipoToken t) {
     switch(t) {
@@ -446,8 +239,10 @@ void proximoToken() {
     while(1) {
         c = L.fonte[L.pos];
         while(c && isspace((unsigned char)c)) {
-            if(c == '\n') { L.linha_atual++; L.coluna_atual = 1; }
-            else L.coluna_atual++;
+            if(c == '\n') {
+                L.linha_atual++;
+                L.coluna_atual = 1;
+            } else L.coluna_atual++;
             L.pos++;
             c = L.fonte[L.pos];
         }
@@ -500,8 +295,7 @@ void proximoToken() {
             if(c == '\n') {
                 L.linha_atual++;
                 L.coluna_atual = 1;
-            }
-            else L.coluna_atual++;
+            } else L.coluna_atual++;
             L.pos++;
             c = L.fonte[L.pos];
         }
@@ -583,8 +377,7 @@ void proximoToken() {
         if(L.fonte[L.pos] == '"') {
             L.pos++;
             L.coluna_atual++;
-        }
-        else fatal("tex nao fechado");
+        } else fatal("tex nao fechado");
         L.tk.tipo = T_TEX;
         return;
     }
@@ -953,7 +746,6 @@ void verificar_por(FILE* s, int escopo) {
         // pode ser vazio sem inicialização
         excessao(T_PONTO_VIRGULA);
     }
-    
     // condição
     int rotulo_inicio = escopo_global++;
     int rotulo_fim = escopo_global++;
@@ -1167,6 +959,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             excessao(T_PAREN_ESQ);
             
             if(strcmp(idn,"escrever") == 0) {
+                // >>>>>>>ESCREVE NA SAIDA<<<<<<<<
                 while(1) {
                     if(L.tk.tipo == T_ID) {
                         Variavel* var = buscar_var(L.tk.lex, escopo);
@@ -1176,7 +969,8 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                             escrever_valor(s, T_TEX);
                             proximoToken();
                         } else if(var && var->eh_array && var->tipo_base == T_pCAR) {
-                            fprintf(s, "  add x0, x29, %d\n", var->pos);
+                            if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+                            else fprintf(s, "  add x0, x29, %d\n", var->pos);
                             escrever_valor(s, T_TEX);
                             proximoToken();
                         } else {
@@ -1200,7 +994,6 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                 // >>>>>CHAMADA DE FUNÇÃO NORMAL<<<<<
                 Funcao* fn = buscar_fn(idn);
                 if(!fn) fatal("[verificar_stmt] função não declarada");
-                
                 tratar_chamada_funcao(s, escopo, idn, fn);
                 excessao(T_PONTO_VIRGULA);
                 return;
@@ -1262,17 +1055,44 @@ void verificar_fn(FILE* s) {
     if(!eh_prototipo) {
         int pos = -16; // começa apos registros salvos
         Lexer salvo = L;
-        // calcular espaço pra variáveis locais
+        
+        int pos_calculado = -16;
         while(L.tk.tipo != T_CHAVE_DIR) {
-            if(L.tk.tipo == T_pCAR || L.tk.tipo == T_pINT || L.tk.tipo == T_pFLU || L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO || L.tk.tipo == T_pLONGO) {
-                TipoToken tipo = L.tk.tipo;
-                int tam = tam_tipo(tipo);
-                proximoToken();
+            if(L.tk.tipo == T_pCAR || L.tk.tipo == T_pINT || L.tk.tipo == T_pFLU || 
+               L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO || L.tk.tipo == T_pLONGO) {
                 
+                TipoToken tipo_base = L.tk.tipo;
+                int eh_ponteiro_local = 0;
+                int eh_array_local = 0;
+                int tam_array_local = 0;
+
+                proximoToken();
+
+                if(L.tk.tipo == T_VEZES) {
+                    eh_ponteiro_local = 1;
+                    proximoToken();
+                } else if(L.tk.tipo == T_COL_ESQ) {
+                    eh_array_local = 1;
+                    proximoToken();
+                    if(L.tk.tipo == T_INT) {
+                        tam_array_local = L.tk.valor_l;
+                        proximoToken();
+                    }
+                    excessao(T_COL_DIR);
+                }
+                
+                int tam;
+                if(eh_ponteiro_local) {
+                    tam = 8;
+                } else if(eh_array_local) {
+                    tam = (tam_array_local == 0 ? tam_tipo(tipo_base) : tam_array_local * tam_tipo(tipo_base));
+                } else tam = tam_tipo(tipo_base);
+                
+                int alinhamento = eh_ponteiro_local ? 8 : tam_tipo(tipo_base);
+
                 if(L.tk.tipo == T_ID) {
-                    pos -= tam;
-                    // alinhamento para o tipo
-                    pos = pos & ~(tam - 1);
+                    pos_calculado = pos_calculado - tam;
+                    pos_calculado = pos_calculado & ~(alinhamento - 1);
                     proximoToken();
                     
                     if(L.tk.tipo == T_IGUAL) {
@@ -1284,9 +1104,20 @@ void verificar_fn(FILE* s) {
                 }
             } else proximoToken();
         }
+        
         L = salvo;
-        // calcula o tamanho do frame
-        int frame_tam = ((-pos + 15) & ~15); // alinhado pra 16 bytes
+        // usa o pos_calculado como ponto de partida
+        pos = pos_calculado;
+        int frame_tam = ((-pos_calculado + 15) & ~15); // alinhado pra 16 bytes
+        
+        // add espaço extra para operações temporárias da pilha
+        int max = 128; // acesso minimo
+        int tam_necessario = max + 16; // Margem de segurança
+        
+        if(frame_tam < tam_necessario) {
+            frame_tam = tam_necessario;
+            frame_tam = (frame_tam + 15) & ~15;
+        }
         
         // so adiciona espaço para registros se não for função vazio
         if(tipo_real != T_pVAZIO) frame_tam += 32; // espaço pra registros salvos(x19-x22)
@@ -1297,54 +1128,44 @@ void verificar_fn(FILE* s) {
             if(var->eh_parametro && var->reg[0] != '\0') frame_tam += 8; // 8 bytes por parâmetro salvo
         }
         
-        // garante mínimo de 16 bytes e alinhamento de 16
-        frame_tam = (frame_tam < 16) ? 16 : frame_tam;
+        frame_tam = (frame_tam < max + 32) ? max + 32 : frame_tam;
         frame_tam = (frame_tam + 15) & ~15;
         
         funcs[fn_cnt - 1].frame_tam = frame_tam;
-
         // >>>>>>PROLOGO DA FUNÇÃO<<<<<<
         fprintf(s, ".align 2\n");
         fprintf(s, "%s:\n", fnome);
-        fprintf(s, "  // [prologo]\n");
+        fprintf(s, "  stp x29, x30, [sp, -%d]!\n", frame_tam);
+        fprintf(s, "  mov x29, sp\n");
         
-        // prologo diferente para funções vazio
-        if(tipo_real == T_pVAZIO) {
-            fprintf(s, "  stp x29, x30, [sp, -%d]!\n", frame_tam);
-            fprintf(s, "  mov x29, sp\n");
-        } else {
-            fprintf(s, "  stp x29, x30, [sp, -%d]!\n", frame_tam);
-            fprintf(s, "  mov x29, sp\n");
+        if(tipo_real != T_pVAZIO) {
             fprintf(s, "  stp x19, x20, [x29, 16]\n");
-            fprintf(s, "  stp x21, x22, [x29, 32]\n"); // salva mais registros
+            fprintf(s, "  stp x21, x22, [x29, 32]\n");
         }
 
         // salva parametros que tão nos registradores
-        int param_pos = (tipo_real == T_pVAZIO) ? 16 : 48; // posição diferente para vazio
-        for(int i = 0; i < funcs[fn_cnt-1].var_conta; i++) {
-            Variavel* var = &funcs[fn_cnt-1].vars[i];
+        int param_pos = (tipo_real == T_pVAZIO) ? 16 : 48;
+        for(int i = 0; i < funcs[fn_cnt - 1].var_conta; i++) {
+            Variavel* var = &funcs[fn_cnt - 1].vars[i];
             if(var->eh_parametro && var->reg[0] != '\0') {
                 fprintf(s, "  str %s, [x29, %d]  // salvar param %s\n", 
                         var->reg, param_pos, var->nome);
-                var->pos = param_pos; // atualiza posição real
+                var->pos = param_pos;
                 param_pos += 8;
             }
         }
         // gera o corpo da função
         while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &pos, 0);
         fprintf(s, "  b .epilogo_%d\n", fn_cnt - 1);
+        
         // >>>>>>EPÍLOGO DA FUNÇÃO<<<<<<
         fprintf(s, ".epilogo_%d:\n", fn_cnt - 1);
-        // epilogo diferente para funções vazio
-        if(tipo_real == T_pVAZIO) {
-            fprintf(s, "  mov sp, x29\n");
-            fprintf(s, "  ldp x29, x30, [sp], %d\n", frame_tam);
-        } else {
+        if(tipo_real != T_pVAZIO) {
             fprintf(s, "  ldp x19, x20, [x29, 16]\n");
             fprintf(s, "  ldp x21, x22, [x29, 32]\n");
-            fprintf(s, "  mov sp, x29\n");
-            fprintf(s, "  ldp x29, x30, [sp], %d\n", frame_tam);
         }
+        fprintf(s, "  mov sp, x29\n");
+        fprintf(s, "  ldp x29, x30, [sp], %d\n", frame_tam);
         fprintf(s, "  ret\n");
         proximoToken(); // consome }
     }
@@ -1353,7 +1174,6 @@ void verificar_fn(FILE* s) {
 // [GERAÇÃO]:
 void gerar_prelude(FILE* s) {
     fprintf(s,
-        ".section .data\n"
         ".section .text\n"
         ".global _start\n"
          ".align 2\n"
@@ -1381,11 +1201,11 @@ void gerar_consts(FILE* s) {
     fprintf(s, "  .align 8\n");
     for(int i = 0; i < const_cnt; i++) {
         fprintf(s, "const_%d:\n", i);
-        if(constpos[i].tipo == T_INT) fprintf(s, "  .word %ld\n", constpos[i].l_val);
-        else if(constpos[i].tipo == T_FLU) {
-            float f = (float)constpos[i].d_val;
+        if(constantes[i].tipo == T_INT) fprintf(s, "  .word %ld\n", constantes[i].l_val);
+        else if(constantes[i].tipo == T_FLU) {
+            float f = (float)constantes[i].d_val;
             fprintf(s, "  .float %f\n", f);
-        } else if(constpos[i].tipo == T_DOBRO) fprintf(s, "  .double %f\n", constpos[i].d_val);
+        } else if(constantes[i].tipo == T_DOBRO) fprintf(s, "  .double %f\n", constantes[i].d_val);
     }
     fprintf(s, "  .section .text\n\n");
 }
@@ -1483,13 +1303,6 @@ void escrever_valor(FILE* s, TipoToken tipo) {
     else fprintf(s, "  bl _escrever_int\n");
 }
 
-void fim(FILE* s) {
-    fprintf(s,
-        "  mov x8,93\n"
-        "  mov x0,0\n"
-        "  svc 0\n");
-}
-
 void carregar_valor(FILE* s, Variavel* var) {
     if(var->eh_ponteiro) fatal("[carregar_valor] erro interno: carregar_valor chamado para ponteiro");
     else if(var->eh_array) fprintf(s, "  add x0, x29, %d\n", var->pos);
@@ -1539,7 +1352,7 @@ void armazenar_valor(FILE* s, Variavel* var) {
 }
 
 void carregar_const(FILE* s, int titulo) {
-    Constante* c = &constpos[titulo];
+    Constante* c = &constantes[titulo];
     if(c->tipo == T_FLU) {
         fprintf(s, "  ldr x0, = const_%d\n", titulo);
         fprintf(s, "  ldr s0, [x0]\n");
@@ -1554,15 +1367,15 @@ void carregar_const(FILE* s, int titulo) {
 
 int add_const(TipoToken tipo, const char* lex, double d_val, long l_val) {
     for(int i = 0; i < const_cnt; i++) {
-        if(tipo == T_FLU && constpos[i].tipo == T_FLU && fabs(constpos[i].d_val - d_val) < 1e-9)
-            return constpos[i].titulo;
-        if(tipo == T_DOBRO && constpos[i].tipo == T_DOBRO && fabs(constpos[i].d_val - d_val) < 1e-9)
-            return constpos[i].titulo;
-        if(tipo == T_INT && constpos[i].tipo == T_INT && constpos[i].l_val == l_val)
-            return constpos[i].titulo;
+        if(tipo == T_FLU && constantes[i].tipo == T_FLU && fabs(constantes[i].d_val - d_val) < 1e-9)
+            return constantes[i].titulo;
+        if(tipo == T_DOBRO && constantes[i].tipo == T_DOBRO && fabs(constantes[i].d_val - d_val) < 1e-9)
+            return constantes[i].titulo;
+        if(tipo == T_INT && constantes[i].tipo == T_INT && constantes[i].l_val == l_val)
+            return constantes[i].titulo;
     }
-    if(const_cnt >= MAX_CONST) fatal("[add_const] excesso de constpos");
-    Constante* c = &constpos[const_cnt];
+    if(const_cnt >= MAX_CONST) fatal("[add_const] excesso de constantes");
+    Constante* c = &constantes[const_cnt];
     c->tipo = tipo;
     strcpy(c->lex, lex);
     c->d_val = d_val;
@@ -1582,16 +1395,6 @@ int add_tex(const char* valor) {
     sprintf(tex->nome, ".tex_%d", tex_cnt);
     tex_cnt++;
     return tex_cnt - 1;
-}
-
-void empurrar_arg(FILE* s, TipoToken tipo) {
-    if(tipo == T_pFLU) fprintf(s, "  str s0, [sp, -16]!\n");
-    else if(tipo == T_pDOBRO) fprintf(s, "  str d0, [sp, -16]!\n");
-    else {
-        int tam = tam_tipo(tipo);
-        if(tam <= 4) fprintf(s, "  str w0, [sp, -16]!\n");
-        else fprintf(s, "  str x0, [sp, -16]!\n");
-    }
 }
 
 TipoToken fator(FILE* s, int escopo) {
@@ -1641,8 +1444,8 @@ TipoToken expressao(FILE* s, int escopo) {
         TipoToken op = L.tk.tipo;
         proximoToken();
         // salva o valor atual
-        if (tipo == T_pFLU) fprintf(s, "  fmov s1, s0\n");
-        else if (tipo == T_pDOBRO) fprintf(s, "  fmov d1, d0\n");
+        if(tipo == T_pFLU) fprintf(s, "  fmov s1, s0\n");
+        else if(tipo == T_pDOBRO) fprintf(s, "  fmov d1, d0\n");
         else fprintf(s, "  mov w1, w0\n");
         
         TipoToken tipo_dir = termo(s, escopo);
@@ -1659,7 +1462,7 @@ TipoToken expressao(FILE* s, int escopo) {
         proximoToken();
         // salva primeiro operando
         if(tipo == T_pFLU) fprintf(s, "  fmov s1, s0\n");
-        else if (tipo == T_pDOBRO) fprintf(s, "  fmov d1, d0\n");
+        else if(tipo == T_pDOBRO) fprintf(s, "  fmov d1, d0\n");
         else fprintf(s, "  mov w1, w0\n");
         //  segundo operando
         TipoToken tipo_dir = termo(s, escopo);
@@ -1715,9 +1518,13 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro) {
     var->eh_ponteiro = eh_ponteiro;
     var->eh_array = eh_array;
     var->tam_array = tam_array;
-    var->pos = *pos;
+    
+    if(eh_parametro) var->pos = *pos;
+    else var->pos = -(*pos);
+
     var->escopo = escopo;
     var->eh_parametro = eh_parametro;
+    var->bytes = tam;
     f->var_conta++;
 
     proximoToken();
@@ -1726,11 +1533,13 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro) {
         proximoToken();
         
         if(eh_array && tipo_base == T_pCAR && L.tk.tipo == T_TEX) {
+            var->bytes = 0;
             const char* texto_valor = L.tk.lex;
             fprintf(s, "  add x0, x29, %d\n", var->pos);
             for(int i = 0; i <= strlen(texto_valor); i++) {
                 fprintf(s, "  mov w1, %d\n", texto_valor[i]);
                 fprintf(s, "  strb w1, [x0, %d]\n", i);
+                var->bytes += 1;
             }
             proximoToken();
         } else if(eh_array) {
@@ -1771,13 +1580,13 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro) {
             armazenar_valor(s, var);
         }
     }
-    if(eh_parametro) *pos += 16;
+    if(eh_parametro) *pos += 8;
 }
 
 int main(int argc, char** argv) {
     if(argc < 2) {
         printf("FPB: sem arquivos de entrada\n");
-        return 1;
+        return 0;
     }
     if(strcmp(argv[1], "-ajuda") == 0) {
         printf("[informação]:\n");
@@ -1798,7 +1607,7 @@ int main(int argc, char** argv) {
         printf("[configuração]:\n");
         printf("max codigo: %i\n", MAX_CODIGO);
         printf("max variaveis: %i\n", MAX_VAR);
-        printf("max constpos: %i\n", MAX_CONST);
+        printf("max constantes: %i\n", MAX_CONST);
         printf("max texs: %i\n", MAX_TEX);
         printf("max funcoes: %i\n", MAX_FN);
         return 0;

@@ -89,7 +89,9 @@ vazio testeMemoria() {
 
     escrever("\n\nTeste de ponteiro:\n");
     car* ponteiro = "exemplo de ponteiro";
+    
     escrever("\nponteiro texto, valor: ", ponteiro, "\ntamamho em bytes: ", textam(ponteiro));
+    
     int i = texcar(ponteiro, 't');
 
     se(i >= 0) escrever("\no ponteiro tem t no indice: ", i);
@@ -98,6 +100,7 @@ vazio testeMemoria() {
     escrever("\nTeste de manipulação da memoria:\n");
     car[] array = "exemplo";
     escrever("\nArray padrão: ", array);
+    
     car* p = "XxXmplo maior";
     
     memcp(array, p, textam(p));
@@ -106,6 +109,7 @@ vazio testeMemoria() {
     subscar(array, 'X', 'e');
     
     escrever("\nArray usando subscar(array, 'X', 'e'): ", array);
+    
     escrever("\nTeste de acesso a itens array:\n");
     car ca = array[0];
     escrever("item do indice 0 do array: ", ca);

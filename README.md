@@ -19,7 +19,8 @@ essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível
 ## sintaxe
 a sintaxe é simples, é difícil achar algo estável, mas este é o teste que usei para sintaxe:
 
-```Fpb/*
+```Fpb
+/*
 comentarios
 multi linhas
 suportados

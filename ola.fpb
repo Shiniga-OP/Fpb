@@ -1,6 +1,5 @@
 #incluir "biblis/texint.asm";
 
 vazio inicio() {
-    car[] arr = "olá mundo";
-    escrever(arr);
+    escrever("olá mundo\n");
 }

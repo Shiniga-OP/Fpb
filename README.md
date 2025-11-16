@@ -8,7 +8,7 @@ em desenvolvimento.
 # sobre FPB (compilador):
 
 ## AVISO:
-ainda há problemas de calculo de memoria, não utilize muito arrays dentro de 1 função.
+o gerenciamento de memória dos arrays locais finalmente foi consertado.
 
 ## atualização mais recente:
 correção temporaria do uso de arrays.

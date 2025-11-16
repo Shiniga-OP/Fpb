@@ -81,35 +81,19 @@ _escrever_int:
 
 .align 2
 inicio:
-  stp x29, x30, [sp, -160]!
+  sub sp, sp, 160
+  stp x29, x30, [sp]
   mov x29, sp
-  add x0, x29, 32
-  mov w1, 111
-  strb w1, [x0, 0]
-  mov w1, 108
-  strb w1, [x0, 1]
-  mov w1, 195
-  strb w1, [x0, 2]
-  mov w1, 161
-  strb w1, [x0, 3]
-  mov w1, 32
-  strb w1, [x0, 4]
-  mov w1, 109
-  strb w1, [x0, 5]
-  mov w1, 117
-  strb w1, [x0, 6]
-  mov w1, 110
-  strb w1, [x0, 7]
-  mov w1, 100
-  strb w1, [x0, 8]
-  mov w1, 111
-  strb w1, [x0, 9]
-  mov w1, 0
-  strb w1, [x0, 10]
-  add x0, x29, 32
+  ldr x0, =.tex_0
   bl _escrever_tex
   b .epilogo_0
 .epilogo_0:
   mov sp, x29
-  ldp x29, x30, [sp], 160
+  ldp x29, x30, [sp]
+  add sp, sp, 160
   ret
+.section .rodata
+.align 2
+.tex_0: .asciz "olá mundo\n"
+.section .text
+

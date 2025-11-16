@@ -1230,7 +1230,7 @@ void verificar_fn(FILE* s) {
 
                 if(L.tk.tipo == T_ID) {
                     pos_calculado = pos_calculado - tam;
-                    pos_calculado = pos_calculado & ~(alinhamento - 1);
+                    pos_calculado = pos_calculado & ~15;
                     proximoToken();
                     
                     if(L.tk.tipo == T_IGUAL) {
@@ -1245,7 +1245,6 @@ void verificar_fn(FILE* s) {
         
         L = salvo;
         // usa o pos_calculado como ponto de partida
-        pos = pos_calculado;
         int frame_tam = ((-pos_calculado + 15) & ~15); // alinhado pra 16 bytes
         
         // add espaço extra para operações temporárias da pilha
@@ -1256,7 +1255,6 @@ void verificar_fn(FILE* s) {
             frame_tam = tam_necessario;
             frame_tam = (frame_tam + 15) & ~15;
         }
-        
         // so adiciona espaço para registros se não for função vazio
         if(tipo_real != T_pVAZIO) frame_tam += 32; // espaço pra registros salvos(x19-x22)
         
@@ -1265,7 +1263,6 @@ void verificar_fn(FILE* s) {
             Variavel* var = &funcs[fn_cnt-1].vars[i];
             if(var->eh_parametro && var->reg[0] != '\0') frame_tam += 8; // 8 bytes por parâmetro salvo
         }
-        
         frame_tam = (frame_tam < max + 32) ? max + 32 : frame_tam;
         frame_tam = (frame_tam + 15) & ~15;
         
@@ -1273,14 +1270,17 @@ void verificar_fn(FILE* s) {
         // >>>>>>PROLOGO DA FUNÇÃO<<<<<<
         fprintf(s, ".align 2\n");
         fprintf(s, "%s:\n", fnome);
-        fprintf(s, "  stp x29, x30, [sp, -%d]!\n", frame_tam);
+        // aloca o frame grande primeiro
+        fprintf(s, "  sub sp, sp, %d\n", frame_tam);
+        // salva os registradores na base do novo frame
+        fprintf(s, "  stp x29, x30, [sp]\n"); 
+        // aponta o frame pointer para a base
         fprintf(s, "  mov x29, sp\n");
         
         if(tipo_real != T_pVAZIO) {
             fprintf(s, "  stp x19, x20, [x29, 16]\n");
             fprintf(s, "  stp x21, x22, [x29, 32]\n");
         }
-
         // salva parametros que tão nos registradores
         int param_pos = (tipo_real == T_pVAZIO) ? 16 : 48;
         for(int i = 0; i < funcs[fn_cnt - 1].var_conta; i++) {
@@ -1303,7 +1303,10 @@ void verificar_fn(FILE* s) {
             fprintf(s, "  ldp x21, x22, [x29, 32]\n");
         }
         fprintf(s, "  mov sp, x29\n");
-        fprintf(s, "  ldp x29, x30, [sp], %d\n", frame_tam);
+        // restaura os registradores da base
+        fprintf(s, "  ldp x29, x30, [sp]\n"); 
+        // libera o frame grande
+        fprintf(s, "  add sp, sp, %d\n", frame_tam);
         fprintf(s, "  ret\n");
         proximoToken(); // consome }
     }

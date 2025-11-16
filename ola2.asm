@@ -279,7 +279,8 @@ memcp:
 
 .align 2
 somar:
-  stp x29, x30, [sp, -192]!
+  sub sp, sp, 192
+  stp x29, x30, [sp]
   mov x29, sp
   stp x19, x20, [x29, 16]
   stp x21, x22, [x29, 32]
@@ -308,38 +309,40 @@ somar:
   ldp x19, x20, [x29, 16]
   ldp x21, x22, [x29, 32]
   mov sp, x29
-  ldp x29, x30, [sp], 192
+  ldp x29, x30, [sp]
+  add sp, sp, 192
   ret
 .align 2
 inicio:
-  stp x29, x30, [sp, -160]!
+  sub sp, sp, 160
+  stp x29, x30, [sp]
   mov x29, sp
   ldr x0, =.tex_3
   bl _escrever_tex
   mov w0, 65
-  strb w0, [x29, 48]
+  strb w0, [x29, 32]
   ldr x0, =.tex_4
   bl _escrever_tex
-  ldrb w0, [x29, 48]
+  ldrb w0, [x29, 32]
   bl _escrever_car
   mov w0, 42
-  str w0, [x29, 64]
+  str w0, [x29, 48]
   ldr x0, =.tex_5
   bl _escrever_tex
-  ldr w0, [x29, 64]
+  ldr w0, [x29, 48]
   bl _escrever_int
   ldr x0, = const_0
   ldr s0, [x0]
-  str s0, [x29, 80]
+  str s0, [x29, 64]
   ldr x0, =.tex_6
   bl _escrever_tex
-  ldr s0, [x29, 80]
+  ldr s0, [x29, 64]
   bl _escrever_flu
   mov w0, 1
-  strb w0, [x29, 96]
+  strb w0, [x29, 80]
   ldr x0, =.tex_7
   bl _escrever_tex
-  ldrb w0, [x29, 96]
+  ldrb w0, [x29, 80]
   bl _escrever_bool
   ldr x0, =.tex_8
   bl _escrever_tex
@@ -351,18 +354,18 @@ inicio:
   ldr x1, [sp, 0]
   add sp, sp, 32
   bl somar
-  str w0, [x29, 112]
+  str w0, [x29, 96]
   ldr x0, =.tex_9
   bl _escrever_tex
-  ldr w0, [x29, 112]
+  ldr w0, [x29, 96]
   bl _escrever_int
-  ldr w0, [x29, 112]
+  ldr w0, [x29, 96]
   str w0, [sp, -16]!
-  ldr w0, [x29, 64]
+  ldr w0, [x29, 48]
   str w0, [sp, -16]!
-  ldrb w0, [x29, 48]
+  ldrb w0, [x29, 32]
   str w0, [sp, -16]!
-  ldrb w0, [x29, 96]
+  ldrb w0, [x29, 80]
   str w0, [sp, -16]!
   ldr x0, [sp, 48]
   ldr x1, [sp, 32]
@@ -373,11 +376,13 @@ inicio:
   b .epilogo_10
 .epilogo_10:
   mov sp, x29
-  ldp x29, x30, [sp], 160
+  ldp x29, x30, [sp]
+  add sp, sp, 160
   ret
 .align 2
 testeAlteracoes:
-  stp x29, x30, [sp, -176]!
+  sub sp, sp, 176
+  stp x29, x30, [sp]
   mov x29, sp
   str x0, [x29, 16]  // salvar param s
   str x1, [x29, 24]  // salvar param numero
@@ -422,11 +427,13 @@ testeAlteracoes:
   b .epilogo_11
 .epilogo_11:
   mov sp, x29
-  ldp x29, x30, [sp], 176
+  ldp x29, x30, [sp]
+  add sp, sp, 176
   ret
 .align 2
 testeOperacoes:
-  stp x29, x30, [sp, -160]!
+  sub sp, sp, 160
+  stp x29, x30, [sp]
   mov x29, sp
   ldr x0, =.tex_15
   bl _escrever_tex
@@ -491,11 +498,13 @@ testeOperacoes:
   b .epilogo_12
 .epilogo_12:
   mov sp, x29
-  ldp x29, x30, [sp], 160
+  ldp x29, x30, [sp]
+  add sp, sp, 160
   ret
 .align 2
 testeComparacoes:
-  stp x29, x30, [sp, -160]!
+  sub sp, sp, 160
+  stp x29, x30, [sp]
   mov x29, sp
   ldr x0, =.tex_19
   bl _escrever_tex
@@ -564,15 +573,17 @@ testeComparacoes:
   b .epilogo_13
 .epilogo_13:
   mov sp, x29
-  ldp x29, x30, [sp], 160
+  ldp x29, x30, [sp]
+  add sp, sp, 160
   ret
 .align 2
 testeMemoria:
-  stp x29, x30, [sp, -160]!
+  sub sp, sp, 160
+  stp x29, x30, [sp]
   mov x29, sp
   ldr x0, =.tex_25
   bl _escrever_tex
-  add x0, x29, 64
+  add x0, x29, 32
   mov w1, 116
   strb w1, [x0, 0]
   mov w1, 101
@@ -587,37 +598,37 @@ testeMemoria:
   strb w1, [x0, 5]
   ldr x0, =.tex_26
   bl _escrever_tex
-  add x0, x29, 64
+  add x0, x29, 32
   bl _escrever_tex
   mov w0, 0
   mov w1, w0
   mov w0, 88
-  add x2, x29, 64
+  add x2, x29, 32
   mov x3, 1
   mul w1, w1, w3
   add x2, x2, x1
   strb w0, [x2]
   ldr x0, =.tex_27
   bl _escrever_tex
-  add x0, x29, 64
+  add x0, x29, 32
   bl _escrever_tex
   ldr x0, =.tex_28
   bl _escrever_tex
   ldr x0, = .tex_29
-  str x0, [x29, 80]
+  str x0, [x29, 48]
   ldr x0, =.tex_30
   bl _escrever_tex
-  ldr x0, [x29, 80]
+  ldr x0, [x29, 48]
   bl _escrever_tex
   ldr x0, =.tex_31
   bl _escrever_tex
-  ldr x0, [x29, 80]
+  ldr x0, [x29, 48]
   str x0, [sp, -16]!
   ldr x0, [sp, 0]
   add sp, sp, 16
   bl textam
   bl _escrever_int
-  ldr x0, [x29, 80]
+  ldr x0, [x29, 48]
   str x0, [sp, -16]!
   mov w0, 116
   str w0, [sp, -16]!
@@ -625,8 +636,8 @@ testeMemoria:
   ldr x1, [sp, 0]
   add sp, sp, 32
   bl texcar
-  str w0, [x29, 96]
-  ldr w0, [x29, 96]
+  str w0, [x29, 64]
+  ldr w0, [x29, 64]
   str w0, [sp, -16]!
   mov w0, 0
   ldr w1, [sp], 16
@@ -636,7 +647,7 @@ testeMemoria:
   beq .B12
   ldr x0, =.tex_32
   bl _escrever_tex
-  ldr w0, [x29, 96]
+  ldr w0, [x29, 64]
   bl _escrever_int
   b .B13
 .B12:
@@ -645,7 +656,7 @@ testeMemoria:
 .B13:
   ldr x0, =.tex_34
   bl _escrever_tex
-  add x0, x29, 112
+  add x0, x29, 80
   mov w1, 101
   strb w1, [x0, 0]
   mov w1, 120
@@ -664,15 +675,15 @@ testeMemoria:
   strb w1, [x0, 7]
   ldr x0, =.tex_35
   bl _escrever_tex
-  add x0, x29, 112
+  add x0, x29, 80
   bl _escrever_tex
   ldr x0, = .tex_36
-  str x0, [x29, 128]
-  add x0, x29, 112
+  str x0, [x29, 96]
+  add x0, x29, 80
   str x0, [sp, -16]!
-  ldr x0, [x29, 128]
+  ldr x0, [x29, 96]
   str x0, [sp, -16]!
-  ldr x0, [x29, 128]
+  ldr x0, [x29, 96]
   str x0, [sp, -16]!
   ldr x0, [sp, 0]
   add sp, sp, 16
@@ -685,9 +696,9 @@ testeMemoria:
   bl memcp
   ldr x0, =.tex_37
   bl _escrever_tex
-  add x0, x29, 112
+  add x0, x29, 80
   bl _escrever_tex
-  add x0, x29, 112
+  add x0, x29, 80
   str x0, [sp, -16]!
   mov w0, 88
   str w0, [sp, -16]!
@@ -700,30 +711,32 @@ testeMemoria:
   bl subscar
   ldr x0, =.tex_38
   bl _escrever_tex
-  add x0, x29, 112
+  add x0, x29, 80
   bl _escrever_tex
   ldr x0, =.tex_39
   bl _escrever_tex
   mov w0, 0
   mov w1, w0
-  add x2, x29, 112
+  add x2, x29, 80
   mov x3, 1
   mul w1, w1, w3
   add x2, x2, x1
   ldrb w0, [x2]
-  strb w0, [x29, 144]
+  strb w0, [x29, 112]
   ldr x0, =.tex_40
   bl _escrever_tex
-  ldrb w0, [x29, 144]
+  ldrb w0, [x29, 112]
   bl _escrever_car
   b .epilogo_14
 .epilogo_14:
   mov sp, x29
-  ldp x29, x30, [sp], 160
+  ldp x29, x30, [sp]
+  add sp, sp, 160
   ret
 .align 2
 testeLoops:
-  stp x29, x30, [sp, -160]!
+  sub sp, sp, 160
+  stp x29, x30, [sp]
   mov x29, sp
   ldr x0, =.tex_41
   bl _escrever_tex
@@ -780,7 +793,8 @@ testeLoops:
   b .epilogo_15
 .epilogo_15:
   mov sp, x29
-  ldp x29, x30, [sp], 160
+  ldp x29, x30, [sp]
+  add sp, sp, 160
   ret
   .section .rodata
   .align 8

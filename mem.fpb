@@ -1,7 +1,5 @@
 #incluir "tmp/texint.asm";
 
 vazio inicio() {
-    por(int i = 0; i < 100; i = i + 1) {
-        escrever("indice: ", i, "\n");
-    }
+    int[1000] num;
 }

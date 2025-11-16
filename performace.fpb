@@ -19,11 +19,23 @@ vazio teste_loops() {
     
     enq(i < 500) {
         j = 0;
-        enq (j < 500) {
+        enq(j < 500) {
             soma = soma + (i * j) % 97;
             j = j + 1;
         }
         i = i + 1;
+    }
+    escrever("Soma loops: ", soma, "\n");
+}
+
+vazio teste_loops_por() {
+    escrever("=== TESTE LOOPS COM POR ===\n");
+    int soma = 0;
+    
+    por(int i = 0; i < 500; i = i + 1) {
+        por(int j = 0; j < 500; j = j + 1) {
+            soma = soma + (i * j) % 97;
+        }
     }
     escrever("Soma loops: ", soma, "\n");
 }
@@ -33,11 +45,10 @@ vazio teste_operacoes() {
     int x = 0;
     int total = 0;
     
-    enq(x < 10000) {
-        se (x % 3 == 0 && x > 100) {
+    por(int x = 0; x < 10000; x = x + 1) {
+        se(x % 3 == 0 && x > 100) {
             total = total + x;
         }
-        x = x + 1;
     }
     escrever("Total: ", total, "\n");
 }
@@ -46,6 +57,7 @@ vazio inicio() {
     escrever("TESTE DE PERFORMACE\n");
     escrever("=======================\n");
     teste_fibonacci();
+    teste_loops_por();
     teste_loops();
     teste_operacoes();
     escrever("=======================\n");

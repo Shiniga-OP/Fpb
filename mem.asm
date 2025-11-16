@@ -81,39 +81,12 @@ _escrever_int:
 
 .align 2
 inicio:
-  stp x29, x30, [sp, -160]!
+  sub sp, sp, 4016
+  stp x29, x30, [sp]
   mov x29, sp
-  mov w0, 0
-  str w0, [x29, -144]
-.B1:
-  ldr w0, [x29, -144]
-  str w0, [sp, -16]!
-  mov w0, 100
-  ldr w1, [sp], 16
-  cmp w1, w0
-  cset w0, lt
-  cmp w0, 0
-  beq .B2
-  ldr x0, =.tex_0
-  bl _escrever_tex
-  ldr w0, [x29, -144]
-  bl _escrever_int
-  ldr x0, =.tex_1
-  bl _escrever_tex
-  // incremento
-  ldr w0, [x29, -144]
-  add w0, w0, 1
-  str w0, [x29, -144]
-  b .B1
-.B2:
   b .epilogo_0
 .epilogo_0:
   mov sp, x29
-  ldp x29, x30, [sp], 160
+  ldp x29, x30, [sp]
+  add sp, sp, 4016
   ret
-.section .rodata
-.align 2
-.tex_0: .asciz "indice: "
-.tex_1: .asciz "\n"
-.section .text
-

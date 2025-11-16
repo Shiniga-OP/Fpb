@@ -155,6 +155,10 @@ vazio testeLoops() {
         escrever("\nvalor de i: ", i);
         i = i + 1;
     }
+    escrever("\n\nPor:\n");
+    por(int i = 0; i < 10; i = i + 1) {
+        escrever("indice: ", i, "\n");
+    }
 }
 ```
 ## como compilar

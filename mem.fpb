@@ -1,53 +1,7 @@
 #incluir "tmp/texint.asm";
 
-int fib(int n) {
-    se(n <= 1) retorne n;
-    retorne fib(n - 1) + fib(n - 2);
-}
-
-vazio teste_fibonacci() {
-    escrever("=== TESTE FIBONACCI ===\n");
-    int resultado = fib(15);  // Valor menor para teste
-    escrever("Fibonacci(15) = ", resultado, "\n");
-}
-
-vazio teste_loops() {
-    escrever("=== TESTE LOOPS ANINHADOS ===\n");
-    int soma = 0;
-    int i = 0;
-    int j = 0;
-    
-    enq(i < 500) {
-        j = 0;
-        enq (j < 500) {
-            soma = soma + (i * j) % 97;
-            j = j + 1;
-        }
-        i = i + 1;
-    }
-    escrever("Soma loops: ", soma, "\n");
-}
-
-vazio teste_operacoes() {
-    escrever("=== TESTE OPERAÇÕES ===\n");
-    int x = 0;
-    int total = 0;
-    
-    enq(x < 10000) {
-        se (x % 3 == 0 && x > 100) {
-            total = total + x;
-        }
-        x = x + 1;
-    }
-    escrever("Total: ", total, "\n");
-}
-
 vazio inicio() {
-    escrever("TESTE DE PERFORMACE\n");
-    escrever("=======================\n");
-    teste_fibonacci();
-    teste_loops();
-    teste_operacoes();
-    escrever("=======================\n");
-    escrever("FIM\n");
+    por(int i = 0; i < 100; i = i + 1) {
+        escrever("indice: ", i, "\n");
+    }
 }

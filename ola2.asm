@@ -752,6 +752,31 @@ testeLoops:
   str w0, [x29, 32]
   b .B14
 .B15:
+  ldr x0, =.tex_44
+  bl _escrever_tex
+  mov w0, 0
+  str w0, [x29, -144]
+.B17:
+  ldr w0, [x29, -144]
+  str w0, [sp, -16]!
+  mov w0, 10
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, lt
+  cmp w0, 0
+  beq .B18
+  ldr x0, =.tex_45
+  bl _escrever_tex
+  ldr w0, [x29, -144]
+  bl _escrever_int
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  // incremento
+  ldr w0, [x29, -144]
+  add w0, w0, 1
+  str w0, [x29, -144]
+  b .B17
+.B18:
   b .epilogo_15
 .epilogo_15:
   mov sp, x29
@@ -809,5 +834,7 @@ const_0:
 .tex_41: .asciz "\n\nTeste de loops"
 .tex_42: .asciz "\nEnquanto:"
 .tex_43: .asciz "\nvalor de i: "
+.tex_44: .asciz "\n\nPor:\n"
+.tex_45: .asciz "indice: "
 .section .text
 

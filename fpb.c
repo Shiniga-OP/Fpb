@@ -823,22 +823,22 @@ void verificar_por(FILE* s, int escopo) {
     excessao(T_PAREN_ESQ);
     
     int novo_escopo = ++escopo_global;
-    // declaração da variavel de controle
+    // declaração
     if(L.tk.tipo == T_pINT) {
         declaracao_var(s, &funcs[fn_cnt - 1].frame_tam, novo_escopo, 0);
         excessao(T_PONTO_VIRGULA);
     } else if(L.tk.tipo == T_ID) {
-        // atribuição a variavel que existe
         char id[32];
         strcpy(id, L.tk.lex);
         Variavel* var = buscar_var(id, escopo);
         if(!var) fatal("[verificar_por] variável não declarada");
         
         proximoToken();
-        if(L.tk.tipo == T_IGUAL) verificar_atribuicao(s, id, escopo);
+        if(L.tk.tipo == T_IGUAL) {
+            verificar_atribuicao(s, id, escopo);
+        }
         excessao(T_PONTO_VIRGULA);
     } else {
-        // pode ser vazio sem inicialização
         excessao(T_PONTO_VIRGULA);
     }
     // condição
@@ -852,44 +852,87 @@ void verificar_por(FILE* s, int escopo) {
     }
     fprintf(s, "  cmp w0, 0\n");
     fprintf(s, "  beq .B%d\n", rotulo_fim);
-    
     excessao(T_PONTO_VIRGULA);
     
-    size_t inicio_incremento = L.pos;
+    // salva tokens do incremento
+    Token incremento_tokens[32];
+    int incremento_conta = 0;
     
-    while(L.tk.tipo != T_PAREN_DIR && L.tk.tipo != T_FIM) proximoToken();
+    while(L.tk.tipo != T_PAREN_DIR && L.tk.tipo != T_FIM && incremento_conta < 31) {
+        incremento_tokens[incremento_conta] = L.tk;
+        incremento_conta++;
+        proximoToken();
+    }
+    incremento_tokens[incremento_conta].tipo = T_FIM;
     
-    size_t fim_incremento = L.pos;
     excessao(T_PAREN_DIR);
-    
+    // corpo do loop
     if(L.tk.tipo == T_CHAVE_ESQ) {
         proximoToken();
-        while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
+        while(L.tk.tipo != T_CHAVE_DIR) {
+            verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
+        }
         excessao(T_CHAVE_DIR);
-    } else verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
+    } else {
+        verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
+    }
+    // gera código do incremento
     fprintf(s, "  // incremento\n");
-    
-    Lexer estado_original = L;
-    
-    L.pos = inicio_incremento;
-    L.linha_atual = estado_original.linha_atual;
-    L.coluna_atual = estado_original.coluna_atual;
-    proximoToken();
-    
-    while(L.pos < fim_incremento) {
-        if(L.tk.tipo == T_ID) {
+    // salva estado atual
+    Lexer salvo = L;
+    // processa tokens do incremento
+    for(int i = 0; i < incremento_conta; i++) {
+        L.tk = incremento_tokens[i];
+        
+        if(L.tk.tipo == T_ID && i + 1 < incremento_conta && incremento_tokens[i + 1].tipo == T_IGUAL) {
+            // se é uma atribuição:
             char id[32];
             strcpy(id, L.tk.lex);
-            proximoToken();
+            i++; // pula o '='
+            // processa o valor
+            i++; // vai pro proximo token apos '='
+            while(i < incremento_conta && incremento_tokens[i].tipo != T_VIRGULA && incremento_tokens[i].tipo != T_FIM) {
+                L.tk = incremento_tokens[i];
+                
+                if(L.tk.tipo == T_ID) {
+                    Variavel* var = buscar_var(L.tk.lex, novo_escopo);
+                    if(var) carregar_valor(s, var);
+                    else fatal("[verificar_por] variável não encontrada");
+                } else if(L.tk.tipo == T_INT) {
+                    fprintf(s, "  mov w0, %ld\n", L.tk.valor_l);
+                } else if(L.tk.tipo == T_MAIS) {
+                    // processa adição
+                    i++;
+                    L.tk = incremento_tokens[i];
+                    if(L.tk.tipo == T_INT) {
+                        fprintf(s, "  add w0, w0, %ld\n", L.tk.valor_l);
+                    } else if(L.tk.tipo == T_ID) {
+                        Variavel* var = buscar_var(L.tk.lex, novo_escopo);
+                        if(var) {
+                            carregar_valor(s, var);
+                            fprintf(s, "  add w0, w0, w1\n");
+                        } else {
+                            fatal("[verificar_por] variável não encontrada");
+                        }
+                    }
+                }
+                i++;
+            }
+            // armazena resultado
+            Variavel* dest_var = buscar_var(id, novo_escopo);
+            if(dest_var) {
+                fprintf(s, "  str w0, [x29, %d]\n", dest_var->pos);
+            } else {
+                fatal("[verificar_por] variável destino não encontrada");
+            }
             
-            if(L.tk.tipo == T_IGUAL) verificar_atribuicao(s, id, novo_escopo);
-            else expressao(s, novo_escopo);
-        } else expressao(s, novo_escopo);
-        if(L.tk.tipo == T_VIRGULA) proximoToken();
+            break; // processa apenas uma atribuição
+        }
     }
-    L = estado_original;
+    // restaura estado
+    L = salvo;
     
-    fprintf(s, "  b .N%d\n", rotulo_inicio);
+    fprintf(s, "  b .B%d\n", rotulo_inicio);
     fprintf(s, ".B%d:\n", rotulo_fim);
 }
 

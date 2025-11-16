@@ -89,6 +89,8 @@ vazio testeOperacoes() {
 
     escrever(5 + 5, "\n"); // expressão direta
     escrever(somar(5, 5), "\n"); // retorno passado direto
+    
+    escrever("10 % 3 = ?, esperado: 1, recebido: ", 10 % 3, "\n");
 }
 
 vazio testeComparacoes() {
@@ -100,6 +102,14 @@ vazio testeComparacoes() {
     } senao se(x >= 5) {
         escrever("x é maior ou igual a 5\n");
     } senao escrever("x não é maior nem igual a 5\n");
+    
+    int y = 5;
+    
+    se(y >= 4 && x > 4) {
+        escrever("y >= 4 && x > 4 é verdadeiro");
+    } senao {
+        escrever("y >= 4 && x > 4 é falso");
+    }
 }
 
 vazio testeMemoria() {

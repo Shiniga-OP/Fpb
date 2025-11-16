@@ -1,0 +1,19 @@
+#incluir "biblis/impressao.asm";
+
+vazio inicio() {
+    int a = 10;
+    int b = 5;
+    int c = 0;
+    
+    int resultado1 = 0;
+    se(a > b && b > 0) resultado1 = 1;
+    escrever(resultado1);
+    
+    int resultado2 = 0;
+    se(a > b && c > 0) resultado2 = 1;
+    escrever(resultado2);
+
+    int resultado3 = 0;
+    se(c > 0 && a > b) resultado3 = 1;
+    escrever(resultado3);
+}

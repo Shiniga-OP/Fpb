@@ -1,6 +1,6 @@
-#incluir "tmp/texint.asm";
+#incluir "biblis/texint.asm";
 
 vazio inicio() {
-    car[] ola = "olá mundo\n";
-    escrever(ola);
+    car[] arr = "olá mundo";
+    escrever(arr);
 }

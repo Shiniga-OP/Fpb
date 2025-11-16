@@ -7,7 +7,7 @@ _start:
   mov x8, 93
   svc 0
 
-// início de tmp/texint.asm
+// início de biblis/texint.asm
 .section .text
 .align 2
 // [TEXTO]
@@ -77,11 +77,11 @@ _escrever_int:
 .section .data
   .align 2
 5: // buffer do inteiro
-    .fill   32, 1, 0// fim de tmp/texint.asm
+    .fill   32, 1, 0// fim de biblis/texint.asm
 
 .align 2
 inicio:
-  stp x29, x30, [sp, -32]!
+  stp x29, x30, [sp, -160]!
   mov x29, sp
   add x0, x29, 32
   mov w1, 111
@@ -104,16 +104,12 @@ inicio:
   strb w1, [x0, 8]
   mov w1, 111
   strb w1, [x0, 9]
-  mov w1, 92
-  strb w1, [x0, 10]
-  mov w1, 110
-  strb w1, [x0, 11]
   mov w1, 0
-  strb w1, [x0, 12]
+  strb w1, [x0, 10]
   add x0, x29, 32
   bl _escrever_tex
   b .epilogo_0
 .epilogo_0:
   mov sp, x29
-  ldp x29, x30, [sp], 32
+  ldp x29, x30, [sp], 160
   ret

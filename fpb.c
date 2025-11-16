@@ -1737,30 +1737,31 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro) {
             }
             proximoToken();
         } else if(eh_array) {
-    excessao(T_CHAVE_ESQ);
-    int i = 0;
-    while(L.tk.tipo != T_CHAVE_DIR) {
-        if(tam_array > 0 && i >= tam_array) fatal("[declaracao_var] excesso de elementos");
-        TipoToken tipo_valor = expressao(s, escopo);
-        if(tipo_valor != tipo_base) fatal("[declaracao_var] tipo incompatível");
-        int pos = var->pos + i * tam_tipo(tipo_base);
-        if(pos >= 0) {
-            // usa o registrador certo baseado no tipo
-            if(tipo_base == T_pCAR || tipo_base == T_pBOOL) fprintf(s, "  strb w0, [x29, %d]\n", pos);
-            else if(tipo_base == T_pINT) fprintf(s, "  str w0, [x29, %d]\n", pos);  // usa str para inteiros
-            else if(tipo_base == T_pFLU) fprintf(s, "  str s0, [x29, %d]\n", pos);
-            else if(tipo_base == T_pDOBRO) fprintf(s, "  str d0, [x29, %d]\n", pos);
-        } else {
-            fprintf(s, "  mov x1, %d\n", pos);
-            if(tipo_base == T_pCAR || tipo_base == T_pINT || tipo_base == T_pBOOL) fprintf(s, "  strb w0, [x29, x1]\n");  // w0 em vez de x0
-            else if(tipo_base == T_pFLU) fprintf(s, "  str s0, [x29, x1]\n");
-            else if(tipo_base == T_pDOBRO) fprintf(s, "  str d0, [x29, x1]\n");
-        }
-        i++;
-        if(L.tk.tipo == T_VIRGULA) proximoToken();
-    }
-    excessao(T_CHAVE_DIR);
-    if(var->tam_array == 0) var->tam_array = i;
+            excessao(T_CHAVE_ESQ);
+            int i = 0;
+            while(L.tk.tipo != T_CHAVE_DIR) {
+                if(tam_array > 0 && i >= tam_array) fatal("[declaracao_var] excesso de elementos");
+                TipoToken tipo_valor = expressao(s, escopo);
+                if(tipo_valor != tipo_base) fatal("[declaracao_var] tipo incompatível");
+                int pos = var->pos + i * tam_tipo(tipo_base);
+                if(pos >= 0) {
+                    // usa o registrador certo baseado no tipo
+                    if(tipo_base == T_pCAR || tipo_base == T_pBOOL) fprintf(s, "  strb w0, [x29, %d]\n", pos);
+                    else if(tipo_base == T_pINT) fprintf(s, "  str w0, [x29, %d]\n", pos);  // usa str para inteiros
+                    else if(tipo_base == T_pFLU) fprintf(s, "  str s0, [x29, %d]\n", pos);
+                    else if(tipo_base == T_pDOBRO) fprintf(s, "  str d0, [x29, %d]\n", pos);
+                } else {
+                    fprintf(s, "  mov x1, %d\n", pos);
+                    if(tipo_base == T_pCAR || tipo_base == T_pBOOL) fprintf(s, "  strb w0, [x29, x1]\n");  // w0 em vez de x0
+                    else if(tipo_base == T_pINT) fprintf(s, "  str w0, [x29, x1]\n");
+                    else if(tipo_base == T_pFLU) fprintf(s, "  str s0, [x29, x1]\n");
+                    else if(tipo_base == T_pDOBRO) fprintf(s, "  str d0, [x29, x1]\n");
+                }
+                i++;
+                if(L.tk.tipo == T_VIRGULA) proximoToken();
+            }
+            excessao(T_CHAVE_DIR);
+            if(var->tam_array == 0) var->tam_array = i;
         } else if(eh_ponteiro && L.tk.tipo == T_TEX) {
             int id_tex = add_tex(L.tk.lex);
             fprintf(s, "  ldr x0, = %s\n", texs[id_tex].nome);

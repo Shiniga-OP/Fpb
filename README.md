@@ -1,20 +1,11 @@
-# sobre CFF (Compilador Foca-do em FPB):
+# sobre CFF (Compilador Foca-do em FPB) (C++):
+descontinuado.
 
-compilador de FPB escrito em C++ focado em legibilidade e facilidade.
+# sobre FPB (compilador) (C):
+essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível, a implementação usa assembly aarch64 para traduzir código .fpb e assim usar **as** para compilar para .o, usando **ld** para linkagem e execução do binário compilado.
 
 ## estado:
 em desenvolvimento.
-
-# sobre FPB (compilador):
-
-## AVISO:
-o gerenciamento de memória dos arrays locais finalmente foi consertado.
-
-## atualização mais recente:
-correção temporaria do uso de arrays.
-
-## sobre
-essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível, a implementação usa assembly aarch64 para traduzir código .fpb e assim usar **as** para compilar para .o, usando **ld** para linkagem e execução do binário compilado.
 
 ## sintaxe
 este é um código que testa maior parte dos recursos e margem de erros:

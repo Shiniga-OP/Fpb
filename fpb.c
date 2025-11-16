@@ -1537,14 +1537,23 @@ TipoToken termo(FILE* s, int escopo) {
         TipoToken op = L.tk.tipo;
         proximoToken();
         
-        if(tipo == T_pFLU) fprintf(s, "  fmov s1, s0\n");
-        else if (tipo == T_pDOBRO) fprintf(s, "  fmov d1, d0\n");
-        else fprintf(s, "  mov w1, w0\n");
-        
+        if(tipo == T_pFLU) {
+            fprintf(s, "  str s0, [sp, -16]!\n");
+        } else if (tipo == T_pDOBRO) {
+            fprintf(s, "  str d0, [sp, -16]!\n");
+        } else {
+            fprintf(s, "  str w0, [sp, -16]!\n");
+        }
         TipoToken tipo_dir = fator(s, escopo);
         
+        if(tipo == T_pFLU) {
+            fprintf(s, "  ldr s1, [sp], 16\n");
+        } else if (tipo == T_pDOBRO) {
+            fprintf(s, "  ldr d1, [sp], 16\n");
+        } else {
+            fprintf(s, "  ldr w1, [sp], 16\n");
+        }
         tipo = converter_tipos(s, tipo, tipo_dir);
-        
         gerar_operacao(s, op, tipo);
     }
     return tipo;
@@ -1553,23 +1562,30 @@ TipoToken termo(FILE* s, int escopo) {
 TipoToken expressao(FILE* s, int escopo) {
     TipoToken tipo = termo(s, escopo);
     
-    while(L.tk.tipo == T_COMENTARIO) proximoToken();
-    
     while(L.tk.tipo == T_MAIS || L.tk.tipo == T_MENOS || L.tk.tipo == T_TAMBEM_TAMBEM) {
         TipoToken op = L.tk.tipo;
         proximoToken();
-        
-        if(tipo == T_pFLU) fprintf(s, "  fmov s1, s0\n");
-        else if(tipo == T_pDOBRO) fprintf(s, "  fmov d1, d0\n");
-        else fprintf(s, "  mov w1, w0\n");
+       // salva o primeiro resultado:
+        if(tipo == T_pFLU) {
+            fprintf(s, "  str s0, [sp, -16]!\n");
+        } else if(tipo == T_pDOBRO) {
+            fprintf(s, "  str d0, [sp, -16]!\n");
+        } else {
+            fprintf(s, "  str w0, [sp, -16]!\n");
+        }
         
         TipoToken tipo_dir = termo(s, escopo);
-        
+        // recupera o primeiro resultado:
+        if(tipo == T_pFLU) {
+            fprintf(s, "  ldr s1, [sp], 16\n");
+        } else if(tipo == T_pDOBRO) {
+            fprintf(s, "  ldr d1, [sp], 16\n");
+        } else {
+            fprintf(s, "  ldr w1, [sp], 16\n");
+        }
         tipo = converter_tipos(s, tipo, tipo_dir);
-        
         gerar_operacao(s, op, tipo);
     }
-    
     if(L.tk.tipo == T_IGUAL_IGUAL || L.tk.tipo == T_DIFERENTE || 
         L.tk.tipo == T_MAIOR || L.tk.tipo == T_MENOR ||
         L.tk.tipo == T_MAIOR_IGUAL || L.tk.tipo == T_MENOR_IGUAL) {
@@ -1577,14 +1593,23 @@ TipoToken expressao(FILE* s, int escopo) {
         TipoToken op = L.tk.tipo;
         proximoToken();
         
-        if(tipo == T_pFLU) fprintf(s, "  fmov s1, s0\n");
-        else if(tipo == T_pDOBRO) fprintf(s, "  fmov d1, d0\n");
-        else fprintf(s, "  mov w1, w0\n");
-        
+        if(tipo == T_pFLU) {
+            fprintf(s, "  str s0, [sp, -16]!\n");
+        } else if(tipo == T_pDOBRO) {
+            fprintf(s, "  str d0, [sp, -16]!\n");
+        } else {
+            fprintf(s, "  str w0, [sp, -16]!\n");
+        }
         TipoToken tipo_dir = termo(s, escopo);
         
+        if(tipo == T_pFLU) {
+            fprintf(s, "  ldr s1, [sp], 16\n");
+        } else if(tipo == T_pDOBRO) {
+            fprintf(s, "  ldr d1, [sp], 16\n");
+        } else {
+            fprintf(s, "  ldr w1, [sp], 16\n");
+        }
         tipo = converter_tipos(s, tipo, tipo_dir);
-        
         gerar_comparacao(s, op, tipo);
         tipo = T_pBOOL;
     }

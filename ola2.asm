@@ -298,8 +298,9 @@ somar:
   ldr x0, =.tex_1
   bl _escrever_tex
   ldr w0, [x29, 48]
-  mov w1, w0
+  str w0, [sp, -16]!
   ldr w0, [x29, 56]
+  ldr w1, [sp], 16
   add w0, w1, w0
   b .epilogo_9
   b .epilogo_9
@@ -383,8 +384,9 @@ testeAlteracoes:
   str x2, [x29, 32]  // salvar param letra
   str x3, [x29, 40]  // salvar param flag
   mov w0, 5
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 7
+  ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [x29, 16]
   ldr x0, =.tex_10
@@ -431,11 +433,13 @@ testeOperacoes:
   ldr x0, =.tex_16
   bl _escrever_tex
   mov w0, 5
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 5
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 5
+  ldr w1, [sp], 16
   mul w0, w1, w0
+  ldr w1, [sp], 16
   add w0, w1, w0
   bl _escrever_int
   ldr x0, =.tex_1
@@ -443,18 +447,21 @@ testeOperacoes:
   ldr x0, =.tex_17
   bl _escrever_tex
   mov w0, 5
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 5
+  ldr w1, [sp], 16
   add w0, w1, w0
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 5
+  ldr w1, [sp], 16
   mul w0, w1, w0
   bl _escrever_int
   ldr x0, =.tex_1
   bl _escrever_tex
   mov w0, 5
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 5
+  ldr w1, [sp], 16
   add w0, w1, w0
   bl _escrever_int
   ldr x0, =.tex_1
@@ -473,8 +480,9 @@ testeOperacoes:
   ldr x0, =.tex_18
   bl _escrever_tex
   mov w0, 10
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 3
+  ldr w1, [sp], 16
   sdiv w2, w1, w0
   msub w0, w2, w0, w1
   bl _escrever_int
@@ -494,8 +502,9 @@ testeComparacoes:
   mov w0, 4
   str w0, [x29, 32]
   ldr w0, [x29, 32]
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 5
+  ldr w1, [sp], 16
   cmp w1, w0
   cset w0, gt
   cmp w0, 0
@@ -505,8 +514,9 @@ testeComparacoes:
   b .B2
 .B1:
   ldr w0, [x29, 32]
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 5
+  ldr w1, [sp], 16
   cmp w1, w0
   cset w0, ge
   cmp w0, 0
@@ -522,15 +532,17 @@ testeComparacoes:
   mov w0, 5
   str w0, [x29, 48]
   ldr w0, [x29, 48]
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 4
+  ldr w1, [sp], 16
   cmp w1, w0
   cset w0, ge
   cmp w0, 0
   beq .B7
   ldr w0, [x29, 32]
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 4
+  ldr w1, [sp], 16
   cmp w1, w0
   cset w0, gt
   cmp w0, 0
@@ -615,8 +627,9 @@ testeMemoria:
   bl texcar
   str w0, [x29, 96]
   ldr w0, [x29, 96]
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 0
+  ldr w1, [sp], 16
   cmp w1, w0
   cset w0, ge
   cmp w0, 0
@@ -720,8 +733,9 @@ testeLoops:
   str w0, [x29, 32]
 .B14:
   ldr w0, [x29, 32]
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 10
+  ldr w1, [sp], 16
   cmp w1, w0
   cset w0, lt
   cmp w0, 0
@@ -731,8 +745,9 @@ testeLoops:
   ldr w0, [x29, 32]
   bl _escrever_int
   ldr w0, [x29, 32]
-  mov w1, w0
+  str w0, [sp, -16]!
   mov w0, 1
+  ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [x29, 32]
   b .B14

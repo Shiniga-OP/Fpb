@@ -7,7 +7,7 @@ _start:
   mov x8, 93
   svc 0
 
-// início de biblis/impressao.asm
+// início de tmp/texint.asm
 .section .text
 .align 2
 // [TEXTO]
@@ -77,247 +77,260 @@ _escrever_int:
 .section .data
   .align 2
 5: // buffer do inteiro
-    .fill   32, 1, 0
-//[FLUTUANTE]
-.align 2
-_escrever_flu:
-    // s0 contém o valor flutuante
-    adr x1, 8f // buffer de saída
-    mov x6, x1 // salva início do buffer
-    // verifica se é negativo
-    fcmp s0, 0.0
-    b.ge 1f
-    mov w2, '-' // sinal negativo
-    strb w2, [x1], 1
-    fneg s0, s0 // torna positivo para conversão
-    b 2f
-    
-1:
-    mov     w2, ' ' // espaço para positivo
-    strb    w2, [x1], 1
-    
-2:
-    // parte inteira
-    fcvtzs  w2, s0 // converte flutuante para inteiro(trunca)
-    mov w3, 10
-    mov w4, 0 // contador de dígitos
-    mov x5, sp // usa pilha para empilhar dígitos
-    // se parte inteira for zero
-    cbz w2, 4f
-    // converte parte inteira
-3:
-    udiv w7, w2, w3
-    msub w8, w7, w3, w2
-    add w8, w8, '0'
-    strb w8, [x5, -1]! // empilha dígitos
-    add w4, w4, 1
-    mov w2, w7
-    cbnz w2, 3b
-    b 5f
-4:
-    mov w7, '0'
-    strb w7, [x1], 1
-    // desempilha dígitos inteiros
-5:
-    ldrb w7, [x5], 1
-    strb w7, [x1], 1
-    subs w4, w4, 1
-    b.ne 5b
-    // ponto decimal
-    mov w2, '.'
-    strb w2, [x1], 1
-    // parte fracionária(2 casas)
-    fcvtzs w2, s0 // parte inteira
-    scvtf s1, w2 // converte inteiro de volta para flutuante
-    fsub s0, s0, s1 // s0 = parte fracionária
-    // primeiro dígito decimal
-    fmov s2, 10.0
-    fmul s0, s0, s2 // *10
-    fcvtzs w2, s0 // primeiro dígito
-    add w2, w2, '0'
-    strb w2, [x1], 1
-    // segundo dígito decimal
-    fcvtzs w2, s0 // parte inteira
-    scvtf s1, w2 // converte para flutuante
-    fsub s0, s0, s1 // remove parte inteira
-    fmul s0, s0, s2 // *10
-    fcvtzs w2, s0 // segundo dígito
-    add w2, w2, '0'
-    strb w2, [x1], 1
-    // finaliza string
-    mov w2, 0
-    strb w2, [x1]
-    mov x0, 1 // saida de impressão
-    mov x1, x6 // início do buffer
-    // calcula tamanho: x1 aponta para início, x1+... para final
-    adr x2, 8f
-    sub x3, x1, x2 // deslocamento atual
-    add x2, x2, x3 // x2 = posição atual
-    sub x2, x1, x6 // ERRADO - vamos fazer diferente
-    // vamos contar até encontrar o null
-    mov x2, 0 // contador
-    mov x3, x6 // ponteiro
-6:
-    ldrb w4, [x3], 1
-    cbz w4, 7f
-    add x2, x2, 1
-    b 6b
-7:
-    mov x1, x6 // string do flutuante
-    mov x8, 64
-    svc 0
-    ret
-.section .data
-  .align 2
-.align 2
-8: // buffer do flutuante
-    .fill   32, 1, 0
-.align 2
-_escrever_double:
-    adr x1, .Ldouble_buffer
-    mov x0, 1
-    mov x2, 12
-    mov x8, 64
-    svc 0
-    ret
-
-.Ldouble_buffer:
-    .asciz  "[double]"
-// [CARACTERE]:
-.align 2
-_escrever_car:
-    strb w0, [sp, -1]!
-    mov x0, 1
-    mov x1, sp
-    mov x2, 1
-    mov x8, 64
-    svc 0
-    add sp, sp, 1
-    ret
+    .fill   32, 1, 0// fim de tmp/texint.asm
 
 .align 2
-_escrever_bool:
-    cmp w0, 0
-    b.eq 1f
-    adr x1, 3f
-    mov x2, 7
-    b 2f
-1:
-    adr x1, 4f
-    mov x2, 5
-2:
-    mov x0, 1
-    mov x8, 64
-    svc 0
-    ret
-// buffers do booleano
-3:
-    .asciz "verdade"
-4:
-    .asciz "falso"// fim de biblis/impressao.asm
-
+fib:
+  stp x29, x30, [sp, -192]!
+  mov x29, sp
+  stp x19, x20, [x29, 16]
+  stp x21, x22, [x29, 32]
+  str x0, [x29, 48]  // salvar param n
+  ldr w0, [x29, 48]
+  str w0, [sp, -16]!
+  mov w0, 1
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, le
+  cmp w0, 0
+  beq .B1
+  ldr w0, [x29, 48]
+  b .epilogo_0
+  b .B2
+.B1:
+.B2:
+  ldr w0, [x29, 48]
+  str w0, [sp, -16]!
+  mov w0, 1
+  ldr w1, [sp], 16
+  sub w0, w1, w0
+  str w0, [sp, -16]!
+  ldr x0, [sp, 0]
+  add sp, sp, 16
+  bl fib
+  str w0, [sp, -16]!
+  ldr w0, [x29, 48]
+  str w0, [sp, -16]!
+  mov w0, 2
+  ldr w1, [sp], 16
+  sub w0, w1, w0
+  str w0, [sp, -16]!
+  ldr x0, [sp, 0]
+  add sp, sp, 16
+  bl fib
+  ldr w1, [sp], 16
+  add w0, w1, w0
+  b .epilogo_0
+  b .epilogo_0
+.epilogo_0:
+  ldp x19, x20, [x29, 16]
+  ldp x21, x22, [x29, 32]
+  mov sp, x29
+  ldp x29, x30, [sp], 192
+  ret
+.align 2
+teste_fibonacci:
+  stp x29, x30, [sp, -160]!
+  mov x29, sp
+  ldr x0, =.tex_0
+  bl _escrever_tex
+  mov w0, 15
+  str w0, [sp, -16]!
+  ldr x0, [sp, 0]
+  add sp, sp, 16
+  bl fib
+  str w0, [x29, 32]
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  ldr w0, [x29, 32]
+  bl _escrever_int
+  ldr x0, =.tex_2
+  bl _escrever_tex
+  b .epilogo_1
+.epilogo_1:
+  mov sp, x29
+  ldp x29, x30, [sp], 160
+  ret
+.align 2
+teste_loops:
+  stp x29, x30, [sp, -160]!
+  mov x29, sp
+  ldr x0, =.tex_3
+  bl _escrever_tex
+  mov w0, 0
+  str w0, [x29, 32]
+  mov w0, 0
+  str w0, [x29, 48]
+  mov w0, 0
+  str w0, [x29, 64]
+.B3:
+  ldr w0, [x29, 48]
+  str w0, [sp, -16]!
+  mov w0, 500
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, lt
+  cmp w0, 0
+  beq .B4
+  mov w0, 0
+  str w0, [x29, 64]
+.B5:
+  ldr w0, [x29, 64]
+  str w0, [sp, -16]!
+  mov w0, 500
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, lt
+  cmp w0, 0
+  beq .B6
+  ldr w0, [x29, 32]
+  str w0, [sp, -16]!
+  ldr w0, [x29, 48]
+  str w0, [sp, -16]!
+  ldr w0, [x29, 64]
+  ldr w1, [sp], 16
+  mul w0, w1, w0
+  str w0, [sp, -16]!
+  mov w0, 97
+  ldr w1, [sp], 16
+  sdiv w2, w1, w0
+  msub w0, w2, w0, w1
+  ldr w1, [sp], 16
+  add w0, w1, w0
+  str w0, [x29, 32]
+  ldr w0, [x29, 64]
+  str w0, [sp, -16]!
+  mov w0, 1
+  ldr w1, [sp], 16
+  add w0, w1, w0
+  str w0, [x29, 64]
+  b .B5
+.B6:
+  ldr w0, [x29, 48]
+  str w0, [sp, -16]!
+  mov w0, 1
+  ldr w1, [sp], 16
+  add w0, w1, w0
+  str w0, [x29, 48]
+  b .B3
+.B4:
+  ldr x0, =.tex_4
+  bl _escrever_tex
+  ldr w0, [x29, 32]
+  bl _escrever_int
+  ldr x0, =.tex_2
+  bl _escrever_tex
+  b .epilogo_2
+.epilogo_2:
+  mov sp, x29
+  ldp x29, x30, [sp], 160
+  ret
+.align 2
+teste_operacoes:
+  stp x29, x30, [sp, -160]!
+  mov x29, sp
+  ldr x0, =.tex_5
+  bl _escrever_tex
+  mov w0, 0
+  str w0, [x29, 32]
+  mov w0, 0
+  str w0, [x29, 48]
+.B7:
+  ldr w0, [x29, 32]
+  str w0, [sp, -16]!
+  mov w0, 10000
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, lt
+  cmp w0, 0
+  beq .B8
+  ldr w0, [x29, 32]
+  str w0, [sp, -16]!
+  mov w0, 3
+  ldr w1, [sp], 16
+  sdiv w2, w1, w0
+  msub w0, w2, w0, w1
+  str w0, [sp, -16]!
+  mov w0, 0
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, eq
+  cmp w0, 0
+  beq .B10
+  ldr w0, [x29, 32]
+  str w0, [sp, -16]!
+  mov w0, 100
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, gt
+  cmp w0, 0
+  beq .B10
+  mov w0, 1
+  b .B11
+.B10:
+  mov w0, 0
+.B11:
+  cmp w0, 0
+  beq .B12
+  ldr w0, [x29, 48]
+  str w0, [sp, -16]!
+  ldr w0, [x29, 32]
+  ldr w1, [sp], 16
+  add w0, w1, w0
+  str w0, [x29, 48]
+  b .B13
+.B12:
+.B13:
+  ldr w0, [x29, 32]
+  str w0, [sp, -16]!
+  mov w0, 1
+  ldr w1, [sp], 16
+  add w0, w1, w0
+  str w0, [x29, 32]
+  b .B7
+.B8:
+  ldr x0, =.tex_6
+  bl _escrever_tex
+  ldr w0, [x29, 48]
+  bl _escrever_int
+  ldr x0, =.tex_2
+  bl _escrever_tex
+  b .epilogo_3
+.epilogo_3:
+  mov sp, x29
+  ldp x29, x30, [sp], 160
+  ret
 .align 2
 inicio:
   stp x29, x30, [sp, -160]!
   mov x29, sp
-  mov w0, 10
-  str w0, [x29, 48]
-  mov w0, 5
-  str w0, [x29, 64]
-  mov w0, 0
-  str w0, [x29, 80]
-  mov w0, 0
-  str w0, [x29, 96]
-  ldr w0, [x29, 48]
-  mov w1, w0
-  ldr w0, [x29, 64]
-  cmp w1, w0
-  cset w0, gt
-  cmp w0, 0
-  beq .B1
-  ldr w0, [x29, 64]
-  mov w1, w0
-  mov w0, 0
-  cmp w1, w0
-  cset w0, gt
-  cmp w0, 0
-  beq .B1
-  mov w0, 1
-  b .B2
-.B1:
-  mov w0, 0
-.B2:
-  cmp w0, 0
-  beq .B3
-  mov w0, 1
-  str w0, [x29, 96]
-  b .B4
-.B3:
-.B4:
-  ldr w0, [x29, 96]
-  bl _escrever_int
-  mov w0, 0
-  str w0, [x29, 112]
-  ldr w0, [x29, 48]
-  mov w1, w0
-  ldr w0, [x29, 64]
-  cmp w1, w0
-  cset w0, gt
-  cmp w0, 0
-  beq .B6
-  ldr w0, [x29, 80]
-  mov w1, w0
-  mov w0, 0
-  cmp w1, w0
-  cset w0, gt
-  cmp w0, 0
-  beq .B6
-  mov w0, 1
-  b .B7
-.B6:
-  mov w0, 0
-.B7:
-  cmp w0, 0
-  beq .B8
-  mov w0, 1
-  str w0, [x29, 112]
-  b .B9
-.B8:
-.B9:
-  ldr w0, [x29, 112]
-  bl _escrever_int
-  mov w0, 0
-  str w0, [x29, 128]
-  ldr w0, [x29, 80]
-  mov w1, w0
-  mov w0, 0
-  cmp w1, w0
-  cset w0, gt
-  cmp w0, 0
-  beq .B11
-  ldr w0, [x29, 48]
-  mov w1, w0
-  ldr w0, [x29, 64]
-  cmp w1, w0
-  cset w0, gt
-  cmp w0, 0
-  beq .B11
-  mov w0, 1
-  b .B12
-.B11:
-  mov w0, 0
-.B12:
-  cmp w0, 0
-  beq .B13
-  mov w0, 1
-  str w0, [x29, 128]
-  b .B14
-.B13:
-.B14:
-  ldr w0, [x29, 128]
-  bl _escrever_int
-  b .epilogo_0
-.epilogo_0:
+  ldr x0, =.tex_7
+  bl _escrever_tex
+  ldr x0, =.tex_8
+  bl _escrever_tex
+  bl teste_fibonacci
+  bl teste_loops
+  bl teste_operacoes
+  ldr x0, =.tex_8
+  bl _escrever_tex
+  ldr x0, =.tex_9
+  bl _escrever_tex
+  b .epilogo_4
+.epilogo_4:
   mov sp, x29
   ldp x29, x30, [sp], 160
   ret
+.section .rodata
+.align 2
+.tex_0: .asciz "=== TESTE FIBONACCI ===\n"
+.tex_1: .asciz "Fibonacci(15) = "
+.tex_2: .asciz "\n"
+.tex_3: .asciz "=== TESTE LOOPS ANINHADOS ===\n"
+.tex_4: .asciz "Soma loops: "
+.tex_5: .asciz "=== TESTE OPERAÇÕES ===\n"
+.tex_6: .asciz "Total: "
+.tex_7: .asciz "TESTE DE PERFORMACE\n"
+.tex_8: .asciz "=======================\n"
+.tex_9: .asciz "FIM\n"
+.section .text
+

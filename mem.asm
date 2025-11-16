@@ -81,12 +81,66 @@ _escrever_int:
 
 .align 2
 inicio:
-  sub sp, sp, 4016
+  sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
+  mov w0, 1
+  str w0, [x29, 32]
+  mov w0, 5
+  str w0, [x29, 36]
+  mov w0, 8
+  str w0, [x29, 40]
+  mov w0, 3
+  str w0, [x29, 44]
+  mov w0, 0
+  mov w1, w0
+  str w1, [sp, -16]!
+  mov w0, 0
+  mov w1, w0
+  add x2, x29, 32
+  add x2, x2, x1, lsl 2
+  ldr w0, [x2]
+  str w0, [sp, -16]!
+  mov w0, 9
+  ldr w1, [sp], 16
+  add w0, w1, w0
+  ldr w1, [sp], 16
+  add x2, x29, 32
+  add x2, x2, x1, lsl 2
+  str w0, [x2]
+  mov w0, 0
+  str w0, [x29, -144]
+.B1:
+  ldr w0, [x29, -144]
+  str w0, [sp, -16]!
+  mov w0, 4
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, lt
+  cmp w0, 0
+  beq .B2
+  ldr w0, [x29, -144]
+  mov w1, w0
+  add x2, x29, 32
+  add x2, x2, x1, lsl 2
+  ldr w0, [x2]
+  bl _escrever_int
+  ldr x0, =.tex_0
+  bl _escrever_tex
+  // incremento
+  ldr w0, [x29, -144]
+  add w0, w0, 1
+  str w0, [x29, -144]
+  b .B1
+.B2:
   b .epilogo_0
 .epilogo_0:
   mov sp, x29
   ldp x29, x30, [sp]
-  add sp, sp, 4016
+  add sp, sp, 160
   ret
+.section .rodata
+.align 2
+.tex_0: .asciz "\n"
+.section .text
+

@@ -1,5 +1,10 @@
 #incluir "tmp/texint.asm";
 
 vazio inicio() {
-    int[1000] num;
+    int[] num = { 1, 5, 8, 3 };
+    num[0] = num[0] + 9;
+    
+    por(int i = 0; i < 4; i = i + 1) {
+        escrever(num[i], "\n");
+    }
 }

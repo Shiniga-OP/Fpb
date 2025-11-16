@@ -602,10 +602,10 @@ testeMemoria:
   bl _escrever_tex
   mov w0, 0
   mov w1, w0
+  str w1, [sp, -16]!
   mov w0, 88
+  ldr w1, [sp], 16
   add x2, x29, 32
-  mov x3, 1
-  mul w1, w1, w3
   add x2, x2, x1
   strb w0, [x2]
   ldr x0, =.tex_27
@@ -718,8 +718,6 @@ testeMemoria:
   mov w0, 0
   mov w1, w0
   add x2, x29, 80
-  mov x3, 1
-  mul w1, w1, w3
   add x2, x2, x1
   ldrb w0, [x2]
   strb w0, [x29, 112]
@@ -727,6 +725,49 @@ testeMemoria:
   bl _escrever_tex
   ldrb w0, [x29, 112]
   bl _escrever_car
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  mov w0, 0
+  str w0, [x29, 128]
+  mov w0, 1
+  str w0, [x29, 132]
+  mov w0, 2
+  str w0, [x29, 136]
+  mov w0, 5
+  str w0, [x29, 140]
+  ldr x0, =.tex_41
+  bl _escrever_tex
+  mov w0, 0
+  str w0, [x29, -144]
+.B15:
+  ldr w0, [x29, -144]
+  str w0, [sp, -16]!
+  mov w0, 4
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, lt
+  cmp w0, 0
+  beq .B16
+  ldr x0, =.tex_42
+  bl _escrever_tex
+  ldr w0, [x29, -144]
+  bl _escrever_int
+  ldr x0, =.tex_43
+  bl _escrever_tex
+  ldr w0, [x29, -144]
+  mov w1, w0
+  add x2, x29, 128
+  add x2, x2, x1, lsl 2
+  ldr w0, [x2]
+  bl _escrever_int
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  // incremento
+  ldr w0, [x29, -144]
+  add w0, w0, 1
+  str w0, [x29, -144]
+  b .B15
+.B16:
   b .epilogo_14
 .epilogo_14:
   mov sp, x29
@@ -738,13 +779,13 @@ testeLoops:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_41
+  ldr x0, =.tex_44
   bl _escrever_tex
-  ldr x0, =.tex_42
+  ldr x0, =.tex_45
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 32]
-.B14:
+.B17:
   ldr w0, [x29, 32]
   str w0, [sp, -16]!
   mov w0, 10
@@ -752,8 +793,8 @@ testeLoops:
   cmp w1, w0
   cset w0, lt
   cmp w0, 0
-  beq .B15
-  ldr x0, =.tex_43
+  beq .B18
+  ldr x0, =.tex_46
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
@@ -763,13 +804,13 @@ testeLoops:
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [x29, 32]
-  b .B14
-.B15:
-  ldr x0, =.tex_44
+  b .B17
+.B18:
+  ldr x0, =.tex_47
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -144]
-.B17:
+.B20:
   ldr w0, [x29, -144]
   str w0, [sp, -16]!
   mov w0, 10
@@ -777,8 +818,8 @@ testeLoops:
   cmp w1, w0
   cset w0, lt
   cmp w0, 0
-  beq .B18
-  ldr x0, =.tex_45
+  beq .B21
+  ldr x0, =.tex_48
   bl _escrever_tex
   ldr w0, [x29, -144]
   bl _escrever_int
@@ -788,8 +829,8 @@ testeLoops:
   ldr w0, [x29, -144]
   add w0, w0, 1
   str w0, [x29, -144]
-  b .B17
-.B18:
+  b .B20
+.B21:
   b .epilogo_15
 .epilogo_15:
   mov sp, x29
@@ -845,10 +886,13 @@ const_0:
 .tex_38: .asciz "\nArray usando subscar(array, 'X', 'e'): "
 .tex_39: .asciz "\nTeste de acesso a itens array:\n"
 .tex_40: .asciz "item do indice 0 do array: "
-.tex_41: .asciz "\n\nTeste de loops"
-.tex_42: .asciz "\nEnquanto:"
-.tex_43: .asciz "\nvalor de i: "
-.tex_44: .asciz "\n\nPor:\n"
-.tex_45: .asciz "indice: "
+.tex_41: .asciz "array de inteiros: \n\n"
+.tex_42: .asciz "no indice: "
+.tex_43: .asciz " valor: "
+.tex_44: .asciz "\n\nTeste de loops"
+.tex_45: .asciz "\nEnquanto:"
+.tex_46: .asciz "\nvalor de i: "
+.tex_47: .asciz "\n\nPor:\n"
+.tex_48: .asciz "indice: "
 .section .text
 

@@ -144,7 +144,13 @@ vazio testeMemoria() {
     
     escrever("\nTeste de acesso a itens array:\n");
     car ca = array[0];
-    escrever("item do indice 0 do array: ", ca);
+    escrever("item do indice 0 do array: ", ca, "\n");
+    
+    int[] num = { 0, 1, 2, 5 };
+    escrever("array de inteiros: \n\n");
+    por(int i = 0; i < 4; i = i + 1) {
+        escrever("no indice: ", i, " valor: ", num[i], "\n");
+    }
 }
 
 vazio testeLoops() {

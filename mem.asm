@@ -7,14 +7,14 @@ _start:
   mov x8, 93
   svc 0
 
-// início de biblis/impressao.asm
+// início de tmp/texint.asm
 .section .text
 .align 2
 // [TEXTO]
 _escrever_tex:
     mov x1, x0 // x1 = texto
     mov x2, 0 // x2 = contador
-    // conta caracteres ate encontrar nulo
+    // conta caracteres até encontrar null
 1:
     ldrb w3, [x1, x2]
     cbz w3, 2f
@@ -29,7 +29,7 @@ _escrever_tex:
 .align 2
 // [INTEIRO]
 _escrever_int:
-    mov w1, w0 // w1 = numero
+    mov w1, w0 // w1 = número
     ldr x0, = 5f // x0 = buffer
     mov x19, 0 // x19 = contador de caracteres
     
@@ -77,174 +77,147 @@ _escrever_int:
 .section .data
   .align 2
 5: // buffer do inteiro
-    .fill   32, 1, 0
-//[FLUTUANTE]
-.align 2
-_escrever_flu:
-    // s0 contem o valor flutuante
-    adr x1, 9f // buffer de saida
-    mov x6, x1 // salva inicio do buffer
-    // verifica se é negativo
-    fcmp s0, 0.0
-    b.ge 1f
-    mov w2, '-' // sinal negativo
-    strb w2, [x1], 1
-    fneg s0, s0 // torna positivo pra conversão
-    b 2f
-1:
-    mov w2, ' ' // espaço pra positivo
-    strb w2, [x1], 1
-2:
-    // parte inteira
-    fcvtzs  w2, s0 // converte flutuante para inteiro(trunca)
-    mov w3, 10
-    mov w4, 0 // contador de dígitos
-    mov x5, sp // usa pilha para empilhar digitos
-    // se parte inteira for zero
-    cbz w2, 4f
-    // converte parte inteira
-3:
-    udiv w7, w2, w3
-    msub w8, w7, w3, w2
-    add w8, w8, '0'
-    strb w8, [x5, -1]! // empilha digitos
-    add w4, w4, 1
-    mov w2, w7
-    cbnz w2, 3b
-    b 5f
-4:
-    mov w7, '0'
-    strb w7, [x1], 1
-    b 6f
-    // desempilha digitos inteiros
-5:
-    ldrb w7, [x5], 1
-    strb w7, [x1], 1
-    subs w4, w4, 1
-    b.ne 5b
-6:
-    // ponto decimal
-    mov w2, '.'
-    strb w2, [x1], 1
-    // parte fracionária(2 casas)
-    fcvtzs w2, s0 // parte inteira
-    scvtf s1, w2 // converte inteiro de volta pra flutuante
-    fsub s0, s0, s1 // s0 = parte fracionaria
-    // primeiro dígito decimal
-    fmov s2, 10.0
-    fmul s0, s0, s2 // *10
-    fcvtzs w2, s0 // primeiro dígito
-    add w2, w2, '0'
-    strb w2, [x1], 1
-    // segundo digito decimal
-    fcvtzs w2, s0 // parte inteira
-    scvtf s1, w2 // converte para flutuante
-    fsub s0, s0, s1 // remove parte inteira
-    fmul s0, s0, s2 // *10
-    fcvtzs w2, s0 // segundo digito
-    add w2, w2, '0'
-    strb w2, [x1], 1
-    // finaliza texto
-    mov w2, 0
-    strb w2, [x1]
-    mov x0, 1 // saida de impressão
-    mov x1, x6 // inicio do buffer
-    // calcula tamanho: x1 aponta para inicio, x1+... para final
-    adr x2, 9f // buffer
-    sub x3, x1, x2 // deslocamento atual
-    add x2, x2, x3 // x2 = posição atual
-    sub x2, x1, x6
-    // conta ate encontrar o nulo
-    mov x2, 0 // contador
-    mov x3, x6 // ponteiro
-7:
-    ldrb w4, [x3], 1
-    cbz w4, 8f
-    add x2, x2, 1
-    b 7b
-8:
-    mov x1, x6 // texto do flutuante
-    mov x8, 64
-    svc 0
-    ret
-.section .data
-  .align 2
-.align 2
-9: // buffer do flutuante
-    .fill   32, 1, 0
-// [CARACTERE]:
-.align 2
-_escrever_car:
-    strb w0, [sp, -1]!
-    mov x0, 1
-    mov x1, sp
-    mov x2, 1
-    mov x8, 64
-    svc 0
-    add sp, sp, 1
-    ret
+    .fill   32, 1, 0// fim de tmp/texint.asm
 
-.align 2
-_escrever_bool:
-    cmp w0, 0
-    b.eq 1f
-    adr x1, 3f
-    mov x2, 7
-    b 2f
-1:
-    adr x1, 4f
-    mov x2, 5
-2:
-    mov x0, 1
-    mov x8, 64
-    svc 0
-    ret
-// buffers do booleano
-3:
-    .asciz "verdade"
-4:
-    .asciz "falso"// fim de biblis/impressao.asm
 
+// início de biblis/texs.asm
+.section .text
+// x0: texto, w0: retorno
 .align 2
-soma:
-  sub sp, sp, 160
-  stp x29, x30, [sp]
-  mov x29, sp
-  str x0, [x29, 16]  // salvar param x
-  mov w0, 0
-  mov w1, w0
-  ldr x2, [x29, 16]
-  add x2, x2, x1, lsl 2
-  ldr s0, [x2]
-  bl _escrever_flu
-  b .epilogo_0
-.epilogo_0:
-  mov sp, x29
-  ldp x29, x30, [sp]
-  add sp, sp, 160
-  ret
+textam:
+    mov x1, x0
+1:
+    ldrb w2, [x1], 1
+    cbnz x2, 1b
+    sub x0, x1, x0
+    sub x0, x0, 1
+    ret
+// x0: texto, w1: car a substituir, w2: novo car
+.align 2
+subscar:
+    mov x3, x0 // x3 = ponteiro para iterar
+1: // loop
+    ldrb w4, [x3] // carrega caractere atual
+    cbz w4, 3f // se zero, fim do texto
+    cmp w4, w1 // e o caractere alvo?
+    b.ne 2f
+    
+    strb w2, [x3] // substitui pelo novo caractere
+2: // proximo
+    add x3, x3, 1 // avança pra o próximo caractere
+    b 1b
+3: // retorna
+    ret
+// x0: ponteiro, w1: caractere
+.align 2
+texcar:
+    mov x2, x0 // x2 = ponteiro para iterar
+    mov w3, w1 // w3 = caractere procurado
+1: // loop
+    ldrb w4, [x2] // carrega byte atual
+    cbz w4, 3f // se zero, fim do texto
+    cmp w4, w3 // compara com caractere buscado
+    b.eq 2f // se igual, encontrou
+    add x2, x2, 1 // próximo caractere
+    b 1b
+2: // achou
+    sub x0, x2, x0 // calcula posição(endereço atual - início)
+    b 4f
+3: // não achou
+    mov x0, -1 // retorna -1 se não encontrou
+4: // retorna
+    ret
+// x0: ponteiro para o texto 1
+// x1: ponteiro para o texto 2
+// w0: retorno(1 se verdadeiro, 0 se falso)
+.align 2
+texcmp:
+    // x2 e x3 são usados para carregar os bytes
+    
+1:  // inicio do loop de comparação
+    ldrb w2, [x0] // carrega o byte atual do texto 1(t1)
+    ldrb w3, [x1] // carrega o byte atual do texto 2(t2)
+
+    cmp w2, w3 // compara os dois bytes
+    b.ne 3f // se forem diferentes salta pra FALSO(3f)
+    // se os bytes são iguais, verifica se é o fim do texto
+    // se w2(que é igual a w3) for zero, ambos os textos terminaram
+    // ao mesmo tempo, logo são iguais
+    cbz w2, 2f// Se w2 for zero, salta para VERDADEIRO(2f)
+    // se os bytes são iguais E não são zero, continua o loop
+    add x0, x0, 1 // avança o ponteiro t1
+    add x1, x1, 1 // avança o ponteiro t2
+    b 1b // volta ao inicio do loop
+2:  // VERDADEIRO: os textos são iguais
+    mov w0, 1 // define o retorno w0 = 1
+    b 4f // salta para o fim da função
+    
+3:  // FALSO: os bytes foram diferentes em algum ponto
+    mov w0, 0 // define o retorno w0 = 0
+    
+4:
+    ret// fim de biblis/texs.asm
+
 .align 2
 inicio:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, = const_0
-  ldr s0, [x0]
-  str s0, [x29, 32]
-  add x0, x29, 32
+  ldr x0, = .tex_0
+  str x0, [x29, 32]
+  ldr x0, = .tex_1
+  str x0, [x29, 48]
+  ldr x0, [x29, 32]
   str x0, [sp, -16]!
-  ldr x0, [sp, 0]
-  add sp, sp, 16
-  bl soma
+  ldr x0, [x29, 48]
+  str x0, [sp, -16]!
+  ldr x0, [sp, 16]
+  ldr x1, [sp, 0]
+  add sp, sp, 32
+  bl texcmp
+  str w0, [sp, -16]!
+  mov w0, 1
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, eq
+  cmp w0, 0
+  beq .B1
+  ldr x0, =.tex_2
+  bl _escrever_tex
+  b .B2
+.B1:
+.B2:
+  ldr x0, [x29, 32]
+  str x0, [sp, -16]!
+  ldr x0, [x29, 48]
+  str x0, [sp, -16]!
+  ldr x0, [sp, 16]
+  ldr x1, [sp, 0]
+  add sp, sp, 32
+  bl texcmp
+  str w0, [sp, -16]!
+  mov w0, 0
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, eq
+  cmp w0, 0
+  beq .B4
+  ldr x0, =.tex_3
+  bl _escrever_tex
+  b .B5
+.B4:
+.B5:
   b .epilogo_1
 .epilogo_1:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
-  .section .rodata
-  .align 8
-const_0:
-  .float 1.000000
-  .section .text
+.section .rodata
+.align 2
+.tex_0: .asciz "teste"
+.tex_1: .asciz "tese"
+.tex_2: .asciz "o valor 1 é igual ao valor 2"
+.tex_3: .asciz "o valor 1 não é igual ao valor 2"
+.section .text
 

@@ -1,10 +1,16 @@
-#incluir "biblis/impressao.asm";
+#incluir "tmp/texint.asm";
+#incluir "biblis/texs.asm";
 
-vazio soma(flu[] x) {
-    escrever(x[0]);
-}
+int texcmp(car* x, car* y);
 
 vazio inicio() {
-    flu[] x = { 1.0 };
-    soma(x);
+    car* exemplo = "teste";
+    car* exemplo2 = "tese";
+    
+    se(texcmp(exemplo, exemplo2) == 1) {
+        escrever("o valor 1 é igual ao valor 2");
+    }
+    se(texcmp(exemplo, exemplo2) == 0) {
+        escrever("o valor 1 não é igual ao valor 2");
+    }
 }

@@ -26,8 +26,11 @@ vazio testeOperacoes();
 vazio testeComparacoes();
 vazio testeMemoria();
 vazio testeLoops();
+
 int textam(car* texto);
 int texcar(car* texto, car alvo);
+int texcmp(car* x, car* y);
+
 vazio subscar(car[] array, car alvo, car novo);
 vazio memcp(car[] array, car* p, int tam);
 
@@ -97,9 +100,24 @@ vazio testeComparacoes() {
     int y = 5;
     
     se(y >= 4 && x > 4) {
-        escrever("y >= 4 && x > 4 é verdadeiro");
+        escrever("y >= 4 && x > 4 é verdadeiro\n");
     } senao {
-        escrever("y >= 4 && x > 4 é falso");
+        escrever("y >= 4 && x > 4 é falso\n");
+    }
+    escrever("\nComparação com textos:\n\n");
+    car* t1 = "texto 1";
+    car* t2 = "texto 2";
+    escrever(t1, "\n", t2, "\n");
+    se(texcmp(t1, t2) == 1) {
+        escrever("texto 1 é igual a texto 2\n");
+    }
+    se(texcmp(t1, t2) == 0) {
+        escrever("texto 1 não é igual a texto 2\n");
+    }
+    se(texcmp(t1, t1) == 1) {
+        escrever("o primeiro texto é texto 1");
+    } senao {
+        escrever("o primeiro texto não é texto 1");
     }
 }
 
@@ -138,9 +156,14 @@ vazio testeMemoria() {
     escrever("item do indice 0 do array: ", ca, "\n");
     
     int[] num = { 0, 1, 2, 5 };
-    escrever("array de inteiros: \n\n");
+    escrever("\nArray de inteiros: \n\n");
     por(int i = 0; i < 4; i = i + 1) {
         escrever("no indice: ", i, " valor: ", num[i], "\n");
+    }
+    flu[] flutuante = { 0.2, 1.5, 5.1, 5.1 };
+    escrever("\nArray de flutuantes: \n\n");
+    por(int i = 0; i < 4; i = i + 1) {
+        escrever("no indice: ", i, " valor: ", flutuante[i], "\n");
     }
 }
 

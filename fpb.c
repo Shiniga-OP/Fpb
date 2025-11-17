@@ -647,25 +647,50 @@ Funcao* buscar_fn(const char* nome) {
 void coletar_args(FILE* s, Funcao* f) {
     int int_reg_idc = 0;
     int fp_reg_idc = 0;
-    int pilha_pos = 0; // pra parametros que vão para a pilha
-    
-    f->param_pos = 0; // reseta
+    int pilha_pos = 0;
+    Token salvo;
+    f->param_pos = 0;
 
     while(L.tk.tipo != T_PAREN_DIR) {
         Variavel* var = &f->vars[f->var_conta];
-        // verifica se cabe em registrador
-        if(int_reg_idc < 8 && (L.tk.tipo == T_pINT || L.tk.tipo == T_pLONGO || 
-            L.tk.tipo == T_pCAR || L.tk.tipo == T_pBOOL)) {
+        
+        // arrays como parametros devem ser tratados como ponteiros(T_pLONGO)
+        // mesmo que seu tipo base seja flutuante
+        TipoToken tipo_param = L.tk.tipo;
+        int eh_array_param = 0;
+        // verifica se é um array
+        if(L.tk.tipo == T_pFLU || L.tk.tipo == T_pINT || L.tk.tipo == T_pCAR || 
+           L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO) {
+            // salva estado atual
+            salvo = L.tk;
+            Lexer salvo_lexer = L;
+            
+            proximoToken();
+            if(L.tk.tipo == T_COL_ESQ) {
+                eh_array_param = 1;
+                tipo_param = T_pLONGO; // arrays são passados como ponteiros
+            }
+            // restaura estado
+            L.tk = salvo;
+            L = salvo_lexer;
+        }
+        
+        // arrays como parametros vão para registradores inteiros
+        if(int_reg_idc < 8 && (tipo_param == T_pINT || tipo_param == T_pLONGO || 
+            tipo_param == T_pCAR || tipo_param == T_pBOOL || eh_array_param)) {
             sprintf(var->reg, "x%d", int_reg_idc++);
-            var->pos = -1;  // indica registrador
-        } else if(fp_reg_idc < 8 && (L.tk.tipo == T_pFLU || L.tk.tipo == T_pDOBRO)) {
+            var->pos = -1;
+            var->eh_array = eh_array_param; // marca como array
+            if(eh_array_param) var->tipo_base = salvo.tipo; // mantem o tipo base
+        } else if(fp_reg_idc < 8 && (tipo_param == T_pFLU || tipo_param == T_pDOBRO) && !eh_array_param) {
             sprintf(var->reg, "d%d", fp_reg_idc++);
             var->pos = -1;
         } else {
-            // vai pra a pilha
             var->reg[0] = '\0';
             var->pos = pilha_pos;
-            pilha_pos += 8;  // 8 bytes por parametro
+            pilha_pos += 8;
+            var->eh_array = eh_array_param;
+            if(eh_array_param) var->tipo_base = salvo.tipo;
         }
         declaracao_var(s, &pilha_pos, 0, 1);
         
@@ -737,7 +762,7 @@ TipoToken processar_condicao(FILE* s, int escopo) {
                 
                 tipo_final = T_pBOOL;
             } else {
-                break; // não é operador lógico, termina
+                break; // não é operador logico, termina
             }
         } else {
             // primeira expressão = avalia normalmente

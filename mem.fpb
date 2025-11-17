@@ -1,8 +1,10 @@
 #incluir "biblis/impressao.asm";
 
+vazio soma(flu[] x) {
+    escrever(x[0]);
+}
+
 vazio inicio() {
-    flu[] arr = { 0.1, 0.2, 1.3, 5.51 };
-    por(int i = 0; i < 4; i = i + 1) {
-        escrever("flutuante", arr[i], "\n");
-    }
+    flu[] x = { 1.0 };
+    soma(x);
 }

@@ -125,9 +125,15 @@ vazio testeMemoria() {
     escrever("item do indice 0 do array: ", ca, "\n");
     
     int[] num = { 0, 1, 2, 5 };
-    escrever("array de inteiros: \n\n");
+    escrever("\nArray de inteiros: \n\n");
     por(int i = 0; i < 4; i = i + 1) {
         escrever("no indice: ", i, " valor: ", num[i], "\n");
+    }
+    flu[] flutuante = { 0.2, 1.5, 2
+    5, 5.1 };
+    escrever("\nArray de flutuantes: \n\n");
+    por(int i = 0; i < 4; i = i + 1) {
+        escrever("no indice: ", i, " valor: ", flutuante[i], "\n");
     }
 }
 

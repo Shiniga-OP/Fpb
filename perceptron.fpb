@@ -1,0 +1,21 @@
+#incluir "biblis/impressao.asm";
+
+int degrau(flu x) {
+    se(x > 0.0) retorne 1;
+    retorne 0;
+}
+
+int prever(flu[] entrada, flu[] pesos, flu bias) {
+    flu soma = bias;
+    por(int i = 0; i < 1; i = i + 1) {
+        soma = soma + entrada[i] * pesos[i];
+    }
+    retorne degrau(soma);
+}
+
+vazio inicio() {
+    flu[] pesos = { 0.4, 0.5 };
+    flu bias = 0.8;
+    flu[] entrada = { 1.0, 1.0 };
+    escrever(prever(entrada, pesos, bias));
+}

@@ -206,38 +206,132 @@ _escrever_bool:
     .asciz "falso"// fim de biblis/impressao.asm
 
 .align 2
-soma:
-  sub sp, sp, 160
+degrau:
+  sub sp, sp, 192
   stp x29, x30, [sp]
   mov x29, sp
-  str x0, [x29, 16]  // salvar param x
+  stp x19, x20, [x29, 16]
+  stp x21, x22, [x29, 32]
+  str d0, [x29, 48]  // salvar param x
+  ldr s0, [x29, 48]
+  str s0, [sp, -16]!
+  ldr x0, = const_0
+  ldr s0, [x0]
+  ldr s1, [sp], 16
+  fcmp s1, s0
+  cset w0, gt
+  cmp w0, 0
+  beq .B1
+  mov w0, 1
+  b .epilogo_0
+  b .B2
+.B1:
+.B2:
   mov w0, 0
-  mov w1, w0
-  ldr x2, [x29, 16]
-  add x2, x2, x1, lsl 2
-  ldr s0, [x2]
-  bl _escrever_flu
+  b .epilogo_0
   b .epilogo_0
 .epilogo_0:
+  ldp x19, x20, [x29, 16]
+  ldp x21, x22, [x29, 32]
   mov sp, x29
   ldp x29, x30, [sp]
-  add sp, sp, 160
+  add sp, sp, 192
+  ret
+.align 2
+prever:
+  sub sp, sp, 208
+  stp x29, x30, [sp]
+  mov x29, sp
+  stp x19, x20, [x29, 16]
+  stp x21, x22, [x29, 32]
+  str x0, [x29, 48]  // salvar param entrada
+  str x1, [x29, 56]  // salvar param pesos
+  str d0, [x29, 64]  // salvar param bias
+  ldr s0, [x29, 64]
+  str s0, [x29, 32]
+  mov w0, 0
+  str w0, [x29, -192]
+.B4:
+  ldr w0, [x29, -192]
+  str w0, [sp, -16]!
+  mov w0, 1
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, lt
+  cmp w0, 0
+  beq .B5
+  ldr s0, [x29, 32]
+  str s0, [sp, -16]!
+  ldr w0, [x29, -192]
+  mov w1, w0
+  ldr x2, [x29, 48]
+  add x2, x2, x1, lsl 2
+  ldr s0, [x2]
+  str s0, [sp, -16]!
+  ldr w0, [x29, -192]
+  mov w1, w0
+  ldr x2, [x29, 56]
+  add x2, x2, x1, lsl 2
+  ldr s0, [x2]
+  ldr s1, [sp], 16
+  fmul s0, s1, s0
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  str s0, [x29, 32]
+  // incremento
+  ldr w0, [x29, -192]
+  add w0, w0, 1
+  str w0, [x29, -192]
+  b .B4
+.B5:
+  ldr s0, [x29, 32]
+  str s0, [sp, -16]!
+  ldr s0, [sp, 0]
+  add sp, sp, 16
+  bl degrau
+  b .epilogo_1
+  b .epilogo_1
+.epilogo_1:
+  ldp x19, x20, [x29, 16]
+  ldp x21, x22, [x29, 32]
+  mov sp, x29
+  ldp x29, x30, [sp]
+  add sp, sp, 208
   ret
 .align 2
 inicio:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, = const_0
+  ldr x0, = const_1
   ldr s0, [x0]
   str s0, [x29, 32]
+  ldr x0, = const_2
+  ldr s0, [x0]
+  str s0, [x29, 36]
+  ldr x0, = const_3
+  ldr s0, [x0]
+  str s0, [x29, 48]
+  ldr x0, = const_4
+  ldr s0, [x0]
+  str s0, [x29, 64]
+  ldr x0, = const_4
+  ldr s0, [x0]
+  str s0, [x29, 68]
+  add x0, x29, 64
+  str x0, [sp, -16]!
   add x0, x29, 32
   str x0, [sp, -16]!
-  ldr x0, [sp, 0]
-  add sp, sp, 16
-  bl soma
-  b .epilogo_1
-.epilogo_1:
+  ldr s0, [x29, 48]
+  str s0, [sp, -16]!
+  ldr x0, [sp, 32]
+  ldr x1, [sp, 16]
+  ldr s0, [sp, 0]
+  add sp, sp, 48
+  bl prever
+  bl _escrever_int
+  b .epilogo_2
+.epilogo_2:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
@@ -245,6 +339,14 @@ inicio:
   .section .rodata
   .align 8
 const_0:
+  .float 0.000000
+const_1:
+  .float 0.400000
+const_2:
+  .float 0.500000
+const_3:
+  .float 0.800000
+const_4:
   .float 1.000000
   .section .text
 

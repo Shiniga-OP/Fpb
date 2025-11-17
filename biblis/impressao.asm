@@ -4,7 +4,7 @@
 _escrever_tex:
     mov x1, x0 // x1 = texto
     mov x2, 0 // x2 = contador
-    // conta caracteres até encontrar null
+    // conta caracteres ate encontrar nulo
 1:
     ldrb w3, [x1, x2]
     cbz w3, 2f
@@ -19,7 +19,7 @@ _escrever_tex:
 .align 2
 // [INTEIRO]
 _escrever_int:
-    mov w1, w0 // w1 = número
+    mov w1, w0 // w1 = numero
     ldr x0, = 5f // x0 = buffer
     mov x19, 0 // x19 = contador de caracteres
     

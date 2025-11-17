@@ -37,11 +37,12 @@ typedef enum {
     // condicionais:
     T_SE, T_SENAO, T_IGUAL_IGUAL, T_DIFERENTE,
     T_MAIOR, T_MENOR, T_MAIOR_IGUAL, T_MENOR_IGUAL,
-    T_TAMBEM_TAMBEM,
+    T_TAMBEM_TAMBEM, T_OU, T_OU_OU,
     // loops:
     T_POR, T_ENQ,
     // retornos:
-    T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, T_pLONGO,
+    T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, 
+    T_pLONGO, T_PONTEIRO,
     T_pVAZIO,
     // definições:
     T_DEF, T_REG, T_FIM, T_RETORNAR, T_INCLUIR,
@@ -195,7 +196,7 @@ const char* token_str(TipoToken t) {
         case T_pFLU: return "flu";
         case T_pBOOL: return "bool";
         case T_pDOBRO: return "dobro";
-        case T_pLONGO: return "longo";
+        case T_PONTEIRO: return "ponteiro";
         case T_pVAZIO: return "vazio";
         case T_DEF: return "def";
         case T_REG: return "reg";
@@ -229,7 +230,7 @@ int tam_tipo(TipoToken t) {
     switch(t) {
         case T_pCAR: case T_pBOOL: return 1;
         case T_pINT: case T_pFLU: return 4;
-        case T_pDOBRO: case T_pLONGO: return 8;
+        case T_pDOBRO: case T_pLONGO: case T_PONTEIRO: return 8;
         default: return 0;
     }
 }
@@ -237,6 +238,7 @@ int tam_tipo(TipoToken t) {
 int tipos_compativeis(TipoToken tipo1, TipoToken tipo2) {
     if(tipo1 == tipo2) return 1;
     if((tipo1 == T_pCAR && tipo2 == T_pINT) || (tipo1 == T_pINT && tipo2 == T_pCAR)) return 1;
+    if((tipo1 == T_pINT && tipo2 == T_pLONGO) || (tipo1 == T_pLONGO && tipo2 == T_pINT)) return 1;
     return 0;
 }
 
@@ -459,6 +461,13 @@ void proximoToken() {
             L.coluna_atual++;
         } else L.tk.tipo = T_TAMBEM;
         break;
+        case '|':
+        if(L.fonte[L.pos + 1] == '|') {
+            L.tk.tipo = T_OU_OU;
+            L.pos++;
+            L.coluna_atual++;
+        } else L.tk.tipo = T_OU;
+        break;
         default: fatal("simbolo invalido"); break;
     }
     L.tk.lex[0] = c;
@@ -519,10 +528,10 @@ TipoToken tratar_id(FILE* s, int escopo) {
     } else if(var->eh_array) {
         if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos); // carrega o endereço do array(parâmetro)
         else fprintf(s, "  add x0, x29, %d\n", var->pos); // endereço do array local
-        return T_pLONGO;
+        return T_PONTEIRO;
     } else if(var->eh_ponteiro) {
         fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-        return T_pLONGO;
+        return T_PONTEIRO;
     } else {
         carregar_valor(s, var);
         return var->tipo_base;
@@ -556,7 +565,7 @@ TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* f
     for(int i = 0; i < param_conta; i++) {
         int pos = (param_conta - i - 1) * 16;
         
-        if(int_reg < 8 && (param_tipos[i] == T_pINT || param_tipos[i] == T_pLONGO || param_tipos[i] == T_pCAR || param_tipos[i] == T_pBOOL)) {
+        if(int_reg < 8 && (param_tipos[i] == T_pINT || param_tipos[i] == T_pLONGO || param_tipos[i] == T_PONTEIRO || param_tipos[i] == T_pCAR || param_tipos[i] == T_pBOOL)) {
             fprintf(s, "  ldr x%d, [sp, %d]\n", int_reg, pos);
             int_reg++;
         } else if(fp_s_reg < 8 && param_tipos[i] == T_pFLU) {
@@ -597,13 +606,32 @@ TipoToken tratar_inteiro(FILE* s) {
     strcpy(num, L.tk.lex);
     long l_val = L.tk.valor_l;
     proximoToken();
-    
-    if(l_val < 65536) fprintf(s, "  mov w0, %ld\n", l_val);
-    else {
-        int titulo = add_const(T_INT, num, 0.0, l_val);
-        carregar_const(s, titulo);
+    // verifica se é um sufixo 'L' pra longo
+    if(L.tk.tipo == T_ID && (strcmp(L.tk.lex, "L") == 0 || strcmp(L.tk.lex, "l") == 0)) {
+        // é um numero longo
+        proximoToken();
+        
+        // pra numeros longos, sempre usa constante para valores maiores que 16 bits
+        if(l_val <= 0xFFFF) {
+            // numero pequeno cabe em mov imediato
+            fprintf(s, "  mov x0, %ld\n", l_val);
+        } else {
+            // numero grande, precisa de constante
+            int titulo = add_const(T_LONGO, num, 0.0, l_val);
+            carregar_const(s, titulo);
+        }
+        return T_pLONGO;
+    } else {
+        // é um inteiro normal
+        // pra inteiros de 32 bits, usa constante pra valores maiores que 16 bits
+        if(l_val <= 0xFFFF) {
+            fprintf(s, "  mov w0, %ld\n", l_val);
+        } else {
+            int titulo = add_const(T_INT, num, 0.0, l_val);
+            carregar_const(s, titulo);
+        }
+        return T_pINT;
     }
-    return T_pINT;
 }
 
 TipoToken tratar_flutuante(FILE* s) {
@@ -654,13 +682,13 @@ void coletar_args(FILE* s, Funcao* f) {
     while(L.tk.tipo != T_PAREN_DIR) {
         Variavel* var = &f->vars[f->var_conta];
         
-        // arrays como parametros devem ser tratados como ponteiros(T_pLONGO)
+        // arrays como parametros devem ser tratados como ponteiros(T_PONTEIRO)
         // mesmo que seu tipo base seja flutuante
         TipoToken tipo_param = L.tk.tipo;
         int eh_array_param = 0;
         // verifica se é um array
         if(L.tk.tipo == T_pFLU || L.tk.tipo == T_pINT || L.tk.tipo == T_pCAR || 
-           L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO) {
+           L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO || L.tk.tipo == T_pLONGO) {
             // salva estado atual
             salvo = L.tk;
             Lexer salvo_lexer = L;
@@ -668,15 +696,14 @@ void coletar_args(FILE* s, Funcao* f) {
             proximoToken();
             if(L.tk.tipo == T_COL_ESQ) {
                 eh_array_param = 1;
-                tipo_param = T_pLONGO; // arrays são passados como ponteiros
+                tipo_param = T_PONTEIRO; // arrays são passados como ponteiros
             }
             // restaura estado
             L.tk = salvo;
             L = salvo_lexer;
         }
-        
         // arrays como parametros vão para registradores inteiros
-        if(int_reg_idc < 8 && (tipo_param == T_pINT || tipo_param == T_pLONGO || 
+        if(int_reg_idc < 8 && (tipo_param == T_pINT || tipo_param == T_pLONGO || tipo_param == T_PONTEIRO || 
             tipo_param == T_pCAR || tipo_param == T_pBOOL || eh_array_param)) {
             sprintf(var->reg, "x%d", int_reg_idc++);
             var->pos = -1;
@@ -708,9 +735,9 @@ void verificar_retorno(FILE* s, int escopo) {
         return;
     }
     TipoToken tipo_exp = expressao(s, escopo);
-    // em funções que retornam ponteiro/array espera T_pLONGO
-    if(funcs[fn_cnt - 1].retorno == T_pLONGO) {
-        if(tipo_exp != T_pLONGO) fatal("[verificar_retorno] retorno deve ser ponteiro ou endereço");
+    // em funções que retornam ponteiro/array espera T_PONTEIRO
+    if(funcs[fn_cnt - 1].retorno == T_PONTEIRO) {
+        if(tipo_exp != T_PONTEIRO) fatal("[verificar_retorno] retorno deve ser ponteiro ou endereço");
     } else if(!tipos_compativeis(funcs[fn_cnt - 1].retorno, tipo_exp)) {
         fatal("[verificar_retorno] tipo de retorno incompatível");
     }
@@ -812,7 +839,6 @@ void verificar_se(FILE* s, int escopo) {
     if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
         fatal("[verificar_se] condição deve ser inteiro ou booleano");
     }
-    
     excessao(T_PAREN_DIR);
     
     int rotulo_falso = escopo_global++;
@@ -901,7 +927,7 @@ void verificar_por(FILE* s, int escopo) {
     } else {
         verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
     }
-    // gera código do incremento
+    // gera codigo do incremento
     fprintf(s, "  // incremento\n");
     // salva estado atual
     Lexer salvo = L;
@@ -1055,7 +1081,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         verificar_retorno(s, escopo);
         return;
     }
-    TipoToken tipos[] = {T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, T_pLONGO};
+    TipoToken tipos[] = {T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, T_pLONGO, T_PONTEIRO};
     int eh_tipo = 0;
     for(int i=0; i<6; i++) {
         if(L.tk.tipo == tipos[i]) {
@@ -1120,6 +1146,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                 else if(var->tipo_base == T_pINT) fprintf(s, "  str w0, [x2]\n");  // usa str para inteiros de 4 bytes
                 else if(var->tipo_base == T_pFLU) fprintf(s, "  str s0, [x2]\n");
                 else if(var->tipo_base == T_pDOBRO) fprintf(s, "  str d0, [x2]\n");
+                else if(var->tipo_base == T_pLONGO) fprintf(s, "  str x0, [x2]\n");  // usa str para inteiros de 4 bytes
             } else {
                 fatal("[verificar_stmt] acesso a elemento de array deve ser usado em expressão ou atribuição");
             }
@@ -1202,7 +1229,7 @@ void verificar_fn(FILE* s) {
 
     char fnome[32];
     strcpy(fnome, L.tk.lex);
-    TipoToken tipo_real = (eh_ponteiro || eh_array) ? T_pLONGO : rt;
+    TipoToken tipo_real = (eh_ponteiro || eh_array) ? T_PONTEIRO : rt;
     
     funcs[fn_cnt].var_conta = 0;
     funcs[fn_cnt].retorno = tipo_real;
@@ -1229,7 +1256,7 @@ void verificar_fn(FILE* s) {
         int pos_calculado = -16;
         while(L.tk.tipo != T_CHAVE_DIR) {
             if(L.tk.tipo == T_pCAR || L.tk.tipo == T_pINT || L.tk.tipo == T_pFLU || 
-               L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO || L.tk.tipo == T_pLONGO) {
+               L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO || L.tk.tipo == T_PONTEIRO) {
                 
                 TipoToken tipo_base = L.tk.tipo;
                 int eh_ponteiro_local = 0;
@@ -1281,7 +1308,7 @@ void verificar_fn(FILE* s) {
         
         // add espaço extra para operações temporárias da pilha
         int max = 128; // acesso minimo
-        int tam_necessario = max + 16; // Margem de segurança
+        int tam_necessario = 32; // margem de segurança
         
         if(frame_tam < tam_necessario) {
             frame_tam = tam_necessario;
@@ -1379,6 +1406,7 @@ void gerar_consts(FILE* s) {
             float f = (float)constantes[i].d_val;
             fprintf(s, "  .float %f\n", f);
         } else if(constantes[i].tipo == T_DOBRO) fprintf(s, "  .double %f\n", constantes[i].d_val);
+        else if(constantes[i].tipo == T_LONGO) fprintf(s, "  .quad %ld\n", constantes[i].l_val);
     }
     fprintf(s, "  .section .text\n\n");
 }
@@ -1388,26 +1416,33 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
         case T_MAIS: 
             if(tipo == T_pFLU) fprintf(s, "  fadd s0, s1, s0\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fadd d0, d1, d0\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  add x0, x1, x0\n");
             else fprintf(s, "  add w0, w1, w0\n");
         break;
         case T_MENOS: 
             if(tipo == T_pFLU) fprintf(s, "  fsub s0, s1, s0\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fsub d0, d1, d0\n");
+            else if(T_pLONGO) fprintf(s, "  sub x0, x1, x0\n");
             else fprintf(s, "  sub w0, w1, w0\n");
         break;
         case T_VEZES: 
             if(tipo == T_pFLU) fprintf(s, "  fmul s0, s1, s0\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fmul d0, d1, d0\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  mul x0, x1, x0\n");
             else fprintf(s, "  mul w0, w1, w0\n");
         break;
         case T_DIV: 
             if(tipo == T_pFLU) fprintf(s, "  fdiv s0, s1, s0\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fdiv d0, d1, d0\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  sdiv x0, x1, x0\n");
             else fprintf(s, "  sdiv w0, w1, w0\n");
         break;
         case T_PORCEN: 
             if(tipo == T_pFLU || tipo == T_pDOBRO) {
                 fatal("[gerar_operacao] operador módulo não suportado para tipos flutuante");
+            } else if(tipo == T_pLONGO) {
+                fprintf(s, "  sdiv x2, x1, x0\n");
+                fprintf(s, "  msub x0, x2, x0, x1\n");
             } else {
                 fprintf(s, "  sdiv w2, w1, w0\n");
                 fprintf(s, "  msub w0, w2, w0, w1\n");
@@ -1416,6 +1451,13 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
         case T_TAMBEM_TAMBEM:
             if(tipo == T_pFLU || tipo == T_pDOBRO) {
                 fatal("[gerar_operacao] operador && não suportado para tipos flutuante");
+            } else if(tipo == T_pLONGO) {
+                // &&: w0 = (w1 != 0) && (w0 != 0)
+                fprintf(s, "  cmp x1, 0\n");
+                fprintf(s, "  cset x1, ne\n");  // w1 = (w1 != 0) ? 1 : 0
+                fprintf(s, "  cmp x0, 0\n");
+                fprintf(s, "  cset x0, ne\n");  // w0 = (w0 != 0) ? 1 : 0
+                fprintf(s, "  and x0, x1, x0\n"); // w0 = w1 & w0
             } else {
                 // &&: w0 = (w1 != 0) && (w0 != 0)
                 fprintf(s, "  cmp w1, 0\n");
@@ -1434,31 +1476,37 @@ void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo) {
         case T_IGUAL_IGUAL:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, eq\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, eq\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, eq\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, eq\n");
         break;
         case T_DIFERENTE:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, ne\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, ne\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, ne\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, ne\n");
         break;
         case T_MAIOR:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, gt\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, gt\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  fcmp x1, x0\n  cset x0, gt\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, gt\n");
         break;
         case T_MENOR:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, lt\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, lt\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, lt\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, lt\n");
         break;
         case T_MAIOR_IGUAL:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, ge\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, ge\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, ge\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, ge\n");
         break;
         case T_MENOR_IGUAL:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, le\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, le\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, le\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, le\n");
         break;
         default: fatal("[gerar_comparacao] operador de comparação inválido");
@@ -1482,6 +1530,9 @@ TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual
     } else if(tipo_anterior == T_pINT && tipo_atual == T_pDOBRO) {
         fprintf(s, "  scvtf d0, w0\n");
         return T_pDOBRO;
+    } else if(tipo_anterior == T_pLONGO && tipo_atual == T_pDOBRO) {
+        fprintf(s, "  scvtf d0, x0\n");
+        return T_pDOBRO;
     }
     // se não precisa de conversão retorna o tipo dominante
     return (tam_tipo(tipo_atual) > tam_tipo(tipo_anterior)) ? tipo_atual : tipo_anterior;
@@ -1489,10 +1540,10 @@ TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual
 
 void escrever_valor(FILE* s, TipoToken tipo) {
     if(tipo == T_pFLU) fprintf(s, "  bl _escrever_flu\n");
-    else if(tipo == T_pDOBRO) fprintf(s, "  bl _escrever_double\n");
     else if(tipo == T_pCAR) fprintf(s, "  bl _escrever_car\n");
     else if(tipo == T_pBOOL) fprintf(s, "  bl _escrever_bool\n");
-    else if(tipo == T_TEX || tipo == T_LONGO) fprintf(s, "  bl _escrever_tex\n");
+    else if(tipo == T_TEX) fprintf(s, "  bl _escrever_tex\n");
+    else if(tipo == T_pLONGO) fprintf(s, "  bl _escrever_longo\n");
     else fprintf(s, "  bl _escrever_int\n");
 }
 
@@ -1552,6 +1603,9 @@ void carregar_const(FILE* s, int titulo) {
     } else if(c->tipo == T_DOBRO) {
         fprintf(s, "  ldr x0, = const_%d\n", titulo);
         fprintf(s, "  ldr d0, [x0]\n");
+    } else if(c->tipo == T_LONGO) {
+        fprintf(s, "  ldr x0, = const_%d\n", titulo);
+        fprintf(s, "  ldr x0, [x0]\n");
     } else if(c->tipo == T_INT) {
         fprintf(s, "  ldr x0, = const_%d\n", titulo);
         fprintf(s, "  ldr w0, [x0]\n");
@@ -1565,6 +1619,8 @@ int add_const(TipoToken tipo, const char* lex, double d_val, long l_val) {
         if(tipo == T_DOBRO && constantes[i].tipo == T_DOBRO && fabs(constantes[i].d_val - d_val) < 1e-9)
             return constantes[i].titulo;
         if(tipo == T_INT && constantes[i].tipo == T_INT && constantes[i].l_val == l_val)
+            return constantes[i].titulo;
+        if(tipo == T_LONGO && constantes[i].tipo == T_LONGO && constantes[i].l_val == l_val)
             return constantes[i].titulo;
     }
     if(const_cnt >= MAX_CONST) fatal("[add_const] excesso de constantes");

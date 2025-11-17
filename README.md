@@ -19,6 +19,7 @@ suportados
 #incluir "biblis/impressao.asm";
 #incluir "biblis/texs.asm";
 #incluir "biblis/mem.asm";
+#incluir "biblis/sistema.asm";
 
 /* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);
@@ -34,6 +35,8 @@ int texcmp(car* x, car* y);
 vazio subscar(car[] array, car alvo, car novo);
 vazio memcp(car[] array, car* p, int tam);
 
+longo obter_tempo_milis();
+
 int somar(int a, int b) {
    escrever("valor a: ", a, "\n");
    escrever("valor b: ", b, "\n");
@@ -48,26 +51,30 @@ vazio inicio() {
     escrever("\ninteiro: ", numero);
     flu pi = 3.14;
     escrever("\nflutuante: ", pi);
-    bool flag = 1;
-    escrever("\nbooleano: ", flag);
+    bool marca = 1;
+    escrever("\nbooleano: ", marca);
+    longo numLongo = obter_tempo_milis();
+    escrever("\nlongo: ", numLongo);
 
     escrever("\n\nTestando função soma:\n");
     int s = somar(5, 7);
     escrever("\nsoma com retorno 5 + 7 = esperando 12, veio: ", s);
-    testeAlteracoes(s, numero, letra, flag);
+    testeAlteracoes(s, numero, letra, marca, numLongo);
 }
 
-vazio testeAlteracoes(int s, int numero, car letra, bool flag) {
+vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) {
     s = 5 + 7;
     escrever("\nsoma comum 5 + 7 = esperando 12, veio: ", s);
 
     escrever("\n\nTestando atribuições:\n");
     numero = 100;
     letra = 'Z';
-    flag = 0;
+    marca = 0;
+    numLongo = 1763400788119L;
     escrever("\nnovo inteiro: ", numero);
     escrever("\nnovo caractere: ", letra);
-    escrever("\nnovo booleano: ", flag, "\n");
+    escrever("\nnovo booleano: ", marca);
+    escrever("\nnovo longo: ", numLongo, "\n");
     // teste operações:
     testeOperacoes();
     testeComparacoes();

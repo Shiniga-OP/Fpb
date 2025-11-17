@@ -10,7 +10,6 @@ _escrever_tex:
     cbz w3, 2f
     add x2, x2, 1
     b 1b
-    
 2:
     mov x0, 1
     mov x8, 64
@@ -29,7 +28,6 @@ _escrever_int:
     mov w2, '-'
     strb w2, [x0], 1 // escreve sinal
     mov x19, 1 // contador = 1
-
 1:
     // escreve dígitos em ordem reversa
     mov x2, x0 // x2: aponta pra posição atual
@@ -55,7 +53,6 @@ _escrever_int:
     strb w5, [x3], 1
     strb w4, [x2], -1
     b 3b
-
 4:
     ldr x1, = 5f
     mov x0, 1
@@ -63,7 +60,6 @@ _escrever_int:
     mov x8, 64
     svc 0
     ret
-
 .section .data
 5: // buffer do inteiro
     .fill   32, 1, 0
@@ -160,6 +156,52 @@ _escrever_flu:
 .align 2
 9: // buffer do flutuante
     .fill   32, 1, 0
+// [LONGO]
+.align 2
+_escrever_longo:
+    mov x1, x0 // x1 = numero(64 bits)
+    ldr x0, =5f // x0 = buffer
+    mov x19, 0 // x19 = contador de caracteres
+    
+    cmp x1, 0 // compara 64 bits
+    b.ge 1f
+    neg x1, x1 // torna positivo(64 bits)
+    mov w2, '-'
+    strb w2, [x0], 1 // escreve sinal(w2 é 32 bits)
+    mov x19, 1 // contador = 1
+1:
+    // escreve digitos em ordem reversa
+    mov x2, x0 // x2: aponta pra posição atual
+2:
+    mov x3, 10
+    udiv x4, x1, x3 // x4 = quociente(64 bits)
+    msub x5, x4, x3, x1 // x5 = resto(64 bits)
+    add w5, w5, '0' // converte resto pra caractere (w5)
+    strb w5, [x2], 1 // armazena o byte(w5)
+    add x19, x19, 1 // incrementa contador
+    mov x1, x4
+    cbnz x1, 2b // continua se x1 != 0
+    // inverte o texto de digitos
+    sub x2, x2, 1 // x2 aponta para o ultimo digito
+    mov x3, x0 // x3 aponta para o primeiro digito
+3:
+    cmp x3, x2
+    b.ge 4f
+    ldrb w4, [x3] // carrega byte(w4)
+    ldrb w5, [x2] // carrega byte(w5)
+    strb w5, [x3], 1 // armazena byte(w5)
+    strb w4, [x2], -1 // armazena byte(w4)
+    b 3b
+4:
+    ldr     x1, = 5f
+    mov     x0, 1
+    mov     x2, x19 // x19: o numero de caracteres
+    mov x8, 64
+    svc 0
+    ret
+.section .data
+5: // buffer do inteiro
+    .fill   32, 1, 0
 // [CARACTERE]:
 .align 2
 _escrever_car:
@@ -171,7 +213,6 @@ _escrever_car:
     svc 0
     add sp, sp, 1
     ret
-
 .align 2
 _escrever_bool:
     cmp w0, 0

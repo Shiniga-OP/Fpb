@@ -1,9 +1,6 @@
 #incluir "biblis/impressao.asm";
 
 vazio inicio() {
-    flu x = 0.5f * 2;
-    escrever(x);
-    se(x >= 1) {
-        escrever("\nx é maior que 1");
-    }
+    int[] arr = { 1, 1, 1, 1 };
+    escrever("teste");
 }

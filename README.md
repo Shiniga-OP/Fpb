@@ -229,7 +229,7 @@ as configurações:
 fpb -c
 ```
 
-m caso de erro, você poderá ver algo como:
+em caso de erro, você poderá ver algo como:
 ```Bash
 ola.fpb [ERRO] linha: 1 coluna: 1, próximo de ""
 ```
@@ -239,6 +239,7 @@ caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador,
 1. reutilização de constantes.
 2. reutilização de texs.
 3. primeiros 8 parametros sendo passados por registradores.
+4. usando a marcação -O1 após o nome do arquivo, será ativado a eliminação de funções não usadas e labels.
 # requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
 

@@ -6,13 +6,15 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 17/11/2025.
+* [ATUAL]: 18/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+
+#include "util/otimi1.h"
 
 #define MAX_TOK 512 // maximo de tolens
 #define MAX_CODIGO 8192 // maximo de codhgk
@@ -1955,7 +1957,7 @@ int main(int argc, char** argv) {
     char asm_s[128], asm_o[128], cmd[256], nomeArquivo[256];
     arquivoAtual = argv[1];
     
-    int manter_asm = ((argc >= 3 && strcmp(argv[2], "-asm") == 0) || (argc >= 5 && strcmp(argv[4], "-asm") == 0));
+    int manter_asm = ((argc >= 3 && strcmp(argv[2], "-asm") == 0) || (argc >= 4 && strcmp(argv[3], "-asm") == 0) || (argc >= 5 && strcmp(argv[4], "-asm") == 0));
 
     snprintf(nomeArquivo, sizeof(nomeArquivo), "%s.fpb", argv[1]);
     FILE* en = fopen(nomeArquivo, "r");
@@ -1983,18 +1985,24 @@ int main(int argc, char** argv) {
         printf("FPB: [ERRO] não foi possível criar o ASM intermediario\n");
         return 1;
     }
-
     while(L.tk.tipo != T_FIM) {
         if(L.tk.tipo == T_INCLUIR) {
             int pos = 0;
             verificar_stmt(s, &pos, 0);
         } else verificar_fn(s);
     }
-    
     gerar_consts(s);
     gerar_texs(s);
 
     fclose(s);
+    
+    int otimizar = 0;
+    if(argc >= 3 && strcmp(argv[2], "-O1") == 0) otimizar = 1;
+
+    for(int i=1; i<argc; i++) {
+        if(strcmp(argv[i], "-O1") == 0) otimizar = 1;
+    }
+    if(otimizar) otimizarO1(asm_s);
 
     snprintf(asm_o, sizeof(asm_o), "%s.o", argv[1]);
     snprintf(cmd, sizeof(cmd), "as %s -o %s", asm_s, asm_o);

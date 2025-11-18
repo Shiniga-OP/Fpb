@@ -1,9 +1,12 @@
 #incluir "biblis/impressao.asm";
 
-longo teste() {
-    retorne 1233444L;
-}
-
 vazio inicio() {
-    escrever(teste());
+    int x = 1;
+    escrever("inteiro positivo: ", x, "\n");
+    x = -1;
+    escrever("inteiro negativo: ", x, "\n");
+    flu y = 1.1;
+    escrever("flutuante positivo: ", y, "\n");
+    y = -1.1;
+    escrever("flutuante negativo: ", y, "\n");
 }

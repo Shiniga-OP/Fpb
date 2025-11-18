@@ -62,6 +62,15 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     escrever("\nnovo caractere: ", letra);
     escrever("\nnovo booleano: ", marca);
     escrever("\nnovo longo: ", numLongo, "\n");
+    escrever("\nTeste de positivo e negativo:\n\n");
+    int x = 1;
+    escrever("inteiro positivo: ", x, "\n");
+    x = -1;
+    escrever("inteiro negativo: ", x, "\n");
+    flu y = 1.1;
+    escrever("flutuante positivo: ", y, "\n");
+    y = -1.1;
+    escrever("flutuante negativo: ", y, "\n");
     // teste operações:
     testeOperacoes();
     testeComparacoes();

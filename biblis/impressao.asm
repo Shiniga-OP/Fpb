@@ -63,7 +63,7 @@ _escrever_int:
 .section .data
 5: // buffer do inteiro
     .fill   32, 1, 0
-//[FLUTUANTE]
+// [FLUTUANTE]
 .align 2
 _escrever_flu:
     // s0 contem o valor flutuante

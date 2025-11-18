@@ -74,7 +74,7 @@ _escrever_int:
   .align 2
 5: // buffer do inteiro
     .fill   32, 1, 0
-//[FLUTUANTE]
+// [FLUTUANTE]
 .align 2
 _escrever_flu:
     // s0 contem o valor flutuante
@@ -248,32 +248,46 @@ _escrever_bool:
     .asciz "falso"// fim de biblis/impressao.asm
 
 .align 2
-teste:
-  sub sp, sp, 160
-  stp x29, x30, [sp]
-  mov x29, sp
-  stp x19, x20, [x29, 16]
-  stp x21, x22, [x29, 32]
-  ldr x0, = const_0
-  ldr x0, [x0]
-  b .epilogo_0
-  b .epilogo_0
-.epilogo_0:
-  ldp x19, x20, [x29, 16]
-  ldp x21, x22, [x29, 32]
-  mov sp, x29
-  ldp x29, x30, [sp]
-  add sp, sp, 160
-  ret
-.align 2
 inicio:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  bl teste
-  bl _escrever_longo
-  b .epilogo_1
-.epilogo_1:
+  mov w0, 1
+  str w0, [x29, 32]
+  ldr x0, =.tex_0
+  bl _escrever_tex
+  ldr w0, [x29, 32]
+  bl _escrever_int
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  mov w0, -1
+  str w0, [x29, 32]
+  ldr x0, =.tex_2
+  bl _escrever_tex
+  ldr w0, [x29, 32]
+  bl _escrever_int
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  ldr x0, = const_0
+  ldr s0, [x0]
+  str s0, [x29, 48]
+  ldr x0, =.tex_3
+  bl _escrever_tex
+  ldr s0, [x29, 48]
+  bl _escrever_flu
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  ldr x0, = const_1
+  ldr s0, [x0]
+  str s0, [x29, 48]
+  ldr x0, =.tex_4
+  bl _escrever_tex
+  ldr s0, [x29, 48]
+  bl _escrever_flu
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  b .epilogo_0
+.epilogo_0:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
@@ -281,6 +295,17 @@ inicio:
   .section .rodata
   .align 8
 const_0:
-  .quad 1233444
+  .float 1.100000
+const_1:
+  .float -1.100000
   .section .text
+
+.section .rodata
+.align 2
+.tex_0: .asciz "inteiro positivo: "
+.tex_1: .asciz "\n"
+.tex_2: .asciz "inteiro negativo: "
+.tex_3: .asciz "flutuante positivo: "
+.tex_4: .asciz "flutuante negativo: "
+.section .text
 

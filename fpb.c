@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 16/09/2025.
+* [ATUAL]: 17/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -191,6 +191,7 @@ const char* token_str(TipoToken t) {
         case T_MAIOR_IGUAL: return ">=";
         case T_MENOR_IGUAL: return "<=";
         case T_TAMBEM_TAMBEM: return "&&";
+        case T_OU_OU: return "||";
         case T_pCAR: return "car";
         case T_pINT: return "int";
         case T_pFLU: return "flu";
@@ -344,9 +345,18 @@ void proximoToken() {
         else L.tk.tipo = T_ID;
         return;
     }
-    if(isdigit((unsigned char)c) || c == '.') {
+    if((c == '-' && isdigit((unsigned char)L.fonte[L.pos + 1])) || 
+    isdigit((unsigned char)c) || c == '.') {
         i = 0;
         int ponto = 0;
+        int negativo = 0;
+        // verifica se é negativo
+        if(c == '-') {
+            negativo = 1;
+            if(i < MAX_TOK - 1) L.tk.lex[i++] = c;
+            L.pos++; L.coluna_atual++;
+            c = L.fonte[L.pos];
+        }
         while((c = L.fonte[L.pos]) && (isdigit((unsigned char)c) || c == '.')) {
             if(c == '.') {
                 if(ponto) fatal("numero invalido");
@@ -356,6 +366,7 @@ void proximoToken() {
             L.pos++; L.coluna_atual++;
         }
         L.tk.lex[i] = 0;
+        
         if(ponto) {
             L.tk.tipo = T_FLU;
             L.tk.valor_d = atof(L.tk.lex);
@@ -391,7 +402,6 @@ void proximoToken() {
         L.tk.tipo = T_TEX;
         return;
     }
-
     if(c == '\'') {
         L.pos++; L.coluna_atual++;
         if(!L.fonte[L.pos]) fatal("caractere mal formado");
@@ -1647,7 +1657,21 @@ int add_tex(const char* valor) {
 }
 
 TipoToken fator(FILE* s, int escopo) {
-    if(L.tk.tipo == T_PAREN_ESQ) {
+    if(L.tk.tipo == T_MENOS) {
+        proximoToken();
+        TipoToken tipo = fator(s, escopo);
+        
+        if(tipo == T_pFLU) {
+            fprintf(s, "  fneg s0, s0\n");
+        } else if(tipo == T_pDOBRO) {
+            fprintf(s, "  fneg d0, d0\n");
+        } else if(tipo == T_pLONGO) {
+            fprintf(s, "  neg x0, x0\n");
+        } else {
+            fprintf(s, "  neg w0, w0\n");
+        }
+        return tipo;
+    } else if(L.tk.tipo == T_PAREN_ESQ) {
         proximoToken();
         TipoToken tipo = expressao(s, escopo);
         excessao(T_PAREN_DIR);

@@ -345,11 +345,12 @@ void proximoToken() {
         else L.tk.tipo = T_ID;
         return;
     }
-    if((c == '-' && isdigit((unsigned char)L.fonte[L.pos + 1])) || 
-    isdigit((unsigned char)c) || c == '.') {
+    if((c == '-' && isdigit((unsigned char)L.fonte[L.pos + 1])) || isdigit((unsigned char)c) || c == '.') {
         i = 0;
         int ponto = 0;
         int negativo = 0;
+        int tem_sufixo = 0;
+        char sufixo = 0;
         // verifica se é negativo
         if(c == '-') {
             negativo = 1;
@@ -357,17 +358,28 @@ void proximoToken() {
             L.pos++; L.coluna_atual++;
             c = L.fonte[L.pos];
         }
-        while((c = L.fonte[L.pos]) && (isdigit((unsigned char)c) || c == '.')) {
+        while((c = L.fonte[L.pos]) && (isdigit((unsigned char)c) || c == '.' || c == 'f' || c == 'F' || c == 'd' || c == 'D')) {
             if(c == '.') {
                 if(ponto) fatal("numero invalido");
                 ponto = 1;
             }
+            if(c == 'f' || c == 'F' || c == 'd' || c == 'D') {
+                tem_sufixo = 1;
+                sufixo = c;
+                L.pos++;
+                L.coluna_atual++;
+                break;
+            }
             if(i < MAX_TOK - 1) L.tk.lex[i++] = c;
-            L.pos++; L.coluna_atual++;
+            L.pos++;
+            L.coluna_atual++;
         }
         L.tk.lex[i] = 0;
-        
-        if(ponto) {
+        // determina o tipo baseado no sufixo e na presença de ponto
+        if(tem_sufixo && (sufixo == 'd' || sufixo == 'D')) {
+            L.tk.tipo = T_DOBRO;
+            L.tk.valor_d = atof(L.tk.lex);
+        } else if(ponto || (tem_sufixo && (sufixo == 'f' || sufixo == 'F'))) {
             L.tk.tipo = T_FLU;
             L.tk.valor_d = atof(L.tk.lex);
         } else {
@@ -1524,27 +1536,51 @@ void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo) {
 }
 
 TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual) {
-    if(tipo_anterior == T_pFLU && tipo_atual == T_pDOBRO) {
-        fprintf(s, "  fcvt d1, s1\n");
-        fprintf(s, "  fcvt d0, s0\n");
+    if(tipo_anterior == tipo_atual) return tipo_anterior;
+
+    // CASO 1: inteiro(esq) com flutuante(dir)
+    // o inteiro ta em w1(anterior), o flutuante ta em s0(atual)
+    if(tipo_anterior == T_pINT && tipo_atual == T_pFLU) {
+        fprintf(s, "  scvtf s1, w1\n"); // converte w1 pra s1
+        return T_pFLU;
+    }
+    // CASO 2: flutuante(esq) com inteiro(dir)
+    // O flutuante ta em s1(anterior), o inteiro ta em w0(atual)
+    else if(tipo_anterior == T_pFLU && tipo_atual == T_pINT) {
+        fprintf(s, "  scvtf s0, w0\n"); // converte w0 pra s0
+        return T_pFLU;
+    }
+    // CASO 3: inteiro e dobro
+    else if(tipo_anterior == T_pINT && tipo_atual == T_pDOBRO) {
+        fprintf(s, "  scvtf d1, w1\n"); // int w1 -> dobro d1
+        return T_pDOBRO;
+    } else if(tipo_anterior == T_pDOBRO && tipo_atual == T_pINT) {
+        fprintf(s, "  scvtf d0, w0\n"); // int w0 -> dobro d0
+        return T_pDOBRO;
+    }
+    // CASO 4: flutuante e dobro
+    else if(tipo_anterior == T_pFLU && tipo_atual == T_pDOBRO) {
+        fprintf(s, "  fcvt d1, s1\n"); // flu s1 -> dobro d1
         return T_pDOBRO;
     } else if(tipo_anterior == T_pDOBRO && tipo_atual == T_pFLU) {
-        fprintf(s, "  fcvt s1, d1\n");
-        fprintf(s, "  fcvt s0, d0\n");
+        fprintf(s, "  fcvt d0, s0\n"); // flu s0 -> dobro d0(promoção)
+        return T_pDOBRO;
+    }
+    // CASO 5: longo e flutuante/dobro
+    else if(tipo_anterior == T_pLONGO && tipo_atual == T_pFLU) {
+        fprintf(s, "  scvtf s1, x1\n");
         return T_pFLU;
-    } else if(tipo_anterior == T_pINT && tipo_atual == T_pFLU) {
-        fprintf(s, "  scvtf s0, w0\n");
-        fprintf(s, "  fcvt d1, s1\n");
-        fprintf(s, "  fcvt d0, s0\n");
-        return T_pDOBRO;
-    } else if(tipo_anterior == T_pINT && tipo_atual == T_pDOBRO) {
-        fprintf(s, "  scvtf d0, w0\n");
-        return T_pDOBRO;
+    } else if(tipo_anterior == T_pFLU && tipo_atual == T_pLONGO) {
+        fprintf(s, "  scvtf s0, x0\n");
+        return T_pFLU;
     } else if(tipo_anterior == T_pLONGO && tipo_atual == T_pDOBRO) {
+        fprintf(s, "  scvtf d1, x1\n");
+        return T_pDOBRO;
+    } else if(tipo_anterior == T_pDOBRO && tipo_atual == T_pLONGO) {
         fprintf(s, "  scvtf d0, x0\n");
         return T_pDOBRO;
     }
-    // se não precisa de conversão retorna o tipo dominante
+    // retorno padrão(mantem o maior tipo se não tiver conversão especifica)
     return (tam_tipo(tipo_atual) > tam_tipo(tipo_anterior)) ? tipo_atual : tipo_anterior;
 }
 
@@ -1893,6 +1929,7 @@ int main(int argc, char** argv) {
     if(strcmp(argv[1], "-ajuda") == 0) {
         printf("[informação]:\n");
         printf("fpb -v : versão e o distribuidor\n");
+        printf("fpb -O1 : otimização nivel 1, eliminação de código morto\n");
         printf("fpb -c : configurações do compilador\n");
         printf("[compilação]:\n");
         printf("fpb exemplo : compila um arquivo.fpb e gera o binário na pasta atual\n");

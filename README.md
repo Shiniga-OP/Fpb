@@ -92,7 +92,7 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
 }
 
 vazio testeOperacoes() {
-    escrever("\n\nTeste de operações matematicas:\n");
+    escrever("\n\nTeste de operações matematicas:\n\n");
     // testando ordem de precedencia:
     escrever("operação 5 + 5 * 5, esperado: 30, veio: ", 5 + 5 * 5, "\n");
     escrever("operação (5 + 5) * 5, esperado: 50, veio: ", (5 + 5) * 5, "\n");
@@ -101,6 +101,10 @@ vazio testeOperacoes() {
     escrever(somar(5, 5), "\n"); // retorno passado direto
     
     escrever("10 % 3 = ?, esperado: 1, recebido: ", 10 % 3, "\n");
+    escrever("\n\nTeste de operações entre tipos:\n\n");
+    int y = 3;
+    flu x = 0.5f; // pode ter sufixo também
+    escrever("x: ", x, " * y: ", y, ", resultado: ", x * y, "\n");
 }
 
 vazio testeComparacoes() {

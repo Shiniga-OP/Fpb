@@ -1,12 +1,9 @@
 #incluir "biblis/impressao.asm";
 
 vazio inicio() {
-    int x = 1;
-    escrever("inteiro positivo: ", x, "\n");
-    x = -1;
-    escrever("inteiro negativo: ", x, "\n");
-    flu y = 1.1;
-    escrever("flutuante positivo: ", y, "\n");
-    y = -1.1;
-    escrever("flutuante negativo: ", y, "\n");
+    flu x = 0.5f * 2;
+    escrever(x);
+    se(x >= 1) {
+        escrever("\nx é maior que 1");
+    }
 }

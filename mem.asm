@@ -78,7 +78,7 @@ _escrever_int:
 .align 2
 _escrever_flu:
     // s0 contem o valor flutuante
-    adr x1, 9f // buffer de saida
+    adr x1, 8f // buffer de saida
     mov x6, x1 // salva inicio do buffer
     // verifica se é negativo
     fcmp s0, 0.0
@@ -86,39 +86,36 @@ _escrever_flu:
     mov w2, '-' // sinal negativo
     strb w2, [x1], 1
     fneg s0, s0 // torna positivo pra conversão
-    b 2f
+    b 1f
 1:
-    mov w2, ' ' // espaço pra positivo
-    strb w2, [x1], 1
-2:
     // parte inteira
     fcvtzs  w2, s0 // converte flutuante para inteiro(trunca)
     mov w3, 10
     mov w4, 0 // contador de dígitos
     mov x5, sp // usa pilha para empilhar digitos
     // se parte inteira for zero
-    cbz w2, 4f
+    cbz w2, 3f
     // converte parte inteira
-3:
+2:
     udiv w7, w2, w3
     msub w8, w7, w3, w2
     add w8, w8, '0'
     strb w8, [x5, -1]! // empilha digitos
     add w4, w4, 1
     mov w2, w7
-    cbnz w2, 3b
-    b 5f
-4:
+    cbnz w2, 2b
+    b 4f
+3:
     mov w7, '0'
     strb w7, [x1], 1
-    b 6f
+    b 5f
     // desempilha digitos inteiros
-5:
+4:
     ldrb w7, [x5], 1
     strb w7, [x1], 1
     subs w4, w4, 1
-    b.ne 5b
-6:
+    b.ne 4b
+5:
     // ponto decimal
     mov w2, '.'
     strb w2, [x1], 1
@@ -146,19 +143,19 @@ _escrever_flu:
     mov x0, 1 // saida de impressão
     mov x1, x6 // inicio do buffer
     // calcula tamanho: x1 aponta para inicio, x1+... para final
-    adr x2, 9f // buffer
+    adr x2, 8f // buffer
     sub x3, x1, x2 // deslocamento atual
     add x2, x2, x3 // x2 = posição atual
     sub x2, x1, x6
     // conta ate encontrar o nulo
     mov x2, 0 // contador
     mov x3, x6 // ponteiro
-7:
+6:
     ldrb w4, [x3], 1
-    cbz w4, 8f
+    cbz w4, 7f
     add x2, x2, 1
-    b 7b
-8:
+    b 6b
+7:
     mov x1, x6 // texto do flutuante
     mov x8, 64
     svc 0
@@ -166,7 +163,7 @@ _escrever_flu:
 .section .data
   .align 2
 .align 2
-9: // buffer do flutuante
+8: // buffer do flutuante
     .fill   32, 1, 0
 // [LONGO]
 .align 2
@@ -252,40 +249,30 @@ inicio:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  mov w0, 1
-  str w0, [x29, 32]
-  ldr x0, =.tex_0
-  bl _escrever_tex
-  ldr w0, [x29, 32]
-  bl _escrever_int
-  ldr x0, =.tex_1
-  bl _escrever_tex
-  mov w0, -1
-  str w0, [x29, 32]
-  ldr x0, =.tex_2
-  bl _escrever_tex
-  ldr w0, [x29, 32]
-  bl _escrever_int
-  ldr x0, =.tex_1
-  bl _escrever_tex
   ldr x0, = const_0
   ldr s0, [x0]
-  str s0, [x29, 48]
-  ldr x0, =.tex_3
-  bl _escrever_tex
-  ldr s0, [x29, 48]
+  str s0, [sp, -16]!
+  mov w0, 2
+  ldr s1, [sp], 16
+  scvtf s0, w0
+  fmul s0, s1, s0
+  str s0, [x29, 32]
+  ldr s0, [x29, 32]
   bl _escrever_flu
-  ldr x0, =.tex_1
+  ldr s0, [x29, 32]
+  str s0, [sp, -16]!
+  mov w0, 1
+  ldr s1, [sp], 16
+  scvtf s0, w0
+  fcmp s1, s0
+  cset w0, ge
+  cmp w0, 0
+  beq .B1
+  ldr x0, =.tex_0
   bl _escrever_tex
-  ldr x0, = const_1
-  ldr s0, [x0]
-  str s0, [x29, 48]
-  ldr x0, =.tex_4
-  bl _escrever_tex
-  ldr s0, [x29, 48]
-  bl _escrever_flu
-  ldr x0, =.tex_1
-  bl _escrever_tex
+  b .B2
+.B1:
+.B2:
   b .epilogo_0
 .epilogo_0:
   mov sp, x29
@@ -295,17 +282,11 @@ inicio:
   .section .rodata
   .align 8
 const_0:
-  .float 1.100000
-const_1:
-  .float -1.100000
+  .float 0.500000
   .section .text
 
 .section .rodata
 .align 2
-.tex_0: .asciz "inteiro positivo: "
-.tex_1: .asciz "\n"
-.tex_2: .asciz "inteiro negativo: "
-.tex_3: .asciz "flutuante positivo: "
-.tex_4: .asciz "flutuante negativo: "
+.tex_0: .asciz "\nx é maior que 1"
 .section .text
 

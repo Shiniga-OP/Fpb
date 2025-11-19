@@ -1,6 +1,7 @@
 #incluir "tmp/texint.asm";
 
 vazio inicio() {
-    car[] arr = "texto";
-    escrever(arr);
+    int i = 0;
+    i = 1;
+    escrever(i);
 }

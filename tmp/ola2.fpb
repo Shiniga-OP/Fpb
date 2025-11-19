@@ -47,6 +47,9 @@ vazio inicio() {
     escrever("\n\nTestando função soma:\n");
     int s = somar(5, 7);
     escrever("\nsoma com retorno 5 + 7 = esperando 12, veio: ", s);
+    final int varFinal = 1;
+    escrever("\n\nVariavel final inteira:\n");
+    escrever(varFinal, "\n");
     testeAlteracoes(s, numero, letra, marca, numLongo);
 }
 

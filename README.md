@@ -60,6 +60,9 @@ vazio inicio() {
     escrever("\n\nTestando função soma:\n");
     int s = somar(5, 7);
     escrever("\nsoma com retorno 5 + 7 = esperando 12, veio: ", s);
+    final int varFinal = 1;
+    escrever("\n\nVariavel final inteira:\n");
+    escrever(varFinal, "\n");
     testeAlteracoes(s, numero, letra, marca, numLongo);
 }
 
@@ -249,13 +252,15 @@ caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador,
 1. reutilização de constantes.
 2. reutilização de texs.
 3. primeiros 8 parametros sendo passados por registradores.
-4. usando a marcação -O1 após o nome do arquivo, será ativado a eliminação de funções não usadas e labels.
+4. usando a marcação -O1 após o nome do arquivo, será ativado a eliminação de funções não usadas e labels. (beta)
 # requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
 
 o compilador do gera binários válidos para a arquitetura ARM64 Linux (Android).
 
 # extra:
+parâmatros sempre são mutáveis, nunca finais.
+
 as bibliotecas incluidas com **#incluir** não são linkadas, o assembly é colado ao final do arquivo intermediário ASM antes de ser compilado.
 
 o compilador é auto suficiente, sem a necessidade de libc.so para binários **gerados pelo compilador**, o compilador em si, por ser escrito em C, ainda precisa de libc.so pra funcionar.

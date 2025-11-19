@@ -490,6 +490,12 @@ inicio:
   bl _escrever_tex
   ldr w0, [x29, 112]
   bl _escrever_int
+  mov w0, 1
+  str w0, [x29, 128]
+  ldr x0, =.tex_11
+  bl _escrever_tex
+  ldr w0, [x29, 128]
+  bl _escrever_int
   ldr w0, [x29, 112]
   str w0, [sp, -16]!
   ldr w0, [x29, 48]
@@ -531,11 +537,11 @@ testeAlteracoes:
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [x29, 16]
-  ldr x0, =.tex_11
+  ldr x0, =.tex_12
   bl _escrever_tex
   ldr w0, [x29, 16]
   bl _escrever_int
-  ldr x0, =.tex_12
+  ldr x0, =.tex_13
   bl _escrever_tex
   mov w0, 100
   str w0, [x29, 24]
@@ -546,29 +552,29 @@ testeAlteracoes:
   ldr x0, = const_1
   ldr x0, [x0]
   str x0, [x29, 48]
-  ldr x0, =.tex_13
+  ldr x0, =.tex_14
   bl _escrever_tex
   ldr w0, [x29, 24]
   bl _escrever_int
-  ldr x0, =.tex_14
+  ldr x0, =.tex_15
   bl _escrever_tex
   ldrb w0, [x29, 32]
   bl _escrever_car
-  ldr x0, =.tex_15
+  ldr x0, =.tex_16
   bl _escrever_tex
   ldrb w0, [x29, 40]
   bl _escrever_bool
-  ldr x0, =.tex_16
+  ldr x0, =.tex_17
   bl _escrever_tex
   ldr x0, [x29, 48]
   bl _escrever_longo
   ldr x0, =.tex_1
   bl _escrever_tex
-  ldr x0, =.tex_17
+  ldr x0, =.tex_18
   bl _escrever_tex
   mov w0, 1
   str w0, [x29, 32]
-  ldr x0, =.tex_18
+  ldr x0, =.tex_19
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
@@ -576,7 +582,7 @@ testeAlteracoes:
   bl _escrever_tex
   mov w0, -1
   str w0, [x29, 32]
-  ldr x0, =.tex_19
+  ldr x0, =.tex_20
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
@@ -585,7 +591,7 @@ testeAlteracoes:
   ldr x0, = const_2
   ldr s0, [x0]
   str s0, [x29, 48]
-  ldr x0, =.tex_20
+  ldr x0, =.tex_21
   bl _escrever_tex
   ldr s0, [x29, 48]
   bl _escrever_flu
@@ -594,7 +600,7 @@ testeAlteracoes:
   ldr x0, = const_3
   ldr s0, [x0]
   str s0, [x29, 48]
-  ldr x0, =.tex_21
+  ldr x0, =.tex_22
   bl _escrever_tex
   ldr s0, [x29, 48]
   bl _escrever_flu
@@ -618,9 +624,9 @@ testeOperacoes:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_22
-  bl _escrever_tex
   ldr x0, =.tex_23
+  bl _escrever_tex
+  ldr x0, =.tex_24
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -634,7 +640,7 @@ testeOperacoes:
   bl _escrever_int
   ldr x0, =.tex_1
   bl _escrever_tex
-  ldr x0, =.tex_24
+  ldr x0, =.tex_25
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -667,7 +673,7 @@ testeOperacoes:
   bl _escrever_int
   ldr x0, =.tex_1
   bl _escrever_tex
-  ldr x0, =.tex_25
+  ldr x0, =.tex_26
   bl _escrever_tex
   mov w0, 10
   str w0, [sp, -16]!
@@ -678,22 +684,22 @@ testeOperacoes:
   bl _escrever_int
   ldr x0, =.tex_1
   bl _escrever_tex
-  ldr x0, =.tex_26
+  ldr x0, =.tex_27
   bl _escrever_tex
   mov w0, 3
   str w0, [x29, 32]
   ldr x0, = const_4
   ldr s0, [x0]
   str s0, [x29, 48]
-  ldr x0, =.tex_27
+  ldr x0, =.tex_28
   bl _escrever_tex
   ldr s0, [x29, 48]
   bl _escrever_flu
-  ldr x0, =.tex_28
+  ldr x0, =.tex_29
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
-  ldr x0, =.tex_29
+  ldr x0, =.tex_30
   bl _escrever_tex
   ldr s0, [x29, 48]
   str s0, [sp, -16]!
@@ -717,7 +723,7 @@ testeComparacoes:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_30
+  ldr x0, =.tex_31
   bl _escrever_tex
   mov w0, 4
   str w0, [x29, 32]
@@ -729,7 +735,7 @@ testeComparacoes:
   cset w0, gt
   cmp w0, 0
   beq .B1
-  ldr x0, =.tex_31
+  ldr x0, =.tex_32
   bl _escrever_tex
   b .B2
 .B1:
@@ -741,11 +747,11 @@ testeComparacoes:
   cset w0, ge
   cmp w0, 0
   beq .B4
-  ldr x0, =.tex_32
+  ldr x0, =.tex_33
   bl _escrever_tex
   b .B5
 .B4:
-  ldr x0, =.tex_33
+  ldr x0, =.tex_34
   bl _escrever_tex
 .B5:
 .B2:
@@ -774,18 +780,18 @@ testeComparacoes:
 .B8:
   cmp w0, 0
   beq .B9
-  ldr x0, =.tex_34
+  ldr x0, =.tex_35
   bl _escrever_tex
   b .B10
 .B9:
-  ldr x0, =.tex_35
-  bl _escrever_tex
-.B10:
   ldr x0, =.tex_36
   bl _escrever_tex
-  ldr x0, = .tex_37
-  str x0, [x29, 64]
+.B10:
+  ldr x0, =.tex_37
+  bl _escrever_tex
   ldr x0, = .tex_38
+  str x0, [x29, 64]
+  ldr x0, = .tex_39
   str x0, [x29, 80]
   ldr x0, [x29, 64]
   bl _escrever_tex
@@ -810,7 +816,7 @@ testeComparacoes:
   cset w0, eq
   cmp w0, 0
   beq .B12
-  ldr x0, =.tex_39
+  ldr x0, =.tex_40
   bl _escrever_tex
   b .B13
 .B12:
@@ -830,7 +836,7 @@ testeComparacoes:
   cset w0, eq
   cmp w0, 0
   beq .B15
-  ldr x0, =.tex_40
+  ldr x0, =.tex_41
   bl _escrever_tex
   b .B16
 .B15:
@@ -850,11 +856,11 @@ testeComparacoes:
   cset w0, eq
   cmp w0, 0
   beq .B18
-  ldr x0, =.tex_41
+  ldr x0, =.tex_42
   bl _escrever_tex
   b .B19
 .B18:
-  ldr x0, =.tex_42
+  ldr x0, =.tex_43
   bl _escrever_tex
 .B19:
   b .epilogo_16
@@ -870,7 +876,7 @@ testeMemoria:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_43
+  ldr x0, =.tex_44
   bl _escrever_tex
   mov w1, 116
   strb w1, [x29, 32]
@@ -884,7 +890,7 @@ testeMemoria:
   strb w1, [x29, 36]
   mov w1, 0
   strb w1, [x29, 37]
-  ldr x0, =.tex_44
+  ldr x0, =.tex_45
   bl _escrever_tex
   add x0, x29, 32
   bl _escrever_tex
@@ -896,19 +902,19 @@ testeMemoria:
   add x2, x29, 32
   add x2, x2, x1
   strb w0, [x2]
-  ldr x0, =.tex_45
+  ldr x0, =.tex_46
   bl _escrever_tex
   add x0, x29, 32
   bl _escrever_tex
-  ldr x0, =.tex_46
+  ldr x0, =.tex_47
   bl _escrever_tex
-  ldr x0, = .tex_47
+  ldr x0, = .tex_48
   str x0, [x29, 48]
-  ldr x0, =.tex_48
+  ldr x0, =.tex_49
   bl _escrever_tex
   ldr x0, [x29, 48]
   bl _escrever_tex
-  ldr x0, =.tex_49
+  ldr x0, =.tex_50
   bl _escrever_tex
   ldr x0, [x29, 48]
   str x0, [sp, -16]!
@@ -933,16 +939,16 @@ testeMemoria:
   cset w0, ge
   cmp w0, 0
   beq .B21
-  ldr x0, =.tex_50
+  ldr x0, =.tex_51
   bl _escrever_tex
   ldr w0, [x29, 64]
   bl _escrever_int
   b .B22
 .B21:
-  ldr x0, =.tex_51
+  ldr x0, =.tex_52
   bl _escrever_tex
 .B22:
-  ldr x0, =.tex_52
+  ldr x0, =.tex_53
   bl _escrever_tex
   mov w1, 101
   strb w1, [x29, 80]
@@ -960,11 +966,11 @@ testeMemoria:
   strb w1, [x29, 86]
   mov w1, 0
   strb w1, [x29, 87]
-  ldr x0, =.tex_53
+  ldr x0, =.tex_54
   bl _escrever_tex
   add x0, x29, 80
   bl _escrever_tex
-  ldr x0, = .tex_54
+  ldr x0, = .tex_55
   str x0, [x29, 96]
   add x0, x29, 80
   str x0, [sp, -16]!
@@ -981,7 +987,7 @@ testeMemoria:
   ldr x2, [sp, 0]
   add sp, sp, 48
   bl memcp
-  ldr x0, =.tex_55
+  ldr x0, =.tex_56
   bl _escrever_tex
   add x0, x29, 80
   bl _escrever_tex
@@ -996,11 +1002,11 @@ testeMemoria:
   ldr x2, [sp, 0]
   add sp, sp, 48
   bl subscar
-  ldr x0, =.tex_56
+  ldr x0, =.tex_57
   bl _escrever_tex
   add x0, x29, 80
   bl _escrever_tex
-  ldr x0, =.tex_57
+  ldr x0, =.tex_58
   bl _escrever_tex
   mov w0, 0
   str w0, [sp, -16]!
@@ -1013,7 +1019,7 @@ testeMemoria:
   add x2, x2, x0
   ldrb w0, [x2]
   strb w0, [x29, 112]
-  ldr x0, =.tex_58
+  ldr x0, =.tex_59
   bl _escrever_tex
   ldrb w0, [x29, 112]
   bl _escrever_car
@@ -1027,7 +1033,7 @@ testeMemoria:
   str w0, [x29, 136]
   mov w0, 5
   str w0, [x29, 140]
-  ldr x0, =.tex_59
+  ldr x0, =.tex_60
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -144]
@@ -1040,11 +1046,11 @@ testeMemoria:
   cset w0, lt
   cmp w0, 0
   beq .B25
-  ldr x0, =.tex_60
+  ldr x0, =.tex_61
   bl _escrever_tex
   ldr w0, [x29, -144]
   bl _escrever_int
-  ldr x0, =.tex_61
+  ldr x0, =.tex_62
   bl _escrever_tex
   ldr w0, [x29, -144]
   str w0, [sp, -16]!
@@ -1077,7 +1083,7 @@ testeMemoria:
   ldr x0, = const_7
   ldr s0, [x0]
   str s0, [x29, 156]
-  ldr x0, =.tex_62
+  ldr x0, =.tex_63
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -128]
@@ -1090,11 +1096,11 @@ testeMemoria:
   cset w0, lt
   cmp w0, 0
   beq .B28
-  ldr x0, =.tex_60
+  ldr x0, =.tex_61
   bl _escrever_tex
   ldr w0, [x29, -128]
   bl _escrever_int
-  ldr x0, =.tex_61
+  ldr x0, =.tex_62
   bl _escrever_tex
   ldr w0, [x29, -128]
   str w0, [sp, -16]!
@@ -1128,9 +1134,9 @@ testeLoops:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_63
-  bl _escrever_tex
   ldr x0, =.tex_64
+  bl _escrever_tex
+  ldr x0, =.tex_65
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 32]
@@ -1143,7 +1149,7 @@ testeLoops:
   cset w0, lt
   cmp w0, 0
   beq .B30
-  ldr x0, =.tex_65
+  ldr x0, =.tex_66
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
@@ -1155,7 +1161,7 @@ testeLoops:
   str w0, [x29, 32]
   b .B29
 .B30:
-  ldr x0, =.tex_66
+  ldr x0, =.tex_67
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -144]
@@ -1168,7 +1174,7 @@ testeLoops:
   cset w0, lt
   cmp w0, 0
   beq .B33
-  ldr x0, =.tex_67
+  ldr x0, =.tex_68
   bl _escrever_tex
   ldr w0, [x29, -144]
   bl _escrever_int
@@ -1193,7 +1199,7 @@ testeMatrizes:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_68
+  ldr x0, =.tex_69
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 32]
@@ -1207,7 +1213,7 @@ testeMatrizes:
   str w0, [x29, 40]
   mov w0, 0
   str w0, [x29, 44]
-  ldr x0, =.tex_69
+  ldr x0, =.tex_70
   bl _escrever_tex
   mov w0, 0
   str w0, [sp, -16]!
@@ -1246,7 +1252,7 @@ testeMatrizes:
   ldr x0, = const_13
   ldr s0, [x0]
   str s0, [x29, 60]
-  ldr x0, =.tex_70
+  ldr x0, =.tex_71
   bl _escrever_tex
   mov w0, 0
   str w0, [sp, -16]!
@@ -1317,65 +1323,66 @@ const_13:
 .tex_8: .asciz "\nlongo: "
 .tex_9: .asciz "\n\nTestando função soma:\n"
 .tex_10: .asciz "\nsoma com retorno 5 + 7 = esperando 12, veio: "
-.tex_11: .asciz "\nsoma comum 5 + 7 = esperando 12, veio: "
-.tex_12: .asciz "\n\nTestando atribuições:\n"
-.tex_13: .asciz "\nnovo inteiro: "
-.tex_14: .asciz "\nnovo caractere: "
-.tex_15: .asciz "\nnovo booleano: "
-.tex_16: .asciz "\nnovo longo: "
-.tex_17: .asciz "\nTeste de positivo e negativo:\n\n"
-.tex_18: .asciz "inteiro positivo: "
-.tex_19: .asciz "inteiro negativo: "
-.tex_20: .asciz "flutuante positivo: "
-.tex_21: .asciz "flutuante negativo: "
-.tex_22: .asciz "\n\nTeste de operações matematicas:\n\n"
-.tex_23: .asciz "operação 5 + 5 * 5, esperado: 30, veio: "
-.tex_24: .asciz "operação (5 + 5) * 5, esperado: 50, veio: "
-.tex_25: .asciz "10 % 3 = ?, esperado: 1, recebido: "
-.tex_26: .asciz "\n\nTeste de operações entre tipos:\n\n"
-.tex_27: .asciz "x: "
-.tex_28: .asciz " * y: "
-.tex_29: .asciz ", resultado: "
-.tex_30: .asciz "\nTeste comparações:\n\n"
-.tex_31: .asciz "x é maior que 5\n"
-.tex_32: .asciz "x é maior ou igual a 5\n"
-.tex_33: .asciz "x não é maior nem igual a 5\n"
-.tex_34: .asciz "y >= 4 && x > 4 é verdadeiro\n"
-.tex_35: .asciz "y >= 4 && x > 4 é falso\n"
-.tex_36: .asciz "\nComparação com textos:\n\n"
-.tex_37: .asciz "texto 1"
-.tex_38: .asciz "texto 2"
-.tex_39: .asciz "texto 1 é igual a texto 2\n"
-.tex_40: .asciz "texto 1 não é igual a texto 2\n"
-.tex_41: .asciz "o primeiro texto é texto 1"
-.tex_42: .asciz "o primeiro texto não é texto 1"
-.tex_43: .asciz "\nTeste de array:\n"
-.tex_44: .asciz "\nvalor do array: "
-.tex_45: .asciz "\narray mudado no indice 0: "
-.tex_46: .asciz "\n\nTeste de ponteiro:\n"
-.tex_47: .asciz "exemplo de ponteiro"
-.tex_48: .asciz "\nponteiro texto, valor: "
-.tex_49: .asciz "\ntamamho em bytes: "
-.tex_50: .asciz "\no ponteiro tem t no indice: "
-.tex_51: .asciz "\no ponteiro não tem t\n"
-.tex_52: .asciz "\nTeste de manipulação da memoria:\n"
-.tex_53: .asciz "\nArray padrão: "
-.tex_54: .asciz "XxXmplo maior"
-.tex_55: .asciz "\nArray copiado da memoria: "
-.tex_56: .asciz "\nArray usando subscar(array, 'X', 'e'): "
-.tex_57: .asciz "\nTeste de acesso a itens array:\n"
-.tex_58: .asciz "item do indice 0 do array: "
-.tex_59: .asciz "\nArray de inteiros: \n\n"
-.tex_60: .asciz "no indice: "
-.tex_61: .asciz " valor: "
-.tex_62: .asciz "\nArray de flutuantes: \n\n"
-.tex_63: .asciz "\n\nTeste de loops"
-.tex_64: .asciz "\nEnquanto:"
-.tex_65: .asciz "\nvalor de i: "
-.tex_66: .asciz "\n\nPor:\n"
-.tex_67: .asciz "indice: "
-.tex_68: .asciz "\n\nTeste de matrizes:\n\n"
-.tex_69: .asciz "matriz 2D int m2[0][1]: "
-.tex_70: .asciz "matriz 2D flu m2f[0][1]: "
+.tex_11: .asciz "\nVariavel final inteira:\n"
+.tex_12: .asciz "\nsoma comum 5 + 7 = esperando 12, veio: "
+.tex_13: .asciz "\n\nTestando atribuições:\n"
+.tex_14: .asciz "\nnovo inteiro: "
+.tex_15: .asciz "\nnovo caractere: "
+.tex_16: .asciz "\nnovo booleano: "
+.tex_17: .asciz "\nnovo longo: "
+.tex_18: .asciz "\nTeste de positivo e negativo:\n\n"
+.tex_19: .asciz "inteiro positivo: "
+.tex_20: .asciz "inteiro negativo: "
+.tex_21: .asciz "flutuante positivo: "
+.tex_22: .asciz "flutuante negativo: "
+.tex_23: .asciz "\n\nTeste de operações matematicas:\n\n"
+.tex_24: .asciz "operação 5 + 5 * 5, esperado: 30, veio: "
+.tex_25: .asciz "operação (5 + 5) * 5, esperado: 50, veio: "
+.tex_26: .asciz "10 % 3 = ?, esperado: 1, recebido: "
+.tex_27: .asciz "\n\nTeste de operações entre tipos:\n\n"
+.tex_28: .asciz "x: "
+.tex_29: .asciz " * y: "
+.tex_30: .asciz ", resultado: "
+.tex_31: .asciz "\nTeste comparações:\n\n"
+.tex_32: .asciz "x é maior que 5\n"
+.tex_33: .asciz "x é maior ou igual a 5\n"
+.tex_34: .asciz "x não é maior nem igual a 5\n"
+.tex_35: .asciz "y >= 4 && x > 4 é verdadeiro\n"
+.tex_36: .asciz "y >= 4 && x > 4 é falso\n"
+.tex_37: .asciz "\nComparação com textos:\n\n"
+.tex_38: .asciz "texto 1"
+.tex_39: .asciz "texto 2"
+.tex_40: .asciz "texto 1 é igual a texto 2\n"
+.tex_41: .asciz "texto 1 não é igual a texto 2\n"
+.tex_42: .asciz "o primeiro texto é texto 1"
+.tex_43: .asciz "o primeiro texto não é texto 1"
+.tex_44: .asciz "\nTeste de array:\n"
+.tex_45: .asciz "\nvalor do array: "
+.tex_46: .asciz "\narray mudado no indice 0: "
+.tex_47: .asciz "\n\nTeste de ponteiro:\n"
+.tex_48: .asciz "exemplo de ponteiro"
+.tex_49: .asciz "\nponteiro texto, valor: "
+.tex_50: .asciz "\ntamamho em bytes: "
+.tex_51: .asciz "\no ponteiro tem t no indice: "
+.tex_52: .asciz "\no ponteiro não tem t\n"
+.tex_53: .asciz "\nTeste de manipulação da memoria:\n"
+.tex_54: .asciz "\nArray padrão: "
+.tex_55: .asciz "XxXmplo maior"
+.tex_56: .asciz "\nArray copiado da memoria: "
+.tex_57: .asciz "\nArray usando subscar(array, 'X', 'e'): "
+.tex_58: .asciz "\nTeste de acesso a itens array:\n"
+.tex_59: .asciz "item do indice 0 do array: "
+.tex_60: .asciz "\nArray de inteiros: \n\n"
+.tex_61: .asciz "no indice: "
+.tex_62: .asciz " valor: "
+.tex_63: .asciz "\nArray de flutuantes: \n\n"
+.tex_64: .asciz "\n\nTeste de loops"
+.tex_65: .asciz "\nEnquanto:"
+.tex_66: .asciz "\nvalor de i: "
+.tex_67: .asciz "\n\nPor:\n"
+.tex_68: .asciz "indice: "
+.tex_69: .asciz "\n\nTeste de matrizes:\n\n"
+.tex_70: .asciz "matriz 2D int m2[0][1]: "
+.tex_71: .asciz "matriz 2D flu m2f[0][1]: "
 .section .text
 

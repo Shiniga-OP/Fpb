@@ -86,21 +86,12 @@ inicio:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  // Inicializando array de char com string
-  mov w1, 116
-  strb w1, [x29, 32]
-  mov w1, 101
-  strb w1, [x29, 33]
-  mov w1, 120
-  strb w1, [x29, 34]
-  mov w1, 116
-  strb w1, [x29, 35]
-  mov w1, 111
-  strb w1, [x29, 36]
-  mov w1, 0
-  strb w1, [x29, 37]
-  add x0, x29, 32
-  bl _escrever_tex
+  mov w0, 0
+  str w0, [x29, 32]
+  mov w0, 1
+  str w0, [x29, 32]
+  ldr w0, [x29, 32]
+  bl _escrever_int
   b .epilogo_0
 .epilogo_0:
   mov sp, x29

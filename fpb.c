@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 18/11/2025.
+* [ATUAL]: 19/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,6 +26,8 @@
 #define MAX_DIMS 4  // máximo de dimensões para matrizes
 
 typedef enum {
+    // mutação:
+    T_FINAL,
     // tipos:
     T_ID, T_INT, T_TEX, T_CAR, T_FLU, T_BOOL, T_DOBRO, T_LONGO,
     T_COMENTARIO,
@@ -72,9 +74,10 @@ typedef struct {
     TipoToken tipo_base;
     int eh_ponteiro;
     int eh_array;
+    int eh_parametro;
+    int eh_final;
     int num_dims; // numero de dimensões
     int dims[MAX_DIMS]; // tamanho de cada dimensão
-    int eh_parametro;
     int bytes;
     int pos;
     int escopo;
@@ -129,7 +132,7 @@ Funcao* buscar_fn(const char* nome);
 void carregar_valor(FILE* s, Variavel* var);
 void carregar_const(FILE* s, int titulo);
 // declaracao
-void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro);
+void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_final);
 // tratar
 TipoToken tratar_id(FILE* s, int escopo);
 TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* fn);
@@ -178,6 +181,7 @@ const char* token_str(TipoToken t) {
         case T_BOOL: return "booleano";
         case T_DOBRO: return "dobro";
         case T_COMENTARIO: return "comentário";
+        case T_FINAL: return "final";
         case T_PAREN_ESQ: return "(";
         case T_PAREN_DIR: return ")";
         case T_CHAVE_ESQ: return "{";
@@ -337,7 +341,7 @@ void proximoToken() {
             L.pos++; L.coluna_atual++;
         }
         L.tk.lex[i] = 0;
-        // reconhece tipos
+        // reconhece tipos e outros
         if(strcmp(L.tk.lex, "car") == 0) L.tk.tipo = T_pCAR;
         else if(strcmp(L.tk.lex, "int") == 0) L.tk.tipo = T_pINT;
         else if(strcmp(L.tk.lex, "flu") == 0) L.tk.tipo = T_pFLU;
@@ -350,6 +354,7 @@ void proximoToken() {
         else if(strcmp(L.tk.lex, "por") == 0) L.tk.tipo = T_POR;
         else if(strcmp(L.tk.lex, "enq") == 0) L.tk.tipo = T_ENQ;
         else if(strcmp(L.tk.lex, "retorne") == 0) L.tk.tipo = T_RETORNAR;
+        else if(strcmp(L.tk.lex, "final") == 0) L.tk.tipo = T_FINAL;
         else L.tk.tipo = T_ID;
         return;
     }
@@ -793,7 +798,7 @@ void coletar_args(FILE* s, Funcao* f) {
             var->eh_array = eh_array_param;
             if(eh_array_param) var->tipo_base = salvo.tipo;
         }
-        declaracao_var(s, &pilha_pos, 0, 1);
+        declaracao_var(s, &pilha_pos, 0, 1, 0);
         
         if(L.tk.tipo == T_VIRGULA) proximoToken();
         else break;
@@ -897,6 +902,8 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
     Variavel* var = buscar_var(id, escopo);
     if(!var) fatal("[verificar_atribuicao] variável não declarada");
     
+    if(var->eh_final) fatal("[verificar_atribuicao] não é possível alterar uma variável final.");
+    
     if(var->eh_array) fatal("[verificar_atribuicao] não é possível armazenar valor direto em array");
     
     excessao(T_IGUAL);
@@ -984,7 +991,7 @@ void verificar_por(FILE* s, int escopo) {
     int novo_escopo = ++escopo_global;
     // declaração
     if(L.tk.tipo == T_pINT) {
-        declaracao_var(s, &funcs[fn_cnt - 1].frame_tam, novo_escopo, 0);
+        declaracao_var(s, &funcs[fn_cnt - 1].frame_tam, novo_escopo, 0, 0);
         excessao(T_PONTO_VIRGULA);
     } else if(L.tk.tipo == T_ID) {
         char id[32];
@@ -1125,7 +1132,11 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
     if(escopo == 0) escopo = escopo_global;
     
     while(L.tk.tipo == T_COMENTARIO) proximoToken();
-    
+    int eh_final = 0;
+    if(L.tk.tipo == T_FINAL) {
+        eh_final = 1;
+        proximoToken();
+    }
     if(L.tk.tipo == T_SE) {
         verificar_se(s, escopo);
         return;
@@ -1196,8 +1207,8 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             break;
         }
     }
-    if(eh_tipo) {
-        declaracao_var(s, pos, escopo, 0);
+    if(eh_tipo || eh_final) {
+        declaracao_var(s, pos, escopo, 0, eh_final);
         excessao(T_PONTO_VIRGULA);
         return;
     }
@@ -1895,7 +1906,7 @@ TipoToken expressao(FILE* s, int escopo) {
     return tipo;
 }
 
-void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro) {
+void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_final) {
     TipoToken tipo_base = L.tk.tipo;
     int eh_ponteiro = 0;
     int num_dims = 0;
@@ -1933,6 +1944,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro) {
     var->eh_ponteiro = eh_ponteiro;
     var->eh_array = (num_dims > 0);
     var->num_dims = num_dims;
+    var->eh_final = eh_final;
     memcpy(var->dims, dims, sizeof(dims));
     // calcula o tamanho total
     int tam_elemento = tam_tipo(tipo_base);
@@ -2040,7 +2052,6 @@ int main(int argc, char** argv) {
         printf("max dimensões: %i\n", MAX_DIMS);
         return 0;
     }
-
     char asm_s[128], asm_o[128], cmd[256], nomeArquivo[256];
     arquivoAtual = argv[1];
     
@@ -2052,7 +2063,6 @@ int main(int argc, char** argv) {
         printf("FPB: [ERRO] não foi possível abrir %s\n", nomeArquivo);
         return 2;
     }
-
     char* buf = malloc(MAX_CODIGO);
     size_t n = fread(buf, 1, MAX_CODIGO, en);
     buf[n] = 0;

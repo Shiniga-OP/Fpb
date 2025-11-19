@@ -27,6 +27,7 @@ vazio testeOperacoes();
 vazio testeComparacoes();
 vazio testeMemoria();
 vazio testeLoops();
+vazio testeMatrizes();
 
 int textam(car* texto);
 int texcar(car* texto, car alvo);
@@ -89,6 +90,7 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     testeComparacoes();
     testeLoops();
     testeMemoria();
+    testeMatrizes();
 }
 
 vazio testeOperacoes() {
@@ -199,6 +201,14 @@ vazio testeLoops() {
     por(int i = 0; i < 10; i = i + 1) {
         escrever("indice: ", i, "\n");
     }
+}
+
+vazio testeMatrizes() {
+    escrever("\n\nTeste de matrizes:\n\n");
+    int[][] m2 = { {0, 1, 4}, {4, 1, 0} };
+    escrever("matriz 2D int m2[0][1]: ", m2[0][1], "\n");
+    flu[][] m2f = { {3f, 5f, 7f}, {2f, 9f, 10f} };
+    escrever("matriz 2D flu m2f[0][1]: ", m2f[0][1], "\n");
 }
 ```
 ## como compilar

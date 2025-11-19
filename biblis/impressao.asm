@@ -15,8 +15,8 @@ _escrever_tex:
     svc 0
     ret
 // fim: [_escrever_tex]
-.align 2
 // fn: [_escrever_int]
+.align 2
 _escrever_int:
     mov w1, w0 // w1 = numero
     ldr x0, = 5f // x0 = buffer

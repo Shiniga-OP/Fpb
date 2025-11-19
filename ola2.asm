@@ -25,8 +25,8 @@ _escrever_tex:
     svc 0
     ret
 // fim: [_escrever_tex]
-.align 2
 // fn: [_escrever_int]
+.align 2
 _escrever_int:
     mov w1, w0 // w1 = numero
     ldr x0, = 5f // x0 = buffer
@@ -426,9 +426,9 @@ somar:
   ldr w0, [x29, 56]
   ldr w1, [sp], 16
   add w0, w1, w0
-  b .epilogo_11
-  b .epilogo_11
-.epilogo_11:
+  b .epilogo_12
+  b .epilogo_12
+.epilogo_12:
   ldp x19, x20, [x29, 16]
   ldp x21, x22, [x29, 32]
   mov sp, x29
@@ -507,8 +507,8 @@ inicio:
   ldr x4, [sp, 0]
   add sp, sp, 80
   bl testeAlteracoes
-  b .epilogo_12
-.epilogo_12:
+  b .epilogo_13
+.epilogo_13:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
@@ -604,8 +604,9 @@ testeAlteracoes:
   bl testeComparacoes
   bl testeLoops
   bl testeMemoria
-  b .epilogo_13
-.epilogo_13:
+  bl testeMatrizes
+  b .epilogo_14
+.epilogo_14:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
@@ -703,8 +704,8 @@ testeOperacoes:
   bl _escrever_flu
   ldr x0, =.tex_1
   bl _escrever_tex
-  b .epilogo_14
-.epilogo_14:
+  b .epilogo_15
+.epilogo_15:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
@@ -856,8 +857,8 @@ testeComparacoes:
   ldr x0, =.tex_42
   bl _escrever_tex
 .B19:
-  b .epilogo_15
-.epilogo_15:
+  b .epilogo_16
+.epilogo_16:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
@@ -871,19 +872,18 @@ testeMemoria:
   mov x29, sp
   ldr x0, =.tex_43
   bl _escrever_tex
-  add x0, x29, 32
   mov w1, 116
-  strb w1, [x0, 0]
+  strb w1, [x29, 32]
   mov w1, 101
-  strb w1, [x0, 1]
+  strb w1, [x29, 33]
   mov w1, 120
-  strb w1, [x0, 2]
+  strb w1, [x29, 34]
   mov w1, 116
-  strb w1, [x0, 3]
+  strb w1, [x29, 35]
   mov w1, 111
-  strb w1, [x0, 4]
+  strb w1, [x29, 36]
   mov w1, 0
-  strb w1, [x0, 5]
+  strb w1, [x29, 37]
   ldr x0, =.tex_44
   bl _escrever_tex
   add x0, x29, 32
@@ -944,23 +944,22 @@ testeMemoria:
 .B22:
   ldr x0, =.tex_52
   bl _escrever_tex
-  add x0, x29, 80
   mov w1, 101
-  strb w1, [x0, 0]
+  strb w1, [x29, 80]
   mov w1, 120
-  strb w1, [x0, 1]
+  strb w1, [x29, 81]
   mov w1, 101
-  strb w1, [x0, 2]
+  strb w1, [x29, 82]
   mov w1, 109
-  strb w1, [x0, 3]
+  strb w1, [x29, 83]
   mov w1, 112
-  strb w1, [x0, 4]
+  strb w1, [x29, 84]
   mov w1, 108
-  strb w1, [x0, 5]
+  strb w1, [x29, 85]
   mov w1, 111
-  strb w1, [x0, 6]
+  strb w1, [x29, 86]
   mov w1, 0
-  strb w1, [x0, 7]
+  strb w1, [x29, 87]
   ldr x0, =.tex_53
   bl _escrever_tex
   add x0, x29, 80
@@ -1004,9 +1003,14 @@ testeMemoria:
   ldr x0, =.tex_57
   bl _escrever_tex
   mov w0, 0
-  mov w1, w0
+  str w0, [sp, -16]!
+  mov w0, 0
+  ldr w1, [sp], 16
+  mov w2, 1
+  mul w1, w1, w2
+  add w0, w0, w1
   add x2, x29, 80
-  add x2, x2, x1
+  add x2, x2, x0
   ldrb w0, [x2]
   strb w0, [x29, 112]
   ldr x0, =.tex_58
@@ -1043,9 +1047,14 @@ testeMemoria:
   ldr x0, =.tex_61
   bl _escrever_tex
   ldr w0, [x29, -144]
-  mov w1, w0
+  str w0, [sp, -16]!
+  mov w0, 0
+  ldr w1, [sp], 16
+  mov w2, 4
+  mul w1, w1, w2
+  add w0, w0, w1
   add x2, x29, 128
-  add x2, x2, x1, lsl 2
+  add x2, x2, x0
   ldr w0, [x2]
   bl _escrever_int
   ldr x0, =.tex_1
@@ -1088,9 +1097,14 @@ testeMemoria:
   ldr x0, =.tex_61
   bl _escrever_tex
   ldr w0, [x29, -128]
-  mov w1, w0
+  str w0, [sp, -16]!
+  mov w0, 0
+  ldr w1, [sp], 16
+  mov w2, 4
+  mul w1, w1, w2
+  add w0, w0, w1
   add x2, x29, 144
-  add x2, x2, x1, lsl 2
+  add x2, x2, x0
   ldr s0, [x2]
   bl _escrever_flu
   ldr x0, =.tex_1
@@ -1101,8 +1115,8 @@ testeMemoria:
   str w0, [x29, -128]
   b .B27
 .B28:
-  b .epilogo_16
-.epilogo_16:
+  b .epilogo_17
+.epilogo_17:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
@@ -1166,13 +1180,100 @@ testeLoops:
   str w0, [x29, -144]
   b .B32
 .B33:
-  b .epilogo_17
-.epilogo_17:
+  b .epilogo_18
+.epilogo_18:
   mov sp, x29
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
 // fim: [testeLoops]
+// fn: [testeMatrizes]
+.align 2
+testeMatrizes:
+  sub sp, sp, 160
+  stp x29, x30, [sp]
+  mov x29, sp
+  ldr x0, =.tex_68
+  bl _escrever_tex
+  mov w0, 0
+  str w0, [x29, 32]
+  mov w0, 1
+  str w0, [x29, 36]
+  mov w0, 4
+  str w0, [x29, 40]
+  mov w0, 4
+  str w0, [x29, 36]
+  mov w0, 1
+  str w0, [x29, 40]
+  mov w0, 0
+  str w0, [x29, 44]
+  ldr x0, =.tex_69
+  bl _escrever_tex
+  mov w0, 0
+  str w0, [sp, -16]!
+  mov w0, 1
+  str w0, [sp, -16]!
+  mov w0, 0
+  ldr w1, [sp], 16
+  mov w2, 4
+  mul w1, w1, w2
+  add w0, w0, w1
+  ldr w1, [sp], 16
+  mov w2, 4
+  mul w1, w1, w2
+  add w0, w0, w1
+  add x2, x29, 32
+  add x2, x2, x0
+  ldr w0, [x2]
+  bl _escrever_int
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  ldr x0, = const_8
+  ldr s0, [x0]
+  str s0, [x29, 48]
+  ldr x0, = const_9
+  ldr s0, [x0]
+  str s0, [x29, 52]
+  ldr x0, = const_10
+  ldr s0, [x0]
+  str s0, [x29, 56]
+  ldr x0, = const_11
+  ldr s0, [x0]
+  str s0, [x29, 52]
+  ldr x0, = const_12
+  ldr s0, [x0]
+  str s0, [x29, 56]
+  ldr x0, = const_13
+  ldr s0, [x0]
+  str s0, [x29, 60]
+  ldr x0, =.tex_70
+  bl _escrever_tex
+  mov w0, 0
+  str w0, [sp, -16]!
+  mov w0, 1
+  str w0, [sp, -16]!
+  mov w0, 0
+  ldr w1, [sp], 16
+  mov w2, 4
+  mul w1, w1, w2
+  add w0, w0, w1
+  ldr w1, [sp], 16
+  mov w2, 4
+  mul w1, w1, w2
+  add w0, w0, w1
+  add x2, x29, 48
+  add x2, x2, x0
+  ldr s0, [x2]
+  bl _escrever_flu
+  ldr x0, =.tex_1
+  bl _escrever_tex
+  b .epilogo_19
+.epilogo_19:
+  mov sp, x29
+  ldp x29, x30, [sp]
+  add sp, sp, 160
+  ret
+// fim: [testeMatrizes]
   .section .rodata
   .align 8
 const_0:
@@ -1191,6 +1292,18 @@ const_6:
   .float 1.500000
 const_7:
   .float 5.100000
+const_8:
+  .float 3.000000
+const_9:
+  .float 5.000000
+const_10:
+  .float 7.000000
+const_11:
+  .float 2.000000
+const_12:
+  .float 9.000000
+const_13:
+  .float 10.000000
 .section .rodata
 .align 2
 .tex_0: .asciz "valor a: "
@@ -1261,5 +1374,8 @@ const_7:
 .tex_65: .asciz "\nvalor de i: "
 .tex_66: .asciz "\n\nPor:\n"
 .tex_67: .asciz "indice: "
+.tex_68: .asciz "\n\nTeste de matrizes:\n\n"
+.tex_69: .asciz "matriz 2D int m2[0][1]: "
+.tex_70: .asciz "matriz 2D flu m2f[0][1]: "
 .section .text
 

@@ -1,5 +1,6 @@
-#incluir "biblis/impressao.asm";
+#incluir "tmp/texint.asm";
 
 vazio inicio() {
-    escrever(0.1);
+    car[] arr = "texto";
+    escrever(arr);
 }

@@ -1,6 +1,5 @@
-.section .text
+// fn: [_escrever_tex]
 .align 2
-// [TEXTO]
 _escrever_tex:
     mov x1, x0 // x1 = texto
     mov x2, 0 // x2 = contador
@@ -16,8 +15,9 @@ _escrever_tex:
     mov x8, 64
     svc 0
     ret
+// fim: [_escrever_tex]
+// fn: [_escrever_int]
 .align 2
-// [INTEIRO]
 _escrever_int:
     mov w1, w0 // w1 = número
     ldr x0, = 5f // x0 = buffer
@@ -67,3 +67,4 @@ _escrever_int:
 .section .data
 5: // buffer do inteiro
     .fill   32, 1, 0
+// fim: [_escrever_int]

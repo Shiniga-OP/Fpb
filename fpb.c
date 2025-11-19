@@ -15,6 +15,7 @@
 #include <math.h>
 
 #include "util/otimi1.h"
+#include "util/otimi2.h"
 
 #define MAX_TOK 512 // maximo de tolens
 #define MAX_CODIGO 8192 // maximo de codhgk
@@ -528,7 +529,7 @@ int calcular_pos_matriz(Variavel* var, int indices[]) {
 // [TRATAMENTO]:
 TipoToken tratar_texto(FILE* s) {
     int id = add_tex(L.tk.lex);
-    fprintf(s, "  ldr x0, =%s\n", texs[id].nome);
+    fprintf(s, "  ldr x0, = %s\n", texs[id].nome);
     proximoToken();
     return T_TEX;
 }
@@ -1529,7 +1530,7 @@ void gerar_prelude(FILE* s) {
         ".global _start\n"
          ".align 2\n"
         "_start:\n"
-        "  bl inicio // usada [inicio]\n"
+        "  bl inicio\n"
         "  mov x0, 0\n"
         "  mov x8, 93\n"
         "  svc 0\n");
@@ -2125,13 +2126,20 @@ int main(int argc, char** argv) {
 
     fclose(s);
     
-    int otimizar = 0;
-    if(argc >= 3 && strcmp(argv[2], "-O1") == 0) otimizar = 1;
+    int otimizar1 = 0;
+    if(argc >= 3 && strcmp(argv[2], "-O1") == 0) otimizar1 = 1;
 
     for(int i=1; i<argc; i++) {
-        if(strcmp(argv[i], "-O1") == 0) otimizar = 1;
+        if(strcmp(argv[i], "-O1") == 0) otimizar1 = 1;
     }
-    if(otimizar) otimizarO1(asm_s);
+    int otimizar2 = 0;
+    if(argc >= 3 && strcmp(argv[2], "-O2") == 0) otimizar2 = 1;
+
+    for(int i=1; i<argc; i++) {
+        if(strcmp(argv[i], "-O2") == 0) otimizar2 = 1;
+    }
+    if(otimizar1) otimizarO1(asm_s);
+    if(otimizar2) otimizarO2(asm_s);
 
     snprintf(asm_o, sizeof(asm_o), "%s.o", argv[1]);
     snprintf(cmd, sizeof(cmd), "as %s -o %s", asm_s, asm_o);

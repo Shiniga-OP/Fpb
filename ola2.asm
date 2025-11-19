@@ -2,15 +2,14 @@
 .global _start
 .align 2
 _start:
-  bl inicio
+  bl inicio // usada [inicio]
   mov x0, 0
   mov x8, 93
   svc 0
 
-// início de biblis/impressao.asm
-.section .text
+// inicio de biblis/impressao.asm
+// fn: [_escrever_tex]
 .align 2
-// [TEXTO]
 _escrever_tex:
     mov x1, x0 // x1 = texto
     mov x2, 0 // x2 = contador
@@ -25,8 +24,9 @@ _escrever_tex:
     mov x8, 64
     svc 0
     ret
+// fim: [_escrever_tex]
 .align 2
-// [INTEIRO]
+// fn: [_escrever_int]
 _escrever_int:
     mov w1, w0 // w1 = numero
     ldr x0, = 5f // x0 = buffer
@@ -74,7 +74,8 @@ _escrever_int:
   .align 2
 5: // buffer do inteiro
     .fill   32, 1, 0
-// [FLUTUANTE]
+// fim: [_escrever_int]
+// fn: [_escrever_flu]
 .align 2
 _escrever_flu:
     // s0 contem o valor flutuante
@@ -165,7 +166,8 @@ _escrever_flu:
 .align 2
 8: // buffer do flutuante
     .fill   32, 1, 0
-// [LONGO]
+// fim: [_escrever_flu]
+// fn: [_escrever_longo]
 .align 2
 _escrever_longo:
     mov x1, x0 // x1 = numero(64 bits)
@@ -212,7 +214,8 @@ _escrever_longo:
   .align 2
 5: // buffer do inteiro
     .fill   32, 1, 0
-// [CARACTERE]:
+// fim: [_escrever_longo]
+// fn: [_escrever_car]
 .align 2
 _escrever_car:
     strb w0, [sp, -1]!
@@ -223,6 +226,8 @@ _escrever_car:
     svc 0
     add sp, sp, 1
     ret
+// fim: [_escrever_car]
+// fn: [_escrever_bool]
 .align 2
 _escrever_bool:
     cmp w0, 0
@@ -242,11 +247,13 @@ _escrever_bool:
 3:
     .asciz "verdade"
 4:
-    .asciz "falso"// fim de biblis/impressao.asm
+    .asciz "falso"
+// fim: [_escrever_bool]
+// fim de biblis/impressao.asm
 
 
-// início de biblis/texs.asm
-.section .text
+// inicio de biblis/texs.asm
+// fn: [textam]
 // x0: texto, w0: retorno
 .align 2
 textam:
@@ -257,6 +264,8 @@ textam:
     sub x0, x1, x0
     sub x0, x0, 1
     ret
+// fim: [textam]
+// fn: [subscar]
 // x0: texto, w1: car a substituir, w2: novo car
 .align 2
 subscar:
@@ -273,6 +282,8 @@ subscar:
     b 1b
 3: // retorna
     ret
+// fim: [subscar]
+// fn: [texcar]
 // x0: ponteiro, w1: caractere
 .align 2
 texcar:
@@ -292,6 +303,8 @@ texcar:
     mov x0, -1 // retorna -1 se não encontrou
 4: // retorna
     ret
+// fim: [texcar]
+// fn: [texcmp]
 // x0: ponteiro para o texto 1
 // x1: ponteiro para o texto 2
 // w0: retorno(1 se verdadeiro, 0 se falso)
@@ -321,11 +334,13 @@ texcmp:
     mov w0, 0 // define o retorno w0 = 0
     
 4:
-    ret// fim de biblis/texs.asm
+    ret
+// fim: [texcmp]
+// fim de biblis/texs.asm
 
 
-// início de biblis/mem.asm
-.section .text
+// inicio de biblis/mem.asm
+// fn: [memcp]
 // x0: array, x1: endereço da memoria, x2: tamanho
 .align 2
 memcp:
@@ -333,11 +348,13 @@ memcp:
     strb w3, [x0], 1 // armazena byte e incrementa ponteiro
     subs x2, x2, 1 // decrementa contador
     b.gt memcp // continua se não terminou
-    ret// fim de biblis/mem.asm
+    ret
+// fim: [memcp]
+// fim de biblis/mem.asm
 
 
-// início de biblis/sistema.asm
-.section .text
+// inicio de biblis/sistema.asm
+// fn: [obter_tempo_milis]
 // retorna o total de milissegundos desde a epoca(1970)
 // O resultado(64 bits) em x0
 .align 2
@@ -378,8 +395,11 @@ obter_tempo_milis:
     
     // restaura a pilha e retorna
     ldp x29, x30, [sp], 32  // restaura fp, lr e libera a pilha
-    ret// fim de biblis/sistema.asm
+    ret
+// fim: [obter_tempo_milis]
+// fim de biblis/sistema.asm
 
+// fn: [somar]
 .align 2
 somar:
   sub sp, sp, 160
@@ -415,6 +435,8 @@ somar:
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
+// fim: [somar]
+// fn: [inicio]
 .align 2
 inicio:
   sub sp, sp, 160
@@ -491,6 +513,8 @@ inicio:
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
+// fim: [inicio]
+// fn: [testeAlteracoes]
 .align 2
 testeAlteracoes:
   sub sp, sp, 160
@@ -586,6 +610,8 @@ testeAlteracoes:
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
+// fim: [testeAlteracoes]
+// fn: [testeOperacoes]
 .align 2
 testeOperacoes:
   sub sp, sp, 160
@@ -683,6 +709,8 @@ testeOperacoes:
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
+// fim: [testeOperacoes]
+// fn: [testeComparacoes]
 .align 2
 testeComparacoes:
   sub sp, sp, 160
@@ -834,6 +862,8 @@ testeComparacoes:
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
+// fim: [testeComparacoes]
+// fn: [testeMemoria]
 .align 2
 testeMemoria:
   sub sp, sp, 160
@@ -1077,6 +1107,8 @@ testeMemoria:
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
+// fim: [testeMemoria]
+// fn: [testeLoops]
 .align 2
 testeLoops:
   sub sp, sp, 160
@@ -1140,6 +1172,7 @@ testeLoops:
   ldp x29, x30, [sp]
   add sp, sp, 160
   ret
+// fim: [testeLoops]
   .section .rodata
   .align 8
 const_0:
@@ -1158,8 +1191,6 @@ const_6:
   .float 1.500000
 const_7:
   .float 5.100000
-  .section .text
-
 .section .rodata
 .align 2
 .tex_0: .asciz "valor a: "

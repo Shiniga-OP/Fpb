@@ -1,6 +1,5 @@
 #incluir "biblis/impressao.asm";
 
 vazio inicio() {
-    int[] arr = { 1, 1, 1, 1 };
-    escrever("teste");
+    escrever(0.1);
 }

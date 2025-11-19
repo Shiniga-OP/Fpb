@@ -1000,7 +1000,6 @@ void verificar_por(FILE* s, int escopo) {
             } else {
                 fatal("[verificar_por] variável destino não encontrada");
             }
-            
             break; // processa apenas uma atribuição
         }
     }
@@ -1074,7 +1073,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             snprintf(mensagem_erro, sizeof(mensagem_erro), "[verificar_stmt] não foi possível abrir: %s", caminho);
             fatal(mensagem_erro);
         }
-        fprintf(s, "\n// início de %s\n", caminho);
+        fprintf(s, "\n// inicio de %s\n", caminho);
         char linha[512];
         while(fgets(linha, sizeof(linha), arquivo_include)) {
             if(strstr(linha, ".section .data") != NULL) {
@@ -1085,7 +1084,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                 fputs(linha, s);
             } else fputs(linha, s);
         }
-        fprintf(s, "// fim de %s\n\n", caminho);
+        fprintf(s, "\n// fim de %s\n\n", caminho);
         fclose(arquivo_include);
         return;
     }
@@ -1351,6 +1350,7 @@ void verificar_fn(FILE* s) {
         
         funcs[fn_cnt - 1].frame_tam = frame_tam;
         // >>>>>>PROLOGO DA FUNÇÃO<<<<<<
+        fprintf(s, "// fn: [%s]\n", fnome);
         fprintf(s, ".align 2\n");
         fprintf(s, "%s:\n", fnome);
         // aloca o frame grande primeiro
@@ -1391,6 +1391,7 @@ void verificar_fn(FILE* s) {
         // libera o frame grande
         fprintf(s, "  add sp, sp, %d\n", frame_tam);
         fprintf(s, "  ret\n");
+        fprintf(s, "// fim: [%s]\n", fnome);
         proximoToken(); // consome }
     }
 }
@@ -1402,7 +1403,7 @@ void gerar_prelude(FILE* s) {
         ".global _start\n"
          ".align 2\n"
         "_start:\n"
-        "  bl inicio\n"
+        "  bl inicio // usada [inicio]\n"
         "  mov x0, 0\n"
         "  mov x8, 93\n"
         "  svc 0\n");
@@ -1432,7 +1433,6 @@ void gerar_consts(FILE* s) {
         } else if(constantes[i].tipo == T_DOBRO) fprintf(s, "  .double %f\n", constantes[i].d_val);
         else if(constantes[i].tipo == T_LONGO) fprintf(s, "  .quad %ld\n", constantes[i].l_val);
     }
-    fprintf(s, "  .section .text\n\n");
 }
 
 void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {

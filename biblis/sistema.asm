@@ -1,4 +1,4 @@
-.section .text
+// fn: [obter_tempo_milis]
 // retorna o total de milissegundos desde a epoca(1970)
 // O resultado(64 bits) em x0
 .align 2
@@ -40,3 +40,4 @@ obter_tempo_milis:
     // restaura a pilha e retorna
     ldp x29, x30, [sp], 32  // restaura fp, lr e libera a pilha
     ret
+// fim: [obter_tempo_milis]

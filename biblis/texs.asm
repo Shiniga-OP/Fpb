@@ -1,4 +1,4 @@
-.section .text
+// fn: [textam]
 // x0: texto, w0: retorno
 .align 2
 textam:
@@ -9,6 +9,8 @@ textam:
     sub x0, x1, x0
     sub x0, x0, 1
     ret
+// fim: [textam]
+// fn: [subscar]
 // x0: texto, w1: car a substituir, w2: novo car
 .align 2
 subscar:
@@ -25,6 +27,8 @@ subscar:
     b 1b
 3: // retorna
     ret
+// fim: [subscar]
+// fn: [texcar]
 // x0: ponteiro, w1: caractere
 .align 2
 texcar:
@@ -44,6 +48,8 @@ texcar:
     mov x0, -1 // retorna -1 se não encontrou
 4: // retorna
     ret
+// fim: [texcar]
+// fn: [texcmp]
 // x0: ponteiro para o texto 1
 // x1: ponteiro para o texto 2
 // w0: retorno(1 se verdadeiro, 0 se falso)
@@ -74,3 +80,4 @@ texcmp:
     
 4:
     ret
+// fim: [texcmp]

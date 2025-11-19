@@ -1,6 +1,5 @@
-.section .text
+// fn: [_escrever_tex]
 .align 2
-// [TEXTO]
 _escrever_tex:
     mov x1, x0 // x1 = texto
     mov x2, 0 // x2 = contador
@@ -15,8 +14,9 @@ _escrever_tex:
     mov x8, 64
     svc 0
     ret
+// fim: [_escrever_tex]
 .align 2
-// [INTEIRO]
+// fn: [_escrever_int]
 _escrever_int:
     mov w1, w0 // w1 = numero
     ldr x0, = 5f // x0 = buffer
@@ -63,7 +63,8 @@ _escrever_int:
 .section .data
 5: // buffer do inteiro
     .fill   32, 1, 0
-// [FLUTUANTE]
+// fim: [_escrever_int]
+// fn: [_escrever_flu]
 .align 2
 _escrever_flu:
     // s0 contem o valor flutuante
@@ -153,7 +154,8 @@ _escrever_flu:
 .align 2
 8: // buffer do flutuante
     .fill   32, 1, 0
-// [LONGO]
+// fim: [_escrever_flu]
+// fn: [_escrever_longo]
 .align 2
 _escrever_longo:
     mov x1, x0 // x1 = numero(64 bits)
@@ -199,7 +201,8 @@ _escrever_longo:
 .section .data
 5: // buffer do inteiro
     .fill   32, 1, 0
-// [CARACTERE]:
+// fim: [_escrever_longo]
+// fn: [_escrever_car]
 .align 2
 _escrever_car:
     strb w0, [sp, -1]!
@@ -210,6 +213,8 @@ _escrever_car:
     svc 0
     add sp, sp, 1
     ret
+// fim: [_escrever_car]
+// fn: [_escrever_bool]
 .align 2
 _escrever_bool:
     cmp w0, 0
@@ -230,3 +235,4 @@ _escrever_bool:
     .asciz "verdade"
 4:
     .asciz "falso"
+// fim: [_escrever_bool]

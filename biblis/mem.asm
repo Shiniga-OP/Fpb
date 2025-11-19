@@ -1,4 +1,4 @@
-.section .text
+// fn: [memcp]
 // x0: array, x1: endereço da memoria, x2: tamanho
 .align 2
 memcp:
@@ -7,3 +7,4 @@ memcp:
     subs x2, x2, 1 // decrementa contador
     b.gt memcp // continua se não terminou
     ret
+// fim: [memcp]

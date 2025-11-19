@@ -1,7 +1,4 @@
-# sobre CFF (Compilador Foca-do em FPB) (C++):
-descontinuado.
-
-# sobre FPB (compilador) (C):
+# sobre FPB (compilador):
 essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível, a implementação usa assembly aarch64 para traduzir código .fpb e assim usar **as** para compilar para .o, usando **ld** para linkagem e execução do binário compilado.
 
 ## estado:
@@ -128,6 +125,11 @@ vazio testeComparacoes() {
         escrever("y >= 4 && x > 4 é verdadeiro\n");
     } senao {
         escrever("y >= 4 && x > 4 é falso\n");
+    }
+    se(y == x || x > 3) {
+        escrever("y == x || x > 3 é verdadeiro\n");
+    } senao {
+        escrever("y == x || x > 3 é falso\n");
     }
     escrever("\nComparação com textos:\n\n");
     car* t1 = "texto 1";

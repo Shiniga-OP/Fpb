@@ -1,7 +1,10 @@
 #incluir "tmp/texint.asm";
 
 vazio inicio() {
-    int i = 0;
-    i = 1;
-    escrever(i);
+    int x = 1;
+    se(x > 1 || x > 0) {
+        escrever("x é maior que 1 ou maior que 0\n");
+    } senao {
+        escrever("x não é maior que 1 nem maior que 0\n");
+    }
 }

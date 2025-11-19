@@ -814,31 +814,46 @@ TipoToken processar_condicao(FILE* s, int escopo) {
         TipoToken tipo_atual = expressao(s, escopo);
         
         if(!primeiro) {
-            // se não é o primeiro termo, deve ser operador logico
-            if(L.tk.tipo == T_TAMBEM_TAMBEM) {
-                proximoToken(); // consome &&
-                // CURTO-CIRCUITO: se a primeira condição for falsa, pula pra falso
-                int rotulo_falso = escopo_global++;
+            // se não é o primeiro termo, deve ser operador lógico
+            if(L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {
+                TipoToken op = L.tk.tipo;
+                proximoToken(); // consome && ou ||
                 
-                // verifica resultado da expressão anterior(ja ta em w0)
-                fprintf(s, "  cmp w0, 0\n");
-                fprintf(s, "  beq .B%d\n", rotulo_falso);
+                int rotulo_curto = escopo_global++;
+                
+                if(op == T_TAMBEM_TAMBEM) {
+                    // caso E: se a primeira condição for falsa, pula pra falso
+                    fprintf(s, "  cmp w0, 0\n");
+                    fprintf(s, "  beq .B%d\n", rotulo_curto);
+                } else { // T_OU_OU
+                    // caso OU: se a primeira condição for verdadeira, pula pra verdadeiro
+                    fprintf(s, "  cmp w0, 1\n");
+                    fprintf(s, "  beq .B%d\n", rotulo_curto);
+                }
                 // processa proxima expressão
                 TipoToken tipo_dir = expressao(s, escopo);
                 tipo_final = converter_tipos(s, tipo_final, tipo_dir);
                 
-                // continua verificando
-                fprintf(s, "  cmp w0, 0\n");
-                fprintf(s, "  beq .B%d\n", rotulo_falso);
-                fprintf(s, "  mov w0, 1\n");
-                fprintf(s, "  b .B%d\n", rotulo_fim);
-                fprintf(s, ".B%d:\n", rotulo_falso);
-                fprintf(s, "  mov w0, 0\n");
+                if(op == T_TAMBEM_TAMBEM) {
+                    // E: ambas devem ser verdadeiras
+                    fprintf(s, "  cmp w0, 0\n");
+                    fprintf(s, "  beq .B%d\n", rotulo_curto);
+                    fprintf(s, "  mov w0, 1\n");
+                    fprintf(s, "  b .B%d\n", rotulo_fim);
+                    fprintf(s, ".B%d:\n", rotulo_curto);
+                    fprintf(s, "  mov w0, 0\n");
+                } else { // T_OU_OU
+                    // OU: pelo menos uma deve ser verdadeira
+                    fprintf(s, "  cmp w0, 1\n");
+                    fprintf(s, "  beq .B%d\n", rotulo_fim);
+                    fprintf(s, ".B%d:\n", rotulo_curto);
+                    fprintf(s, "  mov w0, 1\n");
+                    fprintf(s, "  b .B%d\n", rotulo_fim);
+                }
                 fprintf(s, ".B%d:\n", rotulo_fim);
-                
                 tipo_final = T_pBOOL;
             } else {
-                break; // não é operador logico, termina
+                break; // não é operador lógico, termina
             }
         } else {
             // primeira expressão = avalia normalmente
@@ -848,31 +863,48 @@ TipoToken processar_condicao(FILE* s, int escopo) {
             tipo_final = tipo_atual;
             primeiro = 0;
             
-            // se ha && apos a primeira expressão, prepara curto-circuito
-            if(L.tk.tipo == T_TAMBEM_TAMBEM) {
-                proximoToken(); // consome &&
+            // se a operador logico apos a primeira expressão, prepara o caso
+            if(L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {
+                TipoToken op = L.tk.tipo;
+                proximoToken(); // consome && ou ||
                 
-                int rotulo_falso = escopo_global++;
-                int rotulo_verdadeiro = escopo_global++;
-                // verifica primeira condição
-                fprintf(s, "  cmp w0, 0\n");
-                fprintf(s, "  beq .B%d\n", rotulo_falso);
+                int rotulo_curto = escopo_global++;
+                int rotulo_final = escopo_global++;
+                
+                if(op == T_TAMBEM_TAMBEM) {
+                    // E: verifica primeira condição
+                    fprintf(s, "  cmp w0, 0\n");
+                    fprintf(s, "  beq .B%d\n", rotulo_curto);
+                } else { // T_OU_OU
+                    // OU: verifica primeira condição  
+                    fprintf(s, "  cmp w0, 1\n");
+                    fprintf(s, "  beq .B%d\n", rotulo_final);
+                }
                 // processa segunda expressão
                 TipoToken tipo_dir = expressao(s, escopo);
                 if(tipo_dir != T_pINT && tipo_dir != T_pBOOL) {
                     fatal("[processar_condicao] condição deve ser inteiro ou booleano");
                 }
-                // verifica segunda condição
-                fprintf(s, "  cmp w0, 0\n");
-                fprintf(s, "  beq .B%d\n", rotulo_falso);
-                fprintf(s, "  mov w0, 1\n");
-                fprintf(s, "  b .B%d\n", rotulo_verdadeiro);
-                fprintf(s, ".B%d:\n", rotulo_falso);
-                fprintf(s, "  mov w0, 0\n");
-                fprintf(s, ".B%d:\n", rotulo_verdadeiro);
-                
+                if(op == T_TAMBEM_TAMBEM) {
+                    // E: verifica segunda condição
+                    fprintf(s, "  cmp w0, 0\n");
+                    fprintf(s, "  beq .B%d\n", rotulo_curto);
+                    fprintf(s, "  mov w0, 1\n");
+                    fprintf(s, "  b .B%d\n", rotulo_final);
+                    fprintf(s, ".B%d:\n", rotulo_curto);
+                    fprintf(s, "  mov w0, 0\n");
+                } else { // T_OU_OU
+                    // OU: verifica segunda condição
+                    fprintf(s, "  cmp w0, 1\n");
+                    fprintf(s, "  beq .B%d\n", rotulo_final);
+                    fprintf(s, ".B%d:\n", rotulo_curto);
+                    fprintf(s, "  mov w0, 0\n");
+                    fprintf(s, "  b .B%d\n", rotulo_final);
+                    fprintf(s, "  mov w0, 1\n");
+                }
+                fprintf(s, ".B%d:\n", rotulo_final);
                 tipo_final = T_pBOOL;
-                rotulo_fim = rotulo_verdadeiro;
+                rotulo_fim = rotulo_final;
             }
         }
     }
@@ -1634,19 +1666,19 @@ void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo) {
 TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual) {
     if(tipo_anterior == tipo_atual) return tipo_anterior;
 
-    // CASO 1: inteiro(esq) com flutuante(dir)
+    // caso 1: inteiro(esq) com flutuante(dir)
     // o inteiro ta em w1(anterior), o flutuante ta em s0(atual)
     if(tipo_anterior == T_pINT && tipo_atual == T_pFLU) {
         fprintf(s, "  scvtf s1, w1\n"); // converte w1 pra s1
         return T_pFLU;
     }
-    // CASO 2: flutuante(esq) com inteiro(dir)
+    // caso 2: flutuante(esq) com inteiro(dir)
     // O flutuante ta em s1(anterior), o inteiro ta em w0(atual)
     else if(tipo_anterior == T_pFLU && tipo_atual == T_pINT) {
         fprintf(s, "  scvtf s0, w0\n"); // converte w0 pra s0
         return T_pFLU;
     }
-    // CASO 3: inteiro e dobro
+    // caso 3: inteiro e dobro
     else if(tipo_anterior == T_pINT && tipo_atual == T_pDOBRO) {
         fprintf(s, "  scvtf d1, w1\n"); // int w1 -> dobro d1
         return T_pDOBRO;
@@ -1654,7 +1686,7 @@ TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual
         fprintf(s, "  scvtf d0, w0\n"); // int w0 -> dobro d0
         return T_pDOBRO;
     }
-    // CASO 4: flutuante e dobro
+    // caso 4: flutuante e dobro
     else if(tipo_anterior == T_pFLU && tipo_atual == T_pDOBRO) {
         fprintf(s, "  fcvt d1, s1\n"); // flu s1 -> dobro d1
         return T_pDOBRO;
@@ -1662,7 +1694,7 @@ TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual
         fprintf(s, "  fcvt d0, s0\n"); // flu s0 -> dobro d0(promoção)
         return T_pDOBRO;
     }
-    // CASO 5: longo e flutuante/dobro
+    // caso 5: longo e flutuante/dobro
     else if(tipo_anterior == T_pLONGO && tipo_atual == T_pFLU) {
         fprintf(s, "  scvtf s1, x1\n");
         return T_pFLU;
@@ -1852,7 +1884,7 @@ TipoToken termo(FILE* s, int escopo) {
 TipoToken expressao(FILE* s, int escopo) {
     TipoToken tipo = termo(s, escopo);
     
-    while(L.tk.tipo == T_MAIS || L.tk.tipo == T_MENOS || L.tk.tipo == T_TAMBEM_TAMBEM) {
+    while(L.tk.tipo == T_MAIS || L.tk.tipo == T_MENOS || L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {
         TipoToken op = L.tk.tipo;
         proximoToken();
        // salva o primeiro resultado:

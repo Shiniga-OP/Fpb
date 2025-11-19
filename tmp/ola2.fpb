@@ -116,6 +116,11 @@ vazio testeComparacoes() {
     } senao {
         escrever("y >= 4 && x > 4 é falso\n");
     }
+    se(y == x || x > 3) {
+        escrever("y == x || x > 3 é verdadeiro\n");
+    } senao {
+        escrever("y == x || x > 3 é falso\n");
+    }
     escrever("\nComparação com textos:\n\n");
     car* t1 = "texto 1";
     car* t2 = "texto 2";

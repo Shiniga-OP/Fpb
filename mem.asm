@@ -86,12 +86,38 @@ inicio:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  mov w0, 0
-  str w0, [x29, 32]
   mov w0, 1
   str w0, [x29, 32]
   ldr w0, [x29, 32]
-  bl _escrever_int
+  str w0, [sp, -16]!
+  mov w0, 1
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, gt
+  cmp w0, 1
+  beq .B2
+  ldr w0, [x29, 32]
+  str w0, [sp, -16]!
+  mov w0, 0
+  ldr w1, [sp], 16
+  cmp w1, w0
+  cset w0, gt
+  cmp w0, 1
+  beq .B2
+.B1:
+  mov w0, 0
+  b .B2
+  mov w0, 1
+.B2:
+  cmp w0, 0
+  beq .B3
+  ldr x0, =.tex_0
+  bl _escrever_tex
+  b .B4
+.B3:
+  ldr x0, =.tex_1
+  bl _escrever_tex
+.B4:
   b .epilogo_0
 .epilogo_0:
   mov sp, x29
@@ -99,3 +125,9 @@ inicio:
   add sp, sp, 160
   ret
 // fim: [inicio]
+.section .rodata
+.align 2
+.tex_0: .asciz "x é maior que 1 ou maior que 0\n"
+.tex_1: .asciz "x não é maior que 1 nem maior que 0\n"
+.section .text
+

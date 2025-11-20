@@ -1,9 +1,7 @@
-#incluir "biblis/impressao.asm";
+vazio teste() {
+    car[128] c;
+}
 
 vazio inicio() {
-    int x = 10;
-    int* p = x;
-    p = p + 4;
-    x = p;
-    escrever(x);
+    teste();
 }

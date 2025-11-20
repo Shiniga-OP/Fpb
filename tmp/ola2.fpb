@@ -97,6 +97,7 @@ vazio testeOperacoes() {
     int y = 3;
     flu x = 0.5f; // pode ter sufixo também
     escrever("x: ", x, " * y: ", y, ", resultado: ", x * y, "\n");
+    escrever("10 << 2, resultado: ", 10 << 2, "\n");
 }
 
 vazio testeComparacoes() {
@@ -144,8 +145,15 @@ vazio testeMemoria() {
     escrever("\nvalor do array: ", array);
     array[0] = 'X';
     escrever("\narray mudado no indice 0: ", array);
-
-    escrever("\n\nTeste de ponteiro:\n");
+    
+    escrever("\n\nTeste de ponteiro:\n\n");
+    int x1 = 10;
+    escrever("int x1 = 10; int* p1 = @x1;\n");
+    int* p1 = @x1;
+    escrever("p1 = p1 + 5; x1 = ?\n");
+    p1 = p1 + 5;
+    escrever("x1 = ", x1, "\n");
+    
     car* ponteiro = "exemplo de ponteiro";
     
     escrever("\nponteiro texto, valor: ", ponteiro, "\ntamamho em bytes: ", textam(ponteiro));
@@ -156,31 +164,33 @@ vazio testeMemoria() {
     senao escrever("\no ponteiro não tem t\n");
     
     escrever("\nTeste de manipulação da memoria:\n");
-    car[] array = "exemplo";
-    escrever("\nArray padrão: ", array);
     
     car* p = "XxXmplo maior";
+    int tamNes = textam(p);
     
-    memcp(array, p, textam(p));
-    escrever("\nArray copiado da memoria: ", array);
+    car[] array2 = "exemplo";
+    escrever("\nArray padrão: ", array2);
     
-    subscar(array, 'X', 'e');
+    memcp(array2, p, tamNes);
+    escrever("\nArray copiado da memoria: ", array2);
     
-    escrever("\nArray usando subscar(array, 'X', 'e'): ", array);
+    subscar(array2, 'X', 'e');
+    
+    escrever("\nArray usando subscar(array2, 'X', 'e'): ", array2);
     
     escrever("\nTeste de acesso a itens array:\n");
-    car ca = array[0];
+    car ca = array2[0];
     escrever("item do indice 0 do array: ", ca, "\n");
     
     int[] num = { 0, 1, 2, 5 };
     escrever("\nArray de inteiros: \n\n");
-    por(int i = 0; i < 4; i = i + 1) {
-        escrever("no indice: ", i, " valor: ", num[i], "\n");
+    por(int j = 0; j < 4; j = j + 1) {
+        escrever("no indice: ", j, " valor: ", num[j], "\n");
     }
     flu[] flutuante = { 0.2, 1.5, 5.1, 5.1 };
     escrever("\nArray de flutuantes: \n\n");
-    por(int i = 0; i < 4; i = i + 1) {
-        escrever("no indice: ", i, " valor: ", flutuante[i], "\n");
+    por(int j = 0; j < 4; j = j + 1) {
+        escrever("no indice: ", j, " valor: ", flutuante[j], "\n");
     }
 }
 

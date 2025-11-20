@@ -409,15 +409,15 @@ somar:
   stp x21, x22, [x29, 32]
   str x0, [x29, 48]  // salvar param a
   str x1, [x29, 56]  // salvar param b
-  ldr x0, =.tex_0
+  ldr x0, = .tex_0
   bl _escrever_tex
   ldr w0, [x29, 48]
   bl _escrever_int
-  ldr x0, =.tex_comb_0
+  ldr x0, = .tex_comb_0
   bl _escrever_tex
   ldr w0, [x29, 56]
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   ldr w0, [x29, 48]
   str w0, [sp, -16]!
@@ -440,40 +440,40 @@ inicio:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_3
+  ldr x0, = .tex_3
   bl _escrever_tex
   mov w0, 65
   strb w0, [x29, 32]
-  ldr x0, =.tex_4
+  ldr x0, = .tex_4
   bl _escrever_tex
   ldrb w0, [x29, 32]
   bl _escrever_car
   mov w0, 42
   str w0, [x29, 48]
-  ldr x0, =.tex_5
+  ldr x0, = .tex_5
   bl _escrever_tex
   ldr w0, [x29, 48]
   bl _escrever_int
   ldr x0, = const_0
   ldr s0, [x0]
   str s0, [x29, 64]
-  ldr x0, =.tex_6
+  ldr x0, = .tex_6
   bl _escrever_tex
   ldr s0, [x29, 64]
   bl _escrever_flu
   mov w0, 1
   strb w0, [x29, 80]
-  ldr x0, =.tex_7
+  ldr x0, = .tex_7
   bl _escrever_tex
   ldrb w0, [x29, 80]
   bl _escrever_bool
   bl obter_tempo_milis
   str x0, [x29, 96]
-  ldr x0, =.tex_8
+  ldr x0, = .tex_8
   bl _escrever_tex
   ldr x0, [x29, 96]
   bl _escrever_longo
-  ldr x0, =.tex_9
+  ldr x0, = .tex_9
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -484,17 +484,17 @@ inicio:
   add sp, sp, 32
   bl somar
   str w0, [x29, 112]
-  ldr x0, =.tex_10
+  ldr x0, = .tex_10
   bl _escrever_tex
   ldr w0, [x29, 112]
   bl _escrever_int
   mov w0, 1
   str w0, [x29, 128]
-  ldr x0, =.tex_11
+  ldr x0, = .tex_11
   bl _escrever_tex
   ldr w0, [x29, 128]
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   ldr w0, [x29, 112]
   str w0, [sp, -16]!
@@ -537,11 +537,11 @@ testeAlteracoes:
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [x29, 16]
-  ldr x0, =.tex_12
+  ldr x0, = .tex_12
   bl _escrever_tex
   ldr w0, [x29, 16]
   bl _escrever_int
-  ldr x0, =.tex_13
+  ldr x0, = .tex_13
   bl _escrever_tex
   mov w0, 100
   str w0, [x29, 24]
@@ -552,57 +552,57 @@ testeAlteracoes:
   ldr x0, = const_1
   ldr x0, [x0]
   str x0, [x29, 48]
-  ldr x0, =.tex_14
+  ldr x0, = .tex_14
   bl _escrever_tex
   ldr w0, [x29, 24]
   bl _escrever_int
-  ldr x0, =.tex_15
+  ldr x0, = .tex_15
   bl _escrever_tex
   ldrb w0, [x29, 32]
   bl _escrever_car
-  ldr x0, =.tex_16
+  ldr x0, = .tex_16
   bl _escrever_tex
   ldrb w0, [x29, 40]
   bl _escrever_bool
-  ldr x0, =.tex_17
+  ldr x0, = .tex_17
   bl _escrever_tex
   ldr x0, [x29, 48]
   bl _escrever_longo
-  ldr x0, =.tex_comb_1
+  ldr x0, = .tex_comb_1
   bl _escrever_tex
   mov w0, 1
   str w0, [x29, 32]
-  ldr x0, =.tex_19
+  ldr x0, = .tex_19
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   mov w0, -1
   str w0, [x29, 32]
-  ldr x0, =.tex_20
+  ldr x0, = .tex_20
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   ldr x0, = const_2
   ldr s0, [x0]
   str s0, [x29, 48]
-  ldr x0, =.tex_21
+  ldr x0, = .tex_21
   bl _escrever_tex
   ldr s0, [x29, 48]
   bl _escrever_flu
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   ldr x0, = const_3
   ldr s0, [x0]
   str s0, [x29, 48]
-  ldr x0, =.tex_22
+  ldr x0, = .tex_22
   bl _escrever_tex
   ldr s0, [x29, 48]
   bl _escrever_flu
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   bl testeOperacoes
   bl testeComparacoes
@@ -622,7 +622,7 @@ testeOperacoes:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_comb_2
+  ldr x0, = .tex_comb_2
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -634,7 +634,7 @@ testeOperacoes:
   ldr w1, [sp], 16
   add w0, w1, w0
   bl _escrever_int
-  ldr x0, =.tex_comb_3
+  ldr x0, = .tex_comb_3
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -646,7 +646,7 @@ testeOperacoes:
   ldr w1, [sp], 16
   mul w0, w1, w0
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -654,7 +654,7 @@ testeOperacoes:
   ldr w1, [sp], 16
   add w0, w1, w0
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -665,7 +665,7 @@ testeOperacoes:
   add sp, sp, 32
   bl somar
   bl _escrever_int
-  ldr x0, =.tex_comb_4
+  ldr x0, = .tex_comb_4
   bl _escrever_tex
   mov w0, 10
   str w0, [sp, -16]!
@@ -674,22 +674,22 @@ testeOperacoes:
   sdiv w2, w1, w0
   msub w0, w2, w0, w1
   bl _escrever_int
-  ldr x0, =.tex_comb_5
+  ldr x0, = .tex_comb_5
   bl _escrever_tex
   mov w0, 3
   str w0, [x29, 32]
   ldr x0, = const_4
   ldr s0, [x0]
   str s0, [x29, 48]
-  ldr x0, =.tex_28
+  ldr x0, = .tex_28
   bl _escrever_tex
   ldr s0, [x29, 48]
   bl _escrever_flu
-  ldr x0, =.tex_29
+  ldr x0, = .tex_29
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
-  ldr x0, =.tex_30
+  ldr x0, = .tex_30
   bl _escrever_tex
   ldr s0, [x29, 48]
   str s0, [sp, -16]!
@@ -698,7 +698,7 @@ testeOperacoes:
   scvtf s0, w0
   fmul s0, s1, s0
   bl _escrever_flu
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   b .epilogo_15
 .epilogo_15:
@@ -713,7 +713,7 @@ testeComparacoes:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_31
+  ldr x0, = .tex_31
   bl _escrever_tex
   mov w0, 4
   str w0, [x29, 32]
@@ -725,7 +725,7 @@ testeComparacoes:
   cset w0, gt
   cmp w0, 0
   beq .B1
-  ldr x0, =.tex_32
+  ldr x0, = .tex_32
   bl _escrever_tex
   b .B2
 .B1:
@@ -737,11 +737,11 @@ testeComparacoes:
   cset w0, ge
   cmp w0, 0
   beq .B4
-  ldr x0, =.tex_33
+  ldr x0, = .tex_33
   bl _escrever_tex
   b .B5
 .B4:
-  ldr x0, =.tex_34
+  ldr x0, = .tex_34
   bl _escrever_tex
 .B5:
 .B2:
@@ -770,11 +770,11 @@ testeComparacoes:
 .B8:
   cmp w0, 0
   beq .B9
-  ldr x0, =.tex_35
+  ldr x0, = .tex_35
   bl _escrever_tex
   b .B10
 .B9:
-  ldr x0, =.tex_36
+  ldr x0, = .tex_36
   bl _escrever_tex
 .B10:
   ldr w0, [x29, 48]
@@ -800,14 +800,14 @@ testeComparacoes:
 .B13:
   cmp w0, 0
   beq .B14
-  ldr x0, =.tex_37
+  ldr x0, = .tex_37
   bl _escrever_tex
   b .B15
 .B14:
-  ldr x0, =.tex_38
+  ldr x0, = .tex_38
   bl _escrever_tex
 .B15:
-  ldr x0, =.tex_39
+  ldr x0, = .tex_39
   bl _escrever_tex
   ldr x0, = .tex_40
   str x0, [x29, 64]
@@ -815,11 +815,11 @@ testeComparacoes:
   str x0, [x29, 80]
   ldr x0, [x29, 64]
   bl _escrever_tex
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   ldr x0, [x29, 80]
   bl _escrever_tex
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   ldr x0, [x29, 64]
   str x0, [sp, -16]!
@@ -836,7 +836,7 @@ testeComparacoes:
   cset w0, eq
   cmp w0, 0
   beq .B17
-  ldr x0, =.tex_42
+  ldr x0, = .tex_42
   bl _escrever_tex
   b .B18
 .B17:
@@ -856,7 +856,7 @@ testeComparacoes:
   cset w0, eq
   cmp w0, 0
   beq .B20
-  ldr x0, =.tex_43
+  ldr x0, = .tex_43
   bl _escrever_tex
   b .B21
 .B20:
@@ -876,11 +876,11 @@ testeComparacoes:
   cset w0, eq
   cmp w0, 0
   beq .B23
-  ldr x0, =.tex_44
+  ldr x0, = .tex_44
   bl _escrever_tex
   b .B24
 .B23:
-  ldr x0, =.tex_45
+  ldr x0, = .tex_45
   bl _escrever_tex
 .B24:
   b .epilogo_16
@@ -896,7 +896,7 @@ testeMemoria:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_46
+  ldr x0, = .tex_46
   bl _escrever_tex
   mov w1, 116
   strb w1, [x29, 32]
@@ -910,7 +910,7 @@ testeMemoria:
   strb w1, [x29, 36]
   mov w1, 0
   strb w1, [x29, 37]
-  ldr x0, =.tex_47
+  ldr x0, = .tex_47
   bl _escrever_tex
   add x0, x29, 32
   bl _escrever_tex
@@ -922,19 +922,19 @@ testeMemoria:
   add x2, x29, 32
   add x2, x2, x1
   strb w0, [x2]
-  ldr x0, =.tex_48
+  ldr x0, = .tex_48
   bl _escrever_tex
   add x0, x29, 32
   bl _escrever_tex
-  ldr x0, =.tex_49
+  ldr x0, = .tex_49
   bl _escrever_tex
   ldr x0, = .tex_50
   str x0, [x29, 48]
-  ldr x0, =.tex_51
+  ldr x0, = .tex_51
   bl _escrever_tex
   ldr x0, [x29, 48]
   bl _escrever_tex
-  ldr x0, =.tex_52
+  ldr x0, = .tex_52
   bl _escrever_tex
   ldr x0, [x29, 48]
   str x0, [sp, -16]!
@@ -959,16 +959,16 @@ testeMemoria:
   cset w0, ge
   cmp w0, 0
   beq .B26
-  ldr x0, =.tex_53
+  ldr x0, = .tex_53
   bl _escrever_tex
   ldr w0, [x29, 64]
   bl _escrever_int
   b .B27
 .B26:
-  ldr x0, =.tex_54
+  ldr x0, = .tex_54
   bl _escrever_tex
 .B27:
-  ldr x0, =.tex_55
+  ldr x0, = .tex_55
   bl _escrever_tex
   mov w1, 101
   strb w1, [x29, 80]
@@ -986,7 +986,7 @@ testeMemoria:
   strb w1, [x29, 86]
   mov w1, 0
   strb w1, [x29, 87]
-  ldr x0, =.tex_56
+  ldr x0, = .tex_56
   bl _escrever_tex
   add x0, x29, 80
   bl _escrever_tex
@@ -1007,7 +1007,7 @@ testeMemoria:
   ldr x2, [sp, 0]
   add sp, sp, 48
   bl memcp
-  ldr x0, =.tex_58
+  ldr x0, = .tex_58
   bl _escrever_tex
   add x0, x29, 80
   bl _escrever_tex
@@ -1022,11 +1022,11 @@ testeMemoria:
   ldr x2, [sp, 0]
   add sp, sp, 48
   bl subscar
-  ldr x0, =.tex_59
+  ldr x0, = .tex_59
   bl _escrever_tex
   add x0, x29, 80
   bl _escrever_tex
-  ldr x0, =.tex_60
+  ldr x0, = .tex_60
   bl _escrever_tex
   mov w0, 0
   str w0, [sp, -16]!
@@ -1039,11 +1039,11 @@ testeMemoria:
   add x2, x2, x0
   ldrb w0, [x2]
   strb w0, [x29, 112]
-  ldr x0, =.tex_61
+  ldr x0, = .tex_61
   bl _escrever_tex
   ldrb w0, [x29, 112]
   bl _escrever_car
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 128]
@@ -1053,7 +1053,7 @@ testeMemoria:
   str w0, [x29, 136]
   mov w0, 5
   str w0, [x29, 140]
-  ldr x0, =.tex_62
+  ldr x0, = .tex_62
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -144]
@@ -1066,11 +1066,11 @@ testeMemoria:
   cset w0, lt
   cmp w0, 0
   beq .B30
-  ldr x0, =.tex_63
+  ldr x0, = .tex_63
   bl _escrever_tex
   ldr w0, [x29, -144]
   bl _escrever_int
-  ldr x0, =.tex_64
+  ldr x0, = .tex_64
   bl _escrever_tex
   ldr w0, [x29, -144]
   str w0, [sp, -16]!
@@ -1083,7 +1083,7 @@ testeMemoria:
   add x2, x2, x0
   ldr w0, [x2]
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   // incremento
   ldr w0, [x29, -144]
@@ -1103,7 +1103,7 @@ testeMemoria:
   ldr x0, = const_7
   ldr s0, [x0]
   str s0, [x29, 156]
-  ldr x0, =.tex_65
+  ldr x0, = .tex_65
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -128]
@@ -1116,11 +1116,11 @@ testeMemoria:
   cset w0, lt
   cmp w0, 0
   beq .B33
-  ldr x0, =.tex_63
+  ldr x0, = .tex_63
   bl _escrever_tex
   ldr w0, [x29, -128]
   bl _escrever_int
-  ldr x0, =.tex_64
+  ldr x0, = .tex_64
   bl _escrever_tex
   ldr w0, [x29, -128]
   str w0, [sp, -16]!
@@ -1133,7 +1133,7 @@ testeMemoria:
   add x2, x2, x0
   ldr s0, [x2]
   bl _escrever_flu
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   // incremento
   ldr w0, [x29, -128]
@@ -1154,7 +1154,7 @@ testeLoops:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_comb_6
+  ldr x0, = .tex_comb_6
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 32]
@@ -1167,7 +1167,7 @@ testeLoops:
   cset w0, lt
   cmp w0, 0
   beq .B35
-  ldr x0, =.tex_68
+  ldr x0, = .tex_68
   bl _escrever_tex
   ldr w0, [x29, 32]
   bl _escrever_int
@@ -1179,7 +1179,7 @@ testeLoops:
   str w0, [x29, 32]
   b .B34
 .B35:
-  ldr x0, =.tex_69
+  ldr x0, = .tex_69
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -144]
@@ -1192,11 +1192,11 @@ testeLoops:
   cset w0, lt
   cmp w0, 0
   beq .B38
-  ldr x0, =.tex_70
+  ldr x0, = .tex_70
   bl _escrever_tex
   ldr w0, [x29, -144]
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   // incremento
   ldr w0, [x29, -144]
@@ -1217,7 +1217,7 @@ testeMatrizes:
   sub sp, sp, 160
   stp x29, x30, [sp]
   mov x29, sp
-  ldr x0, =.tex_71
+  ldr x0, = .tex_71
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 32]
@@ -1231,7 +1231,7 @@ testeMatrizes:
   str w0, [x29, 40]
   mov w0, 0
   str w0, [x29, 44]
-  ldr x0, =.tex_72
+  ldr x0, = .tex_72
   bl _escrever_tex
   mov w0, 0
   str w0, [sp, -16]!
@@ -1250,7 +1250,7 @@ testeMatrizes:
   add x2, x2, x0
   ldr w0, [x2]
   bl _escrever_int
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   ldr x0, = const_8
   ldr s0, [x0]
@@ -1270,7 +1270,7 @@ testeMatrizes:
   ldr x0, = const_13
   ldr s0, [x0]
   str s0, [x29, 60]
-  ldr x0, =.tex_73
+  ldr x0, = .tex_73
   bl _escrever_tex
   mov w0, 0
   str w0, [sp, -16]!
@@ -1289,7 +1289,7 @@ testeMatrizes:
   add x2, x2, x0
   ldr s0, [x2]
   bl _escrever_flu
-  ldr x0, =.tex_1
+  ldr x0, = .tex_1
   bl _escrever_tex
   b .epilogo_19
 .epilogo_19:

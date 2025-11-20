@@ -1,12 +1,12 @@
 /*
-* [INFO]:
+* [FUNÇÃO]: Compilador.
 * [IMPLEMENTAÇÃO]: @Shiniga-OP.
 * [BASE]: Assembly.
 * [SISTEMA OPERACIONAL]: ANDROID.
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 19/11/2025.
+* [ATUAL]: 20/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +36,8 @@ typedef enum {
     T_PAREN_ESQ, T_PAREN_DIR,  
     T_CHAVE_ESQ, T_CHAVE_DIR,
     T_COL_ESQ, T_COL_DIR,
-    T_PONTO_VIRGULA, T_VIRGULA,  
+    T_PONTO_VIRGULA, T_VIRGULA, 
+    T_PONTO, T_LAMBDA,  
     // operadores:
     T_IGUAL, T_MAIS, T_MENOS, T_VEZES, T_DIV, T_PORCEN,
     T_MAIS_MAIS, T_MENOS_MENOS,
@@ -51,7 +52,8 @@ typedef enum {
     T_pLONGO, T_PONTEIRO,
     T_pVAZIO,
     // definições:
-    T_DEF, T_REG, T_FIM, T_RETORNAR, T_INCLUIR,
+    T_DEF, T_REG, T_FIM, T_RETORNAR, T_INCLUIR, 
+    T_ESPACO,
     // bits:
     T_MAIOR_MAIOR, T_MENOR_MENOR, T_TAMBEM, T_NAO
 } TipoToken;
@@ -76,6 +78,7 @@ typedef struct {
     int eh_ponteiro;
     int eh_array;
     int eh_parametro;
+    int espaco_id; // 0 se não for espaço
     int eh_final;
     int num_dims; // numero de dimensões
     int dims[MAX_DIMS]; // tamanho de cada dimensão
@@ -189,7 +192,9 @@ const char* token_str(TipoToken t) {
         case T_CHAVE_DIR: return "}";
         case T_COL_ESQ: return "[";
         case T_COL_DIR: return "]";
+        case T_LAMBDA: return "->";
         case T_PONTO_VIRGULA: return ";";
+        case T_PONTO: return ".";
         case T_VIRGULA: return ",";
         case T_IGUAL: return "=";
         case T_MAIS: return "+";
@@ -218,6 +223,7 @@ const char* token_str(TipoToken t) {
         case T_POR: return "por";
         case T_ENQ: return "enq";
         case T_INCLUIR: return "incluir";
+        case T_ESPACO: return "#espaco";
         case T_FIM: return "fim";
         case T_TAMBEM: return "&";
         case T_MAIOR_MAIOR: return ">>";
@@ -333,6 +339,10 @@ void proximoToken() {
             L.tk.tipo = T_INCLUIR;
             return;
         }
+        if(strcmp(L.tk.lex, "espaco") == 0) {
+            L.tk.tipo = T_ESPACO;
+            return;
+        }
         fatal("diretiva desconhecida");
     }
     if(isalpha((unsigned char)c) || c == '_') {
@@ -356,6 +366,7 @@ void proximoToken() {
         else if(strcmp(L.tk.lex, "enq") == 0) L.tk.tipo = T_ENQ;
         else if(strcmp(L.tk.lex, "retorne") == 0) L.tk.tipo = T_RETORNAR;
         else if(strcmp(L.tk.lex, "final") == 0) L.tk.tipo = T_FINAL;
+        else if(strcmp(L.tk.lex, "->") == 0) L.tk.tipo = T_LAMBDA;
         else L.tk.tipo = T_ID;
         return;
     }
@@ -457,6 +468,7 @@ void proximoToken() {
         case ']': L.tk.tipo = T_COL_DIR; break;
         case ';': L.tk.tipo = T_PONTO_VIRGULA; break;
         case ',': L.tk.tipo = T_VIRGULA; break;
+        case '.': L.tk.tipo = T_PONTO; break;
         case '=':
             if(L.fonte[L.pos + 1] == '=') {
                 L.tk.tipo = T_IGUAL_IGUAL;
@@ -761,7 +773,6 @@ void coletar_args(FILE* s, Funcao* f) {
 
     while(L.tk.tipo != T_PAREN_DIR) {
         Variavel* var = &f->vars[f->var_conta];
-        
         // arrays como parametros devem ser tratados como ponteiros(T_PONTEIRO)
         // mesmo que seu tipo base seja flutuante
         TipoToken tipo_param = L.tk.tipo;
@@ -913,6 +924,24 @@ TipoToken processar_condicao(FILE* s, int escopo) {
 }
 
 // [VERIFICAÇÃO]:
+void verificar_espaco(FILE* s) {
+    excessao(T_ESPACO);
+    
+    if(L.tk.tipo != T_ID) fatal("nome do espaço esperado");
+    
+    char nome_espaco[32];
+    strcpy(nome_espaco, L.tk.lex);
+    proximoToken();
+    
+    excessao(T_CHAVE_ESQ);
+    
+    // ignora tudo dentro do espaço
+    while(L.tk.tipo != T_CHAVE_DIR && L.tk.tipo != T_FIM) {
+        proximoToken();
+    }
+    excessao(T_CHAVE_DIR);
+}
+
 void verificar_retorno(FILE* s, int escopo) {
     excessao(T_RETORNAR);
     if(L.tk.tipo == T_PONTO_VIRGULA) {
@@ -1195,15 +1224,15 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         
         proximoToken();
         
-        FILE* arquivo_include = fopen(caminho, "r");
-        if(!arquivo_include) {
+        FILE* arquivo_incluir = fopen(caminho, "r");
+        if(!arquivo_incluir) {
             char mensagem_erro[300];
             snprintf(mensagem_erro, sizeof(mensagem_erro), "[verificar_stmt] não foi possível abrir: %s", caminho);
             fatal(mensagem_erro);
         }
         fprintf(s, "\n// inicio de %s\n", caminho);
         char linha[512];
-        while(fgets(linha, sizeof(linha), arquivo_include)) {
+        while(fgets(linha, sizeof(linha), arquivo_incluir)) {
             if(strstr(linha, ".section .data") != NULL) {
                 fputs(linha, s);
                 fputs("  .align 2\n", s);
@@ -1213,7 +1242,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             } else fputs(linha, s);
         }
         fprintf(s, "\n// fim de %s\n\n", caminho);
-        fclose(arquivo_include);
+        fclose(arquivo_incluir);
         return;
     }
     if(L.tk.tipo == T_DEF) {
@@ -2119,6 +2148,8 @@ int main(int argc, char** argv) {
         if(L.tk.tipo == T_INCLUIR) {
             int pos = 0;
             verificar_stmt(s, &pos, 0);
+        } else if(L.tk.tipo == T_ESPACO) {
+            verificar_espaco(s);
         } else verificar_fn(s);
     }
     gerar_consts(s);

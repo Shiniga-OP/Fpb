@@ -1,9 +1,10 @@
-#incluir "tmp/texint.asm";
+#incluir "biblis/impressao.asm";
+
+#espaco Nome {
+    car letra;
+}
 
 vazio inicio() {
-    escrever("texto 1\n");
-    escrever("texto 2\n");
-    escrever("texto 3\n");
-    escrever("texto 4\n");
-    escrever("texto 5\n");
+    car no = 'A';
+    escrever(no);
 }

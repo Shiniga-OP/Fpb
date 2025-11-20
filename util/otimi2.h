@@ -147,8 +147,8 @@ void otimizarO2(const char* arquivo_asm) {
                             while(isspace(*partes_j)) partes_j++;
                             
                             char ref1[100], ref2[100];
-                            snprintf(ref1, sizeof(ref1), "ldr x0, =%s", tex1);
-                            snprintf(ref2, sizeof(ref2), "ldr x0, =%s", tex2);
+                            snprintf(ref1, sizeof(ref1), "ldr x0, = %s", tex1);
+                            snprintf(ref2, sizeof(ref2), "ldr x0, = %s", tex2);
                             
                             if(strstr(partes_j, ref1)) tex1_usada = 1;
                             if(strstr(partes_j, ref2)) tex2_usada = 1;

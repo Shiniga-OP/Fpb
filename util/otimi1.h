@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include <ctype.h>
 
+static int debug1 = 0;
+
 void otimizarO1(const char* arquivo_asm) {
     FILE *arquivo = fopen(arquivo_asm, "r");
     if(!arquivo) {
@@ -56,7 +58,7 @@ void otimizarO1(const char* arquivo_asm) {
             funcoes[num_funcoes].referenciada = false;
             funcoes[num_funcoes].inicio = posicao_atual - strlen(linha);
             funcoes[num_funcoes].dentro_funcao = true;
-            printf("Encontrada função: '%s'\n", funcoes[num_funcoes].nome);
+            if(debug1) printf("Encontrada função: '%s'\n", funcoes[num_funcoes].nome);
             num_funcoes++;
         }
         // verifica se é fim de função
@@ -73,7 +75,7 @@ void otimizarO1(const char* arquivo_asm) {
     // volta ao inicio do arquivo pra procurar referencias
     rewind(arquivo);
     
-    printf("\n=== PROCURANDO REFERÊNCIAS ===\n");
+    if(debug1) printf("\n=== PROCURANDO REFERÊNCIAS ===\n");
     // procura por referencias "bl nome_funcao" pra cada função
     int linha_num = 0;
     while(fgets(linha, sizeof(linha), arquivo)) {
@@ -87,7 +89,7 @@ void otimizarO1(const char* arquivo_asm) {
         // verifica se tem referencia a alguma função
         char *bl_pos = strstr(linha_sem_comentario, "bl ");
         if(bl_pos != NULL) {
-            printf("Linha %d: Encontrado 'bl' em: %s", linha_num, linha);
+            if(debug1) printf("Linha %d: Encontrado 'bl' em: %s", linha_num, linha);
             
             // pula "bl " pra pegar o nome da função
             char *nome_inicio = bl_pos + 3; // +3 pra pular "bl "
@@ -104,13 +106,13 @@ void otimizarO1(const char* arquivo_asm) {
                 strncpy(nome_chamado, nome_inicio, tam);
                 nome_chamado[tam] = '\0';
                 
-                printf("  Nome extraído: '%s'\n", nome_chamado);
+                if(debug1) printf("  Nome extraído: '%s'\n", nome_chamado);
                 
                 // verifica se é uma das funções que ta rastreando
                 for(int i = 0; i < num_funcoes; i++) {
                     if(strcmp(funcoes[i].nome, nome_chamado) == 0) {
                         funcoes[i].referenciada = true;
-                        printf("  *** FUNÇÃO REFERENCIADA: %s ***\n", funcoes[i].nome);
+                        if(debug1) printf("  *** FUNÇÃO REFERENCIADA: %s ***\n", funcoes[i].nome);
                         break;
                     }
                 }
@@ -119,7 +121,7 @@ void otimizarO1(const char* arquivo_asm) {
         // tambem procura por referencias com tabulação
         char *bl_tab_pos = strstr(linha_sem_comentario, "\tbl ");
         if(bl_tab_pos != NULL) {
-            printf("Linha %d: Encontrado '\\tbl' em: %s", linha_num, linha);
+            if(debug1) printf("Linha %d: Encontrado '\\tbl' em: %s", linha_num, linha);
             
             // pula "\tbl " pra pegar o nome da função
             char *nome_inicio = bl_tab_pos + 4; // +4 pra pular "\tbl "
@@ -136,13 +138,13 @@ void otimizarO1(const char* arquivo_asm) {
                 strncpy(nome_chamado, nome_inicio, tam);
                 nome_chamado[tam] = '\0';
                 
-                printf("  Nome extraído: '%s'\n", nome_chamado);
+                if(debug1) printf("  Nome extraído: '%s'\n", nome_chamado);
                 
                 // verifica se é uma das funções que ta rastreando
                 for(int i = 0; i < num_funcoes; i++) {
                     if(strcmp(funcoes[i].nome, nome_chamado) == 0) {
                         funcoes[i].referenciada = true;
-                        printf("  *** FUNÇÃO REFERENCIADA: %s ***\n", funcoes[i].nome);
+                        if(debug1) printf("  *** FUNÇÃO REFERENCIADA: %s ***\n", funcoes[i].nome);
                         break;
                     }
                 }
@@ -150,9 +152,11 @@ void otimizarO1(const char* arquivo_asm) {
         }
     }
     fclose(arquivo);
-    printf("\n=== RESULTADO DA ANÁLISE ===\n");
-    for(int i = 0; i < num_funcoes; i++) {
-        printf("Função %s: %s\n", funcoes[i].nome, funcoes[i].referenciada ? "REFERENCIADA" : "NÃO REFERENCIADA");
+    if(debug1) {
+        printf("\n=== RESULTADO DA ANÁLISE ===\n");
+        for(int i = 0; i < num_funcoes; i++) {
+            printf("Função %s: %s\n", funcoes[i].nome, funcoes[i].referenciada ? "REFERENCIADA" : "NÃO REFERENCIADA");
+        }
     }
     // segunda passagem: cria novo arquivo sem as funções não referenciadas
     arquivo = fopen(arquivo_asm, "r");
@@ -204,7 +208,7 @@ void otimizarO1(const char* arquivo_asm) {
             // decide se pula a função
             if(funcao_atual_idc != -1 && !funcoes[funcao_atual_idc].referenciada) {
                 pular_secao = true;
-                printf("Removendo função não referenciada: %s\n", nome_temp);
+                if(debug1) printf("Removendo função não referenciada: %s\n", nome_temp);
             } else {
                 pular_secao = false;
                 fputs(linha, temp); // escreve linha de inicio da função
@@ -233,14 +237,15 @@ void otimizarO1(const char* arquivo_asm) {
     // substitui arquivo original pelo temporario
     remove(arquivo_asm);
     rename(arquivo_temp, arquivo_asm);
-    
-    printf("\n=== OTIMIZAÇÃO CONCLUÍDA ===\n");
-    printf("Otimização O1 concluída para %s:\n", arquivo_asm);
-    for(int i = 0; i < num_funcoes; i++) {
-        if(!funcoes[i].referenciada) {
-            printf("  - %s (removida)\n", funcoes[i].nome);
-        } else {
-            printf("  + %s (mantida)\n", funcoes[i].nome);
+    if(debug1) {
+        printf("\n=== OTIMIZAÇÃO CONCLUÍDA ===\n");
+        printf("Otimização O1 concluída para %s:\n", arquivo_asm);
+        for(int i = 0; i < num_funcoes; i++) {
+            if(!funcoes[i].referenciada) {
+                printf("  - %s (removida)\n", funcoes[i].nome);
+            } else {
+                printf("  + %s (mantida)\n", funcoes[i].nome);
+            }
         }
     }
 }

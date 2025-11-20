@@ -37,7 +37,7 @@ typedef enum {
     T_CHAVE_ESQ, T_CHAVE_DIR,
     T_COL_ESQ, T_COL_DIR,
     T_PONTO_VIRGULA, T_VIRGULA, 
-    T_PONTO, T_LAMBDA,  
+    T_PONTO, T_LAMBDA, T_ARROBA,  
     // operadores:
     T_IGUAL, T_MAIS, T_MENOS, T_VEZES, T_DIV, T_PORCEN,
     T_MAIS_MAIS, T_MENOS_MENOS,
@@ -192,6 +192,7 @@ const char* token_str(TipoToken t) {
         case T_CHAVE_DIR: return "}";
         case T_COL_ESQ: return "[";
         case T_COL_DIR: return "]";
+        case T_ARROBA: return "@";
         case T_LAMBDA: return "->";
         case T_PONTO_VIRGULA: return ";";
         case T_PONTO: return ".";
@@ -466,6 +467,7 @@ void proximoToken() {
         case '}': L.tk.tipo = T_CHAVE_DIR; break;
         case '[': L.tk.tipo = T_COL_ESQ; break;
         case ']': L.tk.tipo = T_COL_DIR; break;
+        case '@': L.tk.tipo = T_ARROBA; break;
         case ';': L.tk.tipo = T_PONTO_VIRGULA; break;
         case ',': L.tk.tipo = T_VIRGULA; break;
         case '.': L.tk.tipo = T_PONTO; break;
@@ -595,10 +597,8 @@ TipoToken tratar_id(FILE* s, int escopo) {
                 fprintf(s, "  add w0, w0, w1\n");
             }
             // carrega o valor
-            if(var->eh_parametro) 
-                fprintf(s, "  ldr x2, [x29, %d]\n", var->pos);
-            else 
-                fprintf(s, "  add x2, x29, %d\n", var->pos);
+            if(var->eh_parametro) fprintf(s, "  ldr x2, [x29, %d]\n", var->pos);
+            else fprintf(s, "  add x2, x29, %d\n", var->pos);
             
             fprintf(s, "  add x2, x2, x0\n"); // adiciona pos calculado
             
@@ -1343,9 +1343,16 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                         if(var && var->eh_ponteiro) {
                             if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
                             else fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-                            escrever_valor(s, T_TEX);
-                            proximoToken();
-                        } else if(var && var->eh_array && var->tipo_base == T_pCAR) {
+                            
+                            if(var->tipo_base == T_pCAR) {
+                                escrever_valor(s, T_TEX);
+                            } else if(var->tipo_base == T_pLONGO || var->tipo_base == T_pINT) {
+                                escrever_valor(s, T_pLONGO);
+                            } else if(var->tipo_base == T_pFLU) {
+                                escrever_valor(s, T_pFLU);
+                            }
+                        proximoToken();
+                    } else if(var && var->eh_array && var->tipo_base == T_pCAR) {
                             if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
                             else fprintf(s, "  add x0, x29, %d\n", var->pos);
                             escrever_valor(s, T_TEX);
@@ -1596,31 +1603,31 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
         case T_MAIS: 
             if(tipo == T_pFLU) fprintf(s, "  fadd s0, s1, s0\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fadd d0, d1, d0\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  add x0, x1, x0\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  add x0, x1, x0\n");
             else fprintf(s, "  add w0, w1, w0\n");
         break;
         case T_MENOS: 
             if(tipo == T_pFLU) fprintf(s, "  fsub s0, s1, s0\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fsub d0, d1, d0\n");
-            else if(T_pLONGO) fprintf(s, "  sub x0, x1, x0\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  sub x0, x1, x0\n");
             else fprintf(s, "  sub w0, w1, w0\n");
         break;
         case T_VEZES: 
             if(tipo == T_pFLU) fprintf(s, "  fmul s0, s1, s0\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fmul d0, d1, d0\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  mul x0, x1, x0\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  mul x0, x1, x0\n");
             else fprintf(s, "  mul w0, w1, w0\n");
         break;
         case T_DIV: 
             if(tipo == T_pFLU) fprintf(s, "  fdiv s0, s1, s0\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fdiv d0, d1, d0\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  sdiv x0, x1, x0\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  sdiv x0, x1, x0\n");
             else fprintf(s, "  sdiv w0, w1, w0\n");
         break;
         case T_PORCEN: 
             if(tipo == T_pFLU || tipo == T_pDOBRO) {
                 fatal("[gerar_operacao] operador módulo não suportado para tipos flutuante");
-            } else if(tipo == T_pLONGO) {
+            } else if(tipo == T_pLONGO || tipo == T_PONTEIRO) {
                 fprintf(s, "  sdiv x2, x1, x0\n");
                 fprintf(s, "  msub x0, x2, x0, x1\n");
             } else {
@@ -1631,7 +1638,7 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
         case T_TAMBEM_TAMBEM:
             if(tipo == T_pFLU || tipo == T_pDOBRO) {
                 fatal("[gerar_operacao] operador && não suportado para tipos flutuante");
-            } else if(tipo == T_pLONGO) {
+            } else if(tipo == T_pLONGO || tipo == T_PONTEIRO) {
                 // &&: w0 = (w1 != 0) && (w0 != 0)
                 fprintf(s, "  cmp x1, 0\n");
                 fprintf(s, "  cset x1, ne\n");  // w1 = (w1 != 0) ? 1 : 0
@@ -1656,37 +1663,37 @@ void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo) {
         case T_IGUAL_IGUAL:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, eq\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, eq\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, eq\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  cmp x1, x0\n  cset x0, eq\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, eq\n");
         break;
         case T_DIFERENTE:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, ne\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, ne\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, ne\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  cmp x1, x0\n  cset x0, ne\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, ne\n");
         break;
         case T_MAIOR:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, gt\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, gt\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  fcmp x1, x0\n  cset x0, gt\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  fcmp x1, x0\n  cset x0, gt\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, gt\n");
         break;
         case T_MENOR:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, lt\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, lt\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, lt\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  cmp x1, x0\n  cset x0, lt\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, lt\n");
         break;
         case T_MAIOR_IGUAL:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, ge\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, ge\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, ge\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  cmp x1, x0\n  cset x0, ge\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, ge\n");
         break;
         case T_MENOR_IGUAL:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, le\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, le\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, le\n");
+            else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  cmp x1, x0\n  cset x0, le\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, le\n");
         break;
         default: fatal("[gerar_comparacao] operador de comparação inválido");
@@ -1695,7 +1702,12 @@ void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo) {
 
 TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual) {
     if(tipo_anterior == tipo_atual) return tipo_anterior;
-
+    if(tipo_anterior == T_PONTEIRO && (tipo_atual == T_pINT || tipo_atual == T_pLONGO)) {
+        return T_PONTEIRO;
+    }
+    if(tipo_atual == T_PONTEIRO && (tipo_anterior == T_pINT || tipo_anterior == T_pLONGO)) {
+        return T_PONTEIRO;
+    }
     // caso 1: inteiro(esq) com flutuante(dir)
     // o inteiro ta em w1(anterior), o flutuante ta em s0(atual)
     if(tipo_anterior == T_pINT && tipo_atual == T_pFLU) {
@@ -1776,7 +1788,7 @@ void carregar_valor(FILE* s, Variavel* var) {
 }
 
 void armazenar_valor(FILE* s, Variavel* var) {
-    if(var->eh_ponteiro) fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+    if(var->eh_ponteiro) fprintf(s, "  str x0, [x29, %d]\n", var->pos);
     else if(var->eh_array) fatal("[armazenar_valor] não é possível armazenar valor direto em array");
     else {
         switch(tam_tipo(var->tipo_base)) {
@@ -1851,27 +1863,36 @@ int add_tex(const char* valor) {
 }
 
 TipoToken fator(FILE* s, int escopo) {
+    if(L.tk.tipo == T_ARROBA) {
+        // operador de endereço @
+        proximoToken();
+        
+        if(L.tk.tipo != T_ID) fatal("[fator] @ espera identificador");
+        
+        Variavel* var = buscar_var(L.tk.lex, escopo);
+        if(!var) fatal("[fator] variável não encontrada");
+        // carrega endereço da variavel
+        if(var->eh_parametro && var->eh_array) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+        else fprintf(s, "  add x0, x29, %d\n", var->pos);
+        proximoToken();
+        return T_PONTEIRO;
+    }
     if(L.tk.tipo == T_MENOS) {
         proximoToken();
         TipoToken tipo = fator(s, escopo);
         
-        if(tipo == T_pFLU) {
-            fprintf(s, "  fneg s0, s0\n");
-        } else if(tipo == T_pDOBRO) {
-            fprintf(s, "  fneg d0, d0\n");
-        } else if(tipo == T_pLONGO) {
-            fprintf(s, "  neg x0, x0\n");
-        } else {
-            fprintf(s, "  neg w0, w0\n");
-        }
+        if(tipo == T_pFLU) fprintf(s, "  fneg s0, s0\n");
+        else if(tipo == T_pDOBRO) fprintf(s, "  fneg d0, d0\n");
+        else if(tipo == T_pLONGO) fprintf(s, "  neg x0, x0\n");
+        else fprintf(s, "  neg w0, w0\n");
+        
         return tipo;
     } else if(L.tk.tipo == T_PAREN_ESQ) {
         proximoToken();
         TipoToken tipo = expressao(s, escopo);
         excessao(T_PAREN_DIR);
         return tipo;
-    }
-    else if(L.tk.tipo == T_ID) return tratar_id(s, escopo);
+    } else if(L.tk.tipo == T_ID) return tratar_id(s, escopo);
     else if(L.tk.tipo == T_INT) return tratar_inteiro(s);
     else if(L.tk.tipo == T_FLU || L.tk.tipo == T_DOBRO) return tratar_flutuante(s);
     else if(L.tk.tipo == T_CAR) return tratar_caractere(s);
@@ -1918,20 +1939,24 @@ TipoToken expressao(FILE* s, int escopo) {
         TipoToken op = L.tk.tipo;
         proximoToken();
        // salva o primeiro resultado:
-        if(tipo == T_pFLU) {
-            fprintf(s, "  str s0, [sp, -16]!\n");
-        } else if(tipo == T_pDOBRO) {
-            fprintf(s, "  str d0, [sp, -16]!\n");
-        } else {
-            fprintf(s, "  str w0, [sp, -16]!\n");
-        }
-        
-        TipoToken tipo_dir = termo(s, escopo);
+       if(tipo == T_pFLU) {
+           fprintf(s, "  str s0, [sp, -16]!\n");
+       } else if(tipo == T_pDOBRO) {
+           fprintf(s, "  str d0, [sp, -16]!\n");
+       } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+           fprintf(s, "  str x0, [sp, -16]!\n");
+       } else {
+           fprintf(s, "  str w0, [sp, -16]!\n");
+       }
+       TipoToken tipo_dir = termo(s, escopo);
         // recupera o primeiro resultado:
         if(tipo == T_pFLU) {
             fprintf(s, "  ldr s1, [sp], 16\n");
         } else if(tipo == T_pDOBRO) {
             fprintf(s, "  ldr d1, [sp], 16\n");
+            
+        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+            fprintf(s, "  ldr x1, [sp], 16\n");
         } else {
             fprintf(s, "  ldr w1, [sp], 16\n");
         }
@@ -1949,6 +1974,8 @@ TipoToken expressao(FILE* s, int escopo) {
             fprintf(s, "  str s0, [sp, -16]!\n");
         } else if(tipo == T_pDOBRO) {
             fprintf(s, "  str d0, [sp, -16]!\n");
+        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+            fprintf(s, "  str x0, [sp, -16]!\n");
         } else {
             fprintf(s, "  str w0, [sp, -16]!\n");
         }
@@ -1958,6 +1985,8 @@ TipoToken expressao(FILE* s, int escopo) {
             fprintf(s, "  ldr s1, [sp], 16\n");
         } else if(tipo == T_pDOBRO) {
             fprintf(s, "  ldr d1, [sp], 16\n");
+        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+            fprintf(s, "  ldr x1, [sp], 16\n");
         } else {
             fprintf(s, "  ldr w1, [sp], 16\n");
         }
@@ -2073,7 +2102,18 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
             }
             proximoToken();
         } else if(eh_ponteiro) {
-            fatal("[declaracao_var] esperado texto para ponteiro");
+            // ponteiro pra outros tipos, permite definição com expressões
+            TipoToken tipo_exp = expressao(s, escopo);
+            if(tipo_exp == T_pINT) {
+                // converte de 32-bit pra 64-bit
+                fprintf(s, "  sxtw x0, w0\n"); // estende w0 pra x0 com sinal
+            }
+            // armazena o valor do ponteiro
+            if(var->pos >= 0) fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+            else {
+                fprintf(s, "  mov x1, %d\n", var->pos);
+                fprintf(s, "  str x0, [x29, x1]\n");
+            }
         } else {
             // variavel simples
             TipoToken tipo_exp = expressao(s, escopo);

@@ -1,10 +1,9 @@
 #incluir "biblis/impressao.asm";
 
-#espaco Nome {
-    car letra;
-}
-
 vazio inicio() {
-    car no = 'A';
-    escrever(no);
+    int x = 10;
+    int* p = x;
+    p = p + 4;
+    x = p;
+    escrever(x);
 }

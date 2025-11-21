@@ -98,6 +98,7 @@ vazio testeOperacoes() {
     flu x = 0.5f; // pode ter sufixo também
     escrever("x: ", x, " * y: ", y, ", resultado: ", x * y, "\n");
     escrever("10 << 2, resultado: ", 10 << 2, "\n");
+    escrever("10 >> 2, resultado: ", 10 >> 2, "\n");
 }
 
 vazio testeComparacoes() {

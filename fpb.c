@@ -488,6 +488,10 @@ void proximoToken() {
                 L.tk.tipo = T_MAIOR_IGUAL;
                 L.pos++;
                 L.coluna_atual++;
+            } else if(L.fonte[L.pos + 1] == '>') {
+                L.tk.tipo = T_MAIOR_MAIOR;
+                L.pos++;
+                L.coluna_atual++;
             } else L.tk.tipo = T_MAIOR;
         break;
         case '<':
@@ -718,7 +722,7 @@ TipoToken tratar_inteiro(FILE* s) {
     strcpy(num, L.tk.lex);
     long l_val = L.tk.valor_l;
     proximoToken();
-    // verifica se é um sufixo 'L' pra longo
+    // verifica se é um sufixo "L" pra longo
     if(L.tk.tipo == T_ID && (strcmp(L.tk.lex, "L") == 0 || strcmp(L.tk.lex, "l") == 0)) {
         // é um numero longo
         proximoToken();
@@ -941,6 +945,7 @@ TipoToken processar_condicao(FILE* s, int escopo) {
     }
     return tipo_final;
 }
+
 int processar_variaveis_tam() {
     Lexer salvo = L;
     int tamanho_total = 0;
@@ -1462,25 +1467,32 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             return;
         } else if(L.tk.tipo == T_PAREN_ESQ) {
             excessao(T_PAREN_ESQ);
-            
             if(strcmp(idn,"escrever") == 0) {
-                // >>>>>>>ESCREVE NA SAIDA<<<<<<<<
                 while(1) {
                     if(L.tk.tipo == T_ID) {
                         Variavel* var = buscar_var(L.tk.lex, escopo);
                         if(var && var->eh_ponteiro) {
-                            if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-                            else fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-                            
                             if(var->tipo_base == T_pCAR) {
-                                escrever_valor(s, T_TEX);
-                            } else if(var->tipo_base == T_pLONGO || var->tipo_base == T_pINT) {
-                                escrever_valor(s, T_pLONGO);
-                            } else if(var->tipo_base == T_pFLU) {
-                                escrever_valor(s, T_pFLU);
+                                fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+                                escrever_valor(s, T_TEX); // Escrever como string
+                            } else {
+                                fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+                                // carrega o valor apontado baseado no tipo base
+                                if(var->tipo_base == T_pBOOL) {
+                                    fprintf(s, "  ldrb w0, [x1]\n");
+                                } else if(var->tipo_base == T_pINT) {
+                                    fprintf(s, "  ldr w0, [x1]\n");
+                                } else if(var->tipo_base == T_pFLU) {
+                                    fprintf(s, "  ldr s0, [x1]\n");
+                                } else if(var->tipo_base == T_pDOBRO) {
+                                    fprintf(s, "  ldr d0, [x1]\n");
+                                } else if(var->tipo_base == T_pLONGO) {
+                                    fprintf(s, "  ldr x0, [x1]\n");
+                                }
+                                escrever_valor(s, var->tipo_base);
                             }
-                        proximoToken();
-                    } else if(var && var->eh_array && var->tipo_base == T_pCAR) {
+                            proximoToken();
+                        } else if(var && var->eh_array && var->tipo_base == T_pCAR) {
                             if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
                             else fprintf(s, "  add x0, x29, %d\n", var->pos);
                             escrever_valor(s, T_TEX);
@@ -1743,6 +1755,16 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
             }
             else fprintf(s, "  lsl w0, w1, w0\n");
         break;
+        case T_MAIOR_MAIOR: 
+            if(tipo == T_pFLU) fprintf(s, "  flsr s0, s1, s0\n");
+            else if(tipo == T_pDOBRO) fprintf(s, "  flsr d0, d1, d0\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  lsr x0, x1, x0\n");
+            else if(tipo == T_PONTEIRO) {
+                fprintf(s, "  lsr x0, x0, 3\n");
+                fprintf(s, "  lsr x0, x1, x0\n");
+            }
+            else fprintf(s, "  lsr w0, w1, w0\n");
+        break;
         default: fatal("[gerar_operacao] operador inválido");
     }
 }
@@ -1995,7 +2017,7 @@ TipoToken fator(FILE* s, int escopo) {
 TipoToken termo(FILE* s, int escopo) {
     TipoToken tipo = fator(s, escopo);
     
-    while(L.tk.tipo == T_VEZES || L.tk.tipo == T_DIV || L.tk.tipo == T_PORCEN || L.tk.tipo == T_MENOR_MENOR) {
+    while(L.tk.tipo == T_VEZES || L.tk.tipo == T_DIV || L.tk.tipo == T_PORCEN || L.tk.tipo == T_MENOR_MENOR || L.tk.tipo == T_MAIOR_MAIOR) {
         TipoToken op = L.tk.tipo;
         proximoToken();
         
@@ -2183,11 +2205,16 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
         // caso: ponteiro normal ou variavel normal
         else {
             TipoToken tipo_exp = expressao(s, escopo);
-            if(eh_ponteiro && tipo_exp == T_pINT) {
-                fprintf(s, "  sxtw x0, w0\n");
+            if(eh_ponteiro) {
+                if(tipo_exp == T_pINT) {
+                    fprintf(s, "  sxtw x0, w0\n");
+                }
+                // pra ponteiros, armazena o valor do ponteiro
+                fprintf(s, "  str x0, [x29, %d]\n", var->pos); 
+            } else {
+                // pra variáveis normais, usa armazenar_valor
+                armazenar_valor(s, var);
             }
-            // armazenar_valor usa var->pos como var->pos é negativo, str x0, [x29, -XX] funciona perfeitamente
-            armazenar_valor(s, var);
         }
     }
     if(eh_parametro) *pos += 8;

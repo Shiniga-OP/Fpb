@@ -1,6 +1,10 @@
-#incluir "tmp/texint.asm";
+#incluir "biblis/impressao.asm";
+#incluir "biblis/mem.asm";
+
+int* memalocar(int bytes);
 
 vazio inicio() {
-    int[] arr = { 1, 1, 1 };
-    escrever(arr[0]);
+    int* p = memalocar(4);
+    p = 123;
+    escrever(p);
 }

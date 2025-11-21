@@ -166,12 +166,11 @@ vazio testeMemoria() {
     escrever("\nTeste de manipulação da memoria:\n");
     
     car* p = "XxXmplo maior";
-    int tamNes = textam(p);
     
     car[] array2 = "exemplo";
     escrever("\nArray padrão: ", array2);
     
-    memcp(array2, p, tamNes);
+    memcp(array2, p, textam(p));
     escrever("\nArray copiado da memoria: ", array2);
     
     subscar(array2, 'X', 'e');

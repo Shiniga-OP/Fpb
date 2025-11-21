@@ -1,7 +1,6 @@
-vazio teste() {
-    car[128] c;
-}
+#incluir "tmp/texint.asm";
 
 vazio inicio() {
-    teste();
+    int[] arr = { 1, 1, 1 };
+    escrever(arr[0]);
 }

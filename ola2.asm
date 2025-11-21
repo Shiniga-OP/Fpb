@@ -413,9 +413,7 @@ somar:
   bl _escrever_tex
   ldr w0, [x29, -48]
   bl _escrever_int
-  ldr x0, = .tex_1
-  bl _escrever_tex
-  ldr x0, = .tex_2
+  ldr x0, = .tex_comb_0
   bl _escrever_tex
   ldr w0, [x29, -56]
   bl _escrever_int
@@ -568,9 +566,7 @@ testeAlteracoes:
   bl _escrever_tex
   ldr x0, [x29, -48]
   bl _escrever_longo
-  ldr x0, = .tex_1
-  bl _escrever_tex
-  ldr x0, = .tex_18
+  ldr x0, = .tex_comb_1
   bl _escrever_tex
   mov w0, 1
   str w0, [x29, -80]
@@ -623,9 +619,7 @@ testeOperacoes:
   sub sp, sp, 160
   stp x29, x30, [sp, 144]
   add x29, sp, 144
-  ldr x0, = .tex_23
-  bl _escrever_tex
-  ldr x0, = .tex_24
+  ldr x0, = .tex_comb_2
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -637,9 +631,7 @@ testeOperacoes:
   ldr w1, [sp], 16
   add w0, w1, w0
   bl _escrever_int
-  ldr x0, = .tex_1
-  bl _escrever_tex
-  ldr x0, = .tex_25
+  ldr x0, = .tex_comb_3
   bl _escrever_tex
   mov w0, 5
   str w0, [sp, -16]!
@@ -670,9 +662,7 @@ testeOperacoes:
   add sp, sp, 32
   bl somar
   bl _escrever_int
-  ldr x0, = .tex_1
-  bl _escrever_tex
-  ldr x0, = .tex_26
+  ldr x0, = .tex_comb_4
   bl _escrever_tex
   mov w0, 10
   str w0, [sp, -16]!
@@ -681,9 +671,7 @@ testeOperacoes:
   sdiv w2, w1, w0
   msub w0, w2, w0, w1
   bl _escrever_int
-  ldr x0, = .tex_1
-  bl _escrever_tex
-  ldr x0, = .tex_27
+  ldr x0, = .tex_comb_5
   bl _escrever_tex
   mov w0, 3
   str w0, [x29, -32]
@@ -707,9 +695,7 @@ testeOperacoes:
   scvtf s0, w0
   fmul s0, s1, s0
   bl _escrever_flu
-  ldr x0, = .tex_1
-  bl _escrever_tex
-  ldr x0, = .tex_31
+  ldr x0, = .tex_comb_6
   bl _escrever_tex
   mov w0, 10
   str w0, [sp, -16]!
@@ -717,9 +703,7 @@ testeOperacoes:
   ldr w1, [sp], 16
   lsl w0, w1, w0
   bl _escrever_int
-  ldr x0, = .tex_1
-  bl _escrever_tex
-  ldr x0, = .tex_32
+  ldr x0, = .tex_comb_7
   bl _escrever_tex
   mov w0, 10
   str w0, [sp, -16]!
@@ -1202,9 +1186,7 @@ testeLoops:
   sub sp, sp, 160
   stp x29, x30, [sp, 144]
   add x29, sp, 144
-  ldr x0, = .tex_71
-  bl _escrever_tex
-  ldr x0, = .tex_72
+  ldr x0, = .tex_comb_8
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -32]
@@ -1396,21 +1378,13 @@ const_13:
 .tex_15: .asciz "\nnovo caractere: "
 .tex_16: .asciz "\nnovo booleano: "
 .tex_17: .asciz "\nnovo longo: "
-.tex_18: .asciz "\nTeste de positivo e negativo:\n\n"
 .tex_19: .asciz "inteiro positivo: "
 .tex_20: .asciz "inteiro negativo: "
 .tex_21: .asciz "flutuante positivo: "
 .tex_22: .asciz "flutuante negativo: "
-.tex_23: .asciz "\n\nTeste de operações matematicas:\n\n"
-.tex_24: .asciz "operação 5 + 5 * 5, esperado: 30, veio: "
-.tex_25: .asciz "operação (5 + 5) * 5, esperado: 50, veio: "
-.tex_26: .asciz "10 % 3 = ?, esperado: 1, recebido: "
-.tex_27: .asciz "\n\nTeste de operações entre tipos:\n\n"
 .tex_28: .asciz "x: "
 .tex_29: .asciz " * y: "
 .tex_30: .asciz ", resultado: "
-.tex_31: .asciz "10 << 2, resultado: "
-.tex_32: .asciz "10 >> 2, resultado: "
 .tex_33: .asciz "\nTeste comparações:\n\n"
 .tex_34: .asciz "x é maior que 5\n"
 .tex_35: .asciz "x é maior ou igual a 5\n"
@@ -1449,8 +1423,6 @@ const_13:
 .tex_68: .asciz "no indice: "
 .tex_69: .asciz " valor: "
 .tex_70: .asciz "\nArray de flutuantes: \n\n"
-.tex_71: .asciz "\n\nTeste de loops"
-.tex_72: .asciz "\nEnquanto:"
 .tex_73: .asciz "\nvalor de i: "
 .tex_74: .asciz "\n\nPor:\n"
 .tex_75: .asciz "indice: "
@@ -1459,3 +1431,15 @@ const_13:
 .tex_78: .asciz "matriz 2D flu m2f[0][1]: "
 .section .text
 
+
+.section .rodata
+.align 2
+.tex_comb_0: .asciz "\nvalor b: "
+.tex_comb_1: .asciz "\n\nTeste de positivo e negativo:\n\n"
+.tex_comb_2: .asciz "\n\nTeste de operações matematicas:\n\noperação 5 + 5 * 5, esperado: 30, veio: "
+.tex_comb_3: .asciz "\noperação (5 + 5) * 5, esperado: 50, veio: "
+.tex_comb_4: .asciz "\n10 % 3 = ?, esperado: 1, recebido: "
+.tex_comb_5: .asciz "\n\n\nTeste de operações entre tipos:\n\n"
+.tex_comb_6: .asciz "\n10 << 2, resultado: "
+.tex_comb_7: .asciz "\n10 >> 2, resultado: "
+.tex_comb_8: .asciz "\n\nTeste de loops\nEnquanto:"

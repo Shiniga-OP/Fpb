@@ -1,4 +1,4 @@
-#incluir "tmp/texint.asm";
+#incluir "biblis/impressao.asm";
 
 int fib(int n) {
     se(n <= 1) retorne n;

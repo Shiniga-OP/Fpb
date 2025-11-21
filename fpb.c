@@ -357,7 +357,9 @@ void proximoToken() {
         if(strcmp(L.tk.lex, "car") == 0) L.tk.tipo = T_pCAR;
         else if(strcmp(L.tk.lex, "int") == 0) L.tk.tipo = T_pINT;
         else if(strcmp(L.tk.lex, "flu") == 0) L.tk.tipo = T_pFLU;
-        else if(strcmp(L.tk.lex, "bool") == 0) L.tk.tipo = T_pBOOL;
+        else if(strcmp(L.tk.lex, "bool") == 0 ||
+        strcmp(L.tk.lex, "verdade") == 0 ||
+        strcmp(L.tk.lex, "falso") == 0) L.tk.tipo = T_pBOOL;
         else if(strcmp(L.tk.lex, "dobro") == 0) L.tk.tipo = T_pDOBRO;
         else if(strcmp(L.tk.lex, "longo") == 0) L.tk.tipo = T_pLONGO;
         else if(strcmp(L.tk.lex, "vazio") == 0) L.tk.tipo = T_pVAZIO;

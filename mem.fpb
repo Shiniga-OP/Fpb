@@ -1,10 +1,9 @@
-#incluir "biblis/impressao.asm";
-#incluir "biblis/mem.asm";
-
-int* memalocar(int bytes);
+int teste() {
+    int a = 10 + 20;
+    int b = a * 2;
+    retorne b;
+}
 
 vazio inicio() {
-    int* p = memalocar(4);
-    p = 123;
-    escrever(p);
+    teste();
 }

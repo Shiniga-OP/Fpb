@@ -263,7 +263,7 @@ caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador,
 1. reutilização de constantes.
 2. reutilização de texs.
 3. primeiros 8 parametros sendo passados por registradores.
-4. usando a marcação -O1 após o nome do arquivo, será ativado a eliminação de funções não usadas e labels. (beta)
+4. usando a marcação -O1 após o nome do arquivo, será ativado a eliminação de funções não usadas e labels, + reorganização de sintaxe. (beta)
 5. a marcação -O2 otimiza ainda mais o código juntando textos chamados para serem imprimidos em sequencia, incluindo a eliminação de código morto da O1. (beta)
 # requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.

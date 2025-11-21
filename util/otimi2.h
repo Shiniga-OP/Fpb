@@ -13,6 +13,8 @@
 
 #define MAX_LINHA 1024
 
+static bool debug2 = false;
+
 void otimizarO2(const char* arquivo_asm) {
     FILE *entrada = fopen(arquivo_asm, "r");
     if(!entrada) {
@@ -118,7 +120,7 @@ void otimizarO2(const char* arquivo_asm) {
                     if(strcmp(texs[s].nome, tex2) == 0) strcpy(conteudo2, texs[s].conteudo);
                 }
                 if(conteudo1[0] && conteudo2[0]) {
-                    printf("Combinando texs consecutivas: %s + %s\n", tex1, tex2);
+                    if(debug2) printf("Combinando texs consecutivas: %s + %s\n", tex1, tex2);
                     
                     char novo_tex[2048];
                     snprintf(novo_tex, sizeof(novo_tex), "%s%s", conteudo1, conteudo2);
@@ -158,11 +160,11 @@ void otimizarO2(const char* arquivo_asm) {
                     for(int s = 0; s < num_texs; s++) {
                         if(strcmp(texs[s].nome, tex1) == 0 && !tex1_usada) {
                             texs[s].usada = 0;
-                            printf("Marcando %s como não usada\n", tex1);
+                            if(debug2) printf("Marcando %s como não usada\n", tex1);
                         }
                         if(strcmp(texs[s].nome, tex2) == 0 && !tex2_usada) {
                             texs[s].usada = 0;
-                            printf("Marcando %s como não usada\n", tex2);
+                            if(debug2) printf("Marcando %s como não usada\n", tex2);
                         }
                     }
                     // adiciona nova texto
@@ -237,12 +239,11 @@ void otimizarO2(const char* arquivo_asm) {
     for(int i = 0; i < num_texs; i++) {
         if(strstr(texs[i].nome, ".tex_comb_") && texs[i].usada) {
             fprintf(saida, "%s: .asciz \"%s\"\n", texs[i].nome, texs[i].conteudo);
-            printf("Incluindo texto combinado: %s\n", texs[i].nome);
+            if(debug2) printf("Incluindo texto combinado: %s\n", texs[i].nome);
         }
     }
     fclose(saida);
-    printf("Otimização 2 concluída: %d combinações de texs feitas\n", combinacoes_feitas);
-    
+    if(debug2) printf("Otimização 2 concluída: %d combinações de texs feitas\n", combinacoes_feitas);
     otimizarO1(arquivo_asm);
 }
 #endif

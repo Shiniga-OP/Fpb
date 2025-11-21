@@ -1,6 +1,6 @@
 /*
 * [NÍVEL OTIMIZADOR]: 1.
-* [FUNÇÃO]: eliminação de codigo e dados mortos.
+* [FUNÇÃO]: eliminação de codigo e dados mortos + reorganização.
 */
 #ifndef OTIMI1_H
 #define OTIMI1_H
@@ -11,7 +11,92 @@
 #include <stdbool.h>
 #include <ctype.h>
 
-static int debug1 = 0;
+static bool debug1 = false;
+
+void economiaReg(const char* arquivo_asm) {
+    // abre o arquivo gerado anteriormente(ja sem funções mortas)
+    FILE *arq = fopen(arquivo_asm, "r");
+    if(!arq) return;
+    // cria um temporario para a saida otimizada
+    char temp_nome[300];
+    snprintf(temp_nome, sizeof(temp_nome), "%s.fpbo", arquivo_asm);
+    FILE *saida = fopen(temp_nome, "w");
+    if(!saida) {
+        fclose(arq);
+        return;
+    }
+    char prev_lin[256] = ""; // buffer pra a linha anterior
+    char atual_lin[256]; // nuffer pra a linha atual
+    
+    int instrucoes_rm = 0;
+    // Lê o arquivo linha por linha
+    while(fgets(atual_lin, sizeof(atual_lin), arq)) {
+        // variaveis pra armazenar os registradores detectados
+        char reg_codigo[16] = ""; 
+        char reg_dst[16] = "";
+        int otimizado = 0;
+        // verifica se a linha anterior era um armazenamento na pilha
+        // padrão: str REG, [sp, -16]!
+        // O espaço inicial no sscanf ignora indentação
+        if(prev_lin[0] != '\0' && 
+            (strstr(prev_lin, "str") != NULL) && 
+            (strstr(prev_lin, "[sp, -16]!") != NULL)) {
+            // tenta extrair o registrador de origem da linha anterior
+            // "str w0, [sp, -16]!" -> extrai "w0"
+            sscanf(prev_lin, " str %[^,], [sp, -16]!", reg_codigo);
+            // verifica se a linha atual carrega da pilha
+            // padrão: ldr REG, [sp], 16
+            if(reg_codigo[0] != '\0' && 
+                (strstr(atual_lin, "ldr") != NULL) && 
+                (strstr(atual_lin, "[sp], 16") != NULL)) {
+                // tenta extrair o registrador de destino
+                sscanf(atual_lin, " ldr %[^,], [sp], 16", reg_dst);
+
+                if(reg_dst[0] != '\0') {
+                    // >>>padrão detectado: PUSH seguido de POP<<<
+                    otimizado = 1;
+                    instrucoes_rm += 2;
+                    // caso 1: o registrador é o mesmo(str w0... ldr w0...)
+                    // Ação: apenas ignora ambas as linhas(não escreve nada)
+                    if(strcmp(reg_codigo, reg_dst) == 0) {
+                        if(debug1) printf("  [Otimi1] Removido store/load redundante de %s\n", reg_codigo);
+                    } 
+                    // caso 2: registradores diferentes(str w0... ldr w1...)
+                    // ação: substitui o acesso a memoria por um mov direto
+                    else {
+                        if(debug1) printf("  [Otimi1] Substituído pilha por MOV: %s -> %s\n", reg_codigo, reg_dst);
+                        // detecta se é ponto flutuante(começa com "s" ou "d") ou inteiro("w" ou "x")
+                        if(reg_codigo[0] == 's' || reg_codigo[0] == 'd') {
+                            fprintf(saida, "  fmov %s, %s // otimizado (era pilha)\n", reg_dst, reg_codigo);
+                        } else {
+                            fprintf(saida, "  mov %s, %s // otimizado (era pilha)\n", reg_dst, reg_codigo);
+                        }
+                    }
+                    // limpa o buffer anterior pra não processá-lo na proxima iteração
+                    prev_lin[0] = '\0'; 
+                    continue; // pula pra a proxima leitura sem escrever 'atual_lin' nem 'prev_lin'
+                }
+            }
+        }
+        // se não houve otimização escreve a linha anterior pendente
+        if(prev_lin[0] != '\0') {
+            fputs(prev_lin, saida);
+        }
+        // a linha atual vira a linha anterior para a proxima iteração
+        strcpy(prev_lin, atual_lin);
+    }
+    // escreve a ultima linha que sobrou no buffer se houver
+    if(prev_lin[0] != '\0') fputs(prev_lin, saida);
+    
+    fclose(arq);
+    fclose(saida);
+    // substitui o arquivo original pelo otimizado
+    remove(arquivo_asm);
+    rename(temp_nome, arquivo_asm);
+    if(debug1 && instrucoes_rm > 0) {
+        printf("  [Otimi1] Total de instruções de pilha removidas: %d\n", instrucoes_rm);
+    }
+}
 
 void otimizarO1(const char* arquivo_asm) {
     FILE *arquivo = fopen(arquivo_asm, "r");
@@ -165,7 +250,7 @@ void otimizarO1(const char* arquivo_asm) {
         return;
     }
     char arquivo_temp[300];
-    snprintf(arquivo_temp, sizeof(arquivo_temp), "%s.temp", arquivo_asm);
+    snprintf(arquivo_temp, sizeof(arquivo_temp), "%s.fpbo", arquivo_asm);
     FILE *temp = fopen(arquivo_temp, "w");
     if(!temp) {
         printf("Erro: Não foi possível criar arquivo temporário\n");
@@ -231,9 +316,9 @@ void otimizarO1(const char* arquivo_asm) {
         }
         posicao_atual = proxima_posicao;
     }
-    
     fclose(arquivo);
     fclose(temp);
+    economiaReg(arquivo_temp);
     // substitui arquivo original pelo temporario
     remove(arquivo_asm);
     rename(arquivo_temp, arquivo_asm);

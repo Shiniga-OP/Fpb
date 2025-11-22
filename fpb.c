@@ -213,7 +213,7 @@ const char* token_str(TipoToken t) {
         case T_VEZES: return "*";
         case T_DIV: return "/";
         case T_PORCEN: return "%";
-        case T_CONVERT: return "converter";
+        case T_CONVERT: return "(converter)";
         case T_IGUAL_IGUAL: return "==";
         case T_DIFERENTE: return "!=";
         case T_MAIOR: return ">";

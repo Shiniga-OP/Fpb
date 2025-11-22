@@ -18,6 +18,9 @@ suportados
 #incluir "biblis/mem.asm";
 #incluir "biblis/sistema.asm";
 
+// macro:
+#def TAM 14;
+
 /* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);
 vazio testeOperacoes();
@@ -108,6 +111,7 @@ vazio testeOperacoes() {
     flu x = 0.5f; // pode ter sufixo também
     escrever("x: ", x, " * y: ", y, ", resultado: ", x * y, "\n");
     escrever("10 << 2, resultado: ", 10 << 2, "\n");
+    escrever("10 >> 2, resultado: ", 10 >> 2, "\n");
 }
 
 vazio testeComparacoes() {
@@ -177,7 +181,7 @@ vazio testeMemoria() {
     
     car* p = "XxXmplo maior";
     
-    car[] array2 = "exemplo";
+    car[TAM] array2 = "exemplo"; // array com tamanho do macro
     escrever("\nArray padrão: ", array2);
     
     memcp(array2, p, textam(p));

@@ -424,9 +424,10 @@ somar:
   ldr w0, [x29, -56]
   ldr w1, [sp], 16
   add w0, w1, w0
-  b .epilogo_12
-  b .epilogo_12
-.epilogo_12:
+  b 1f
+  b 1f
+// epilogo
+1:
   ldp x19, x20, [x29, -16]
   ldp x21, x22, [x29, -32]
   ldp x29, x30, [sp, 160]
@@ -512,8 +513,9 @@ inicio:
   ldr x4, [sp, 0]
   add sp, sp, 80
   bl testeAlteracoes
-  b .epilogo_13
-.epilogo_13:
+  b 1f
+// epilogo
+1:
   ldp x29, x30, [sp, 224]
   add sp, sp, 240
   ret
@@ -607,8 +609,9 @@ testeAlteracoes:
   bl testeLoops
   bl testeMemoria
   bl testeMatrizes
-  b .epilogo_14
-.epilogo_14:
+  b 1f
+// epilogo
+1:
   ldp x29, x30, [sp, 192]
   add sp, sp, 208
   ret
@@ -713,8 +716,9 @@ testeOperacoes:
   bl _escrever_int
   ldr x0, = .tex_1
   bl _escrever_tex
-  b .epilogo_15
-.epilogo_15:
+  b 1f
+// epilogo
+1:
   ldp x29, x30, [sp, 144]
   add sp, sp, 160
   ret
@@ -895,8 +899,9 @@ testeComparacoes:
   ldr x0, = .tex_47
   bl _escrever_tex
 .B24:
-  b .epilogo_16
-.epilogo_16:
+  b 1f
+// epilogo
+1:
   ldp x29, x30, [sp, 176]
   add sp, sp, 192
   ret
@@ -1174,8 +1179,9 @@ testeMemoria:
   str w0, [x29, 288]
   b .B32
 .B33:
-  b .epilogo_17
-.epilogo_17:
+  b 1f
+// epilogo
+1:
   ldp x29, x30, [sp, 304]
   add sp, sp, 320
   ret
@@ -1236,8 +1242,9 @@ testeLoops:
   str w0, [x29, 144]
   b .B37
 .B38:
-  b .epilogo_18
-.epilogo_18:
+  b 1f
+// epilogo
+1:
   ldp x29, x30, [sp, 144]
   add sp, sp, 160
   ret
@@ -1322,8 +1329,9 @@ testeMatrizes:
   bl _escrever_flu
   ldr x0, = .tex_1
   bl _escrever_tex
-  b .epilogo_19
-.epilogo_19:
+  b 1f
+// epilogo
+1:
   ldp x29, x30, [sp, 144]
   add sp, sp, 160
   ret

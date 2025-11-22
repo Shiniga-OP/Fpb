@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 20/11/2025.
+* [ATUAL]: 21/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,14 +17,15 @@
 #include "util/otimi1.h"
 #include "util/otimi2.h"
 
-#define MAX_TOK 512 // maximo de tolens
+#define MAX_TOK 8192 // maximo de tolens
 #define MAX_CODIGO 8192 // maximo de codhgk
-#define MAX_FN 64 // maximo de funções
+#define MAX_FN 252 // maximo de funções
 #define MAX_VAR 128 // maximo de variaveis
-#define MAX_CONST 128 // maxmio de constantes
+#define MAX_CONST 252 // maxmio de constantes
 #define MAX_PARAMS 8 // maximo de parametros
-#define MAX_TEX 128 // mqximo de textos
+#define MAX_TEX 252 // mqximo de textos
 #define MAX_DIMS 4  // máximo de dimensões para matrizes
+#define MAX_MACROS 256 // maximo de macros
 
 typedef enum {
     // mutação:
@@ -52,7 +53,7 @@ typedef enum {
     T_pLONGO, T_PONTEIRO,
     T_pVAZIO,
     // definições:
-    T_DEF, T_REG, T_FIM, T_RETORNAR, T_INCLUIR, 
+    T_DEF, T_FIM, T_RETORNAR, T_INCLUIR, 
     T_ESPACO,
     // bits:
     T_MAIOR_MAIOR, T_MENOR_MENOR, T_TAMBEM, T_NAO
@@ -85,6 +86,7 @@ typedef struct {
     int bytes;
     int pos;
     int escopo;
+    int valor;
     char reg[8];
 } Variavel;
 
@@ -116,6 +118,11 @@ typedef struct {
 
 typedef struct {
     char nome[32];
+    long valor;
+} Macro;
+
+typedef struct {
+    char nome[32];
     char valor[MAX_TOK];
 } Tex;
 
@@ -127,11 +134,14 @@ static Constante constantes[MAX_CONST];
 static int const_cnt = 0;
 static Tex texs[MAX_TEX];
 static int tex_cnt = 0;
+static Macro macros[MAX_MACROS];
+static int macro_cnt = 0;
 static char* arquivoAtual;
 
 // buscar
 Variavel* buscar_var(const char* nome, int escopo);
 Funcao* buscar_fn(const char* nome);
+Macro* buscar_macro(const char* nome);
 // carregar
 void carregar_valor(FILE* s, Variavel* var);
 void carregar_const(FILE* s, int titulo);
@@ -218,13 +228,12 @@ const char* token_str(TipoToken t) {
         case T_pDOBRO: return "dobro";
         case T_PONTEIRO: return "ponteiro";
         case T_pVAZIO: return "vazio";
-        case T_DEF: return "def";
-        case T_REG: return "reg";
         case T_RETORNAR: return "retorne";
         case T_POR: return "por";
         case T_ENQ: return "enq";
-        case T_INCLUIR: return "incluir";
+        case T_INCLUIR: return "#incluir";
         case T_ESPACO: return "#espaco";
+        case T_DEF: return "#def";
         case T_FIM: return "fim";
         case T_TAMBEM: return "&";
         case T_MAIOR_MAIOR: return ">>";
@@ -342,6 +351,10 @@ void proximoToken() {
         }
         if(strcmp(L.tk.lex, "espaco") == 0) {
             L.tk.tipo = T_ESPACO;
+            return;
+        }
+        if(strcmp(L.tk.lex, "def") == 0) {
+            L.tk.tipo = T_DEF;
             return;
         }
         fatal("diretiva desconhecida");
@@ -567,7 +580,19 @@ TipoToken tratar_id(FILE* s, int escopo) {
             proximoToken();
             excessao(T_PAREN_ESQ);
             return tratar_chamada_funcao(s, escopo, id, fn);
-        } else fatal("variável ou função não declarada");
+        } else {
+            // NOVO: Verifica se é uma macro
+            Macro* macro = buscar_macro(id);
+            if(macro) {
+                // Trata como um literal T_INT (substituição)
+                L.tk.tipo = T_INT;
+                L.tk.valor_l = macro->valor;
+                // Deixa tratar_inteiro consumir o token e gerar o código
+                return tratar_inteiro(s);
+            }
+            
+            fatal("variável, função ou macro não declarada");
+        }
     }
     proximoToken();
     if(var->eh_ponteiro && var->tipo_base == T_pCAR) {
@@ -789,6 +814,13 @@ Funcao* buscar_fn(const char* nome) {
     return NULL;
 }
 
+Macro* buscar_macro(const char* nome) {
+    for(int i = 0; i < macro_cnt; i++) {
+        if(strcmp(macros[i].nome, nome) == 0) return &macros[i];
+    }
+    return NULL;
+}
+
 void coletar_args(FILE* s, Funcao* f) {
     int int_reg_idc = 0;
     int fp_reg_idc = 0;
@@ -948,7 +980,7 @@ TipoToken processar_condicao(FILE* s, int escopo) {
     return tipo_final;
 }
 
-int processar_variaveis_tam() {
+int processar_variaveis_tam(int escopo) {
     Lexer salvo = L;
     int tamanho_total = 0;
     int nivel_chaves = 0;
@@ -967,7 +999,7 @@ int processar_variaveis_tam() {
         }
         if(L.tk.tipo == T_CHAVE_DIR) {
             nivel_chaves--;
-            if (nivel_chaves == 0) break;
+            if(nivel_chaves == 0) break;
             proximoToken();
             continue;
         }
@@ -994,6 +1026,20 @@ int processar_variaveis_tam() {
                 if(L.tk.tipo == T_INT) {
                     total_elementos *= L.tk.valor_l;
                     proximoToken();
+                } else if(L.tk.tipo == T_ID) {
+                    Variavel* var = buscar_var(L.tk.lex, escopo);
+                    if(var) {
+                        total_elementos *= var->valor;
+                        proximoToken();
+                    } else {
+                        Macro* m = buscar_macro(L.tk.lex);
+                        if(m) {
+                            total_elementos *= m->valor;
+                            proximoToken();
+                        } else {
+                            while(L.tk.tipo != T_COL_DIR && L.tk.tipo != T_FIM) proximoToken();
+                        }
+                    }
                 } else {
                     // pula expressão de tamanho desconhecido na pré-analise
                     while(L.tk.tipo != T_COL_DIR && L.tk.tipo != T_FIM) proximoToken();
@@ -1024,6 +1070,30 @@ int processar_variaveis_tam() {
     return tamanho_total;
 }
 // [VERIFICAÇÃO]:
+void verificar_def(void) {
+    excessao(T_DEF); // Consome #def
+    
+    if(L.tk.tipo != T_ID) fatal("nome do macro esperado");
+    
+    char nome_macro[32];
+    strcpy(nome_macro, L.tk.lex);
+    proximoToken(); // Consome o nome do macro
+    
+    // Suporta inteiros ou longos
+    if(L.tk.tipo != T_INT && L.tk.tipo != T_LONGO) fatal("valor inteiro ou longo esperado para o macro");
+    
+    long valor = L.tk.valor_l;
+    proximoToken(); // Consome o valor
+    
+    excessao(T_PONTO_VIRGULA); // Consome o ;
+    
+    if(macro_cnt >= MAX_MACROS) fatal("[verificar_def] excesso de macros");
+    
+    Macro* m = &macros[macro_cnt++];
+    strcpy(m->nome, nome_macro);
+    m->valor = valor;
+}
+
 void verificar_espaco(FILE* s) {
     excessao(T_ESPACO);
     
@@ -1045,7 +1115,7 @@ void verificar_espaco(FILE* s) {
 void verificar_retorno(FILE* s, int escopo) {
     excessao(T_RETORNAR);
     if(L.tk.tipo == T_PONTO_VIRGULA) {
-        fprintf(s, "  b .epilogo_%d\n", fn_cnt - 1);
+        fprintf(s, "  b 1f\n");
         excessao(T_PONTO_VIRGULA);
         return;
     }
@@ -1056,7 +1126,7 @@ void verificar_retorno(FILE* s, int escopo) {
     } else if(!tipos_compativeis(funcs[fn_cnt - 1].retorno, tipo_exp)) {
         fatal("[verificar_retorno] tipo de retorno incompatível");
     }
-    fprintf(s, "  b .epilogo_%d\n", fn_cnt - 1);
+    fprintf(s, "  b 1f\n");
     excessao(T_PONTO_VIRGULA);
 }
 
@@ -1216,7 +1286,6 @@ void verificar_por(FILE* s, int escopo) {
     fprintf(s, "  cmp w0, 0\n");
     fprintf(s, "  beq .B%d\n", rotulo_fim);
     excessao(T_PONTO_VIRGULA);
-    
     // salva tokens do incremento
     Token incremento_tokens[32];
     int incremento_conta = 0;
@@ -1378,18 +1447,6 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         }
         fprintf(s, "\n// fim de %s\n\n", caminho);
         fclose(arquivo_incluir);
-        return;
-    }
-    if(L.tk.tipo == T_DEF) {
-        proximoToken();
-        if(L.tk.tipo != T_REG) fatal("[verificar_stmt] registrador esperado");
-        char reg[16]; strcpy(reg, L.tk.lex);
-        proximoToken(); excessao(T_IGUAL);
-        if(L.tk.tipo != T_INT && L.tk.tipo != T_CAR) 
-            fatal("[verificar_stmt] valor inteiro ou caractere esperado");
-        char val[16]; strcpy(val, L.tk.lex);
-        proximoToken(); excessao(T_PONTO_VIRGULA);
-        fprintf(s, "  mov %s, %s\n", reg, val);
         return;
     }
     if(L.tk.tipo == T_RETORNAR) {
@@ -1579,8 +1636,8 @@ void verificar_fn(FILE* s) {
 
     if(!eh_prototipo) {
         // chama a simulação real pra saber tamanho na pilha
-        int tamanho_vars_locais = processar_variaveis_tam();
-        int frame_tam = tamanho_vars_locais;
+        int tam_vars_locais = processar_variaveis_tam(escopo_global);
+        int frame_tam = tam_vars_locais;
         // espaço pra registradores salvos (x19..x22)
         if(tipo_real != T_pVAZIO) frame_tam += 32;
         // espaço pra salvar parametros da função
@@ -1595,7 +1652,7 @@ void verificar_fn(FILE* s) {
         
         funcs[fn_cnt - 1].frame_tam = frame_tam;
         // >>>>>>PROLOGO<<<<<<
-        fprintf(s, "// fn: [%s] (vars: %d, total: %d)\n", fnome, tamanho_vars_locais, frame_tam);
+        fprintf(s, "// fn: [%s] (vars: %d, total: %d)\n", fnome, tam_vars_locais, frame_tam);
         fprintf(s, ".align 2\n");
         fprintf(s, "%s:\n", fnome);
         fprintf(s, "  sub sp, sp, %d\n", frame_tam);
@@ -1623,9 +1680,10 @@ void verificar_fn(FILE* s) {
         // gera o corpo
         while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &pos, 0);
         
-        fprintf(s, "  b .epilogo_%d\n", fn_cnt - 1);
+        fprintf(s, "  b 1f\n");
         // >>>>>EPILOGO<<<<<
-        fprintf(s, ".epilogo_%d:\n", fn_cnt - 1);
+        fprintf(s, "// epilogo\n");
+        fprintf(s, "1:\n");
         if(tipo_real != T_pVAZIO) {
             fprintf(s, "  ldp x19, x20, [x29, -16]\n");
             fprintf(s, "  ldp x21, x22, [x29, -32]\n");
@@ -2125,12 +2183,42 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
         while(L.tk.tipo == T_COL_ESQ) {
             if(num_dims >= MAX_DIMS) fatal("[declaracao_var] excesso de dimensões");
             proximoToken();
+            long tam_array = 0;
+            
             if(L.tk.tipo == T_INT) {
-                dims[num_dims] = L.tk.valor_l;
+                // caso 1: literal inteiro
+                tam_array = L.tk.valor_l;
                 proximoToken();
-            } else {
-                dims[num_dims] = 0;
+            } else if(L.tk.tipo == T_ID) { 
+                // caso 2: identificador(variavel constante)
+                char id_tam[32];
+                strcpy(id_tam, L.tk.lex);
+                
+                Variavel* var_tam = buscar_var(id_tam, escopo);
+                if(var_tam) {
+                    if(!var_tam) {
+                        fatal("[declaracao_var] identificador não declarado para tamanho do array");
+                    }
+                    if(var_tam->tipo_base != T_pINT && var_tam->tipo_base != T_pLONGO) {
+                        fatal("[declaracao_var] a variavel de tamanho deve ser do tipo 'int' ou 'longo'");
+                    }
+                    if(!var_tam->eh_final) {
+                        fatal("[declaracao_var] o tamanho do array deve ser um literal inteiro ou uma variavel declarada como 'final'");
+                    }
+                    tam_array = var_tam->valor;
+                    proximoToken(); // consome o T_ID
+                } else {
+                    Macro* ma = buscar_macro(id_tam);
+                    if(ma) {
+                        tam_array = ma->valor;
+                        proximoToken();
+                    } else {
+                        fatal("[declaracao_var] identificador nao declarado (nem variavel nem macro) para tamanho do array");
+                    }
+                }
             }
+            dims[num_dims] = (int)tam_array;
+            
             excessao(T_COL_DIR);
             num_dims++;
         }
@@ -2147,6 +2235,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
     var->eh_array = (num_dims > 0);
     var->num_dims = num_dims;
     var->eh_final = eh_final;
+    var->valor = 0;
     memcpy(var->dims, dims, sizeof(dims));
     
     int tam_elemento = tam_tipo(tipo_base);
@@ -2185,7 +2274,6 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
             }
             for(int i = 0; i <= tam; i++) {
                 fprintf(s, "  mov w1, %d\n", texto_valor[i]);
-                // var->pos é negativo (-32), adiciona "i" funciona corretamente(-32, -31, etc)
                 fprintf(s, "  strb w1, [x29, %d]\n", var->pos + i);
             }
             proximoToken();
@@ -2206,15 +2294,22 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
         } 
         // caso: ponteiro normal ou variavel normal
         else {
+            Token token_valor = L.tk;
+            
             TipoToken tipo_exp = expressao(s, escopo);
+            if(eh_final) {
+                if(token_valor.tipo == T_INT) {
+                    var->valor = (int)token_valor.valor_l;
+                } else if(token_valor.tipo == T_CAR && token_valor.lex[0] != 0) {
+                    var->valor = (int)token_valor.lex[0];
+                }
+            }
             if(eh_ponteiro) {
                 if(tipo_exp == T_pINT) {
                     fprintf(s, "  sxtw x0, w0\n");
                 }
-                // pra ponteiros, armazena o valor do ponteiro
                 fprintf(s, "  str x0, [x29, %d]\n", var->pos); 
             } else {
-                // pra variáveis normais, usa armazenar_valor
                 armazenar_valor(s, var);
             }
         }
@@ -2287,9 +2382,9 @@ int main(int argc, char** argv) {
         if(L.tk.tipo == T_INCLUIR) {
             int pos = 0;
             verificar_stmt(s, &pos, 0);
-        } else if(L.tk.tipo == T_ESPACO) {
-            verificar_espaco(s);
-        } else verificar_fn(s);
+        } else if(L.tk.tipo == T_DEF) verificar_def();
+        else if(L.tk.tipo == T_ESPACO) verificar_espaco(s);
+        else verificar_fn(s);
     }
     gerar_consts(s);
     gerar_texs(s);

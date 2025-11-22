@@ -88,6 +88,8 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     escrever("flutuante positivo: ", y, "\n");
     y = -1.1;
     escrever("flutuante negativo: ", y, "\n");
+    escrever("\nTeste de conversão:\n\n");
+    escrever("(car)65 = ", (car)65);
     // teste operações:
     testeOperacoes();
     testeComparacoes();

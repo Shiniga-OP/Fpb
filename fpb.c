@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 21/11/2025.
+* [ATUAL]: 22/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,7 +38,7 @@ typedef enum {
     T_CHAVE_ESQ, T_CHAVE_DIR,
     T_COL_ESQ, T_COL_DIR,
     T_PONTO_VIRGULA, T_VIRGULA, 
-    T_PONTO, T_LAMBDA, T_ARROBA,  
+    T_PONTO, T_LAMBDA, T_ARROBA, T_CONVERT,
     // operadores:
     T_IGUAL, T_MAIS, T_MENOS, T_VEZES, T_DIV, T_PORCEN,
     T_MAIS_MAIS, T_MENOS_MENOS,
@@ -213,6 +213,7 @@ const char* token_str(TipoToken t) {
         case T_VEZES: return "*";
         case T_DIV: return "/";
         case T_PORCEN: return "%";
+        case T_CONVERT: return "converter";
         case T_IGUAL_IGUAL: return "==";
         case T_DIFERENTE: return "!=";
         case T_MAIOR: return ">";
@@ -476,7 +477,34 @@ void proximoToken() {
     }
     // caracteres simples:
     switch(c) {
-        case '(': L.tk.tipo = T_PAREN_ESQ; break;
+        case '(':
+        // verifica se é um conversão: (tipo)expressao
+        if(isalpha((unsigned char)L.fonte[L.pos + 1])) {
+            // salva estado atual para verificação
+            size_t salvo = L.pos + 1;
+            char tipo_tex[32] = {0};
+            int i = 0;
+            // coleta o possivel nome de tipo
+            while(isalpha((unsigned char)L.fonte[salvo]) && i < 31) {
+                tipo_tex[i++] = L.fonte[salvo++];
+            }
+            tipo_tex[i] = '\0';
+            // verifica se é um tipo valido
+            if(strcmp(tipo_tex, "car") == 0 || strcmp(tipo_tex, "int") == 0 || 
+            strcmp(tipo_tex, "flu") == 0 || strcmp(tipo_tex, "dobro") == 0 ||
+            strcmp(tipo_tex, "longo") == 0 || strcmp(tipo_tex, "bool") == 0) {
+                if(L.fonte[salvo] == ')') {
+                    L.tk.tipo = T_CONVERT;
+                    strcpy(L.tk.lex, tipo_tex);
+                    L.pos = salvo + 1; // pula ')'
+                    L.coluna_atual += (salvo - L.pos + 1);
+                    return;
+                }
+            }
+        }
+        // se não for conversão, trata como parentese normal
+        L.tk.tipo = T_PAREN_ESQ;
+        break;
         case ')': L.tk.tipo = T_PAREN_DIR; break;
         case '{': L.tk.tipo = T_CHAVE_ESQ; break;
         case '}': L.tk.tipo = T_CHAVE_DIR; break;
@@ -1925,6 +1953,63 @@ TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual
     return (tam_tipo(tipo_atual) > tam_tipo(tipo_anterior)) ? tipo_atual : tipo_anterior;
 }
 
+void gerar_convert(FILE* s, TipoToken tipo_origem, TipoToken tipo_destino) {
+    if(tipo_origem == tipo_destino) return; // desnecessario né meu, complicado meu
+    // vonversões numericas
+    if(tipo_destino == T_pINT) {
+        if(tipo_origem == T_pFLU) fprintf(s, "  fcvtzs w0, s0\n");
+        else if(tipo_origem == T_pDOBRO) fprintf(s, "  fcvtzs w0, d0\n");
+        else if(tipo_origem == T_pLONGO) fprintf(s, "  mov w0, w0\n"); // Trunca
+        else if(tipo_origem == T_pCAR) fprintf(s, "  sxtb w0, w0\n");
+        else if(tipo_origem == T_pBOOL) fprintf(s, "  and w0, w0, 1\n");
+    } else if(tipo_destino == T_pLONGO) {
+        if(tipo_origem == T_pINT) fprintf(s, "  sxtw x0, w0\n");
+        else if(tipo_origem == T_pFLU) fprintf(s, "  fcvtzs x0, s0\n");
+        else if(tipo_origem == T_pDOBRO) fprintf(s, "  fcvtzs x0, d0\n");
+        else if(tipo_origem == T_pCAR) fprintf(s, "  sxtb x0, w0\n");
+        else if(tipo_origem == T_pBOOL) fprintf(s, "  and x0, x0, 1\n");
+    } else if(tipo_destino == T_pFLU) {
+        if(tipo_origem == T_pINT) fprintf(s, "  scvtf s0, w0\n");
+        else if(tipo_origem == T_pLONGO) fprintf(s, "  scvtf s0, x0\n");
+        else if(tipo_origem == T_pDOBRO) fprintf(s, "  fcvt s0, d0\n");
+        else if(tipo_origem == T_pCAR) {
+            fprintf(s, "  sxtb w0, w0\n");
+            fprintf(s, "  scvtf s0, w0\n");
+        }
+    } else if(tipo_destino == T_pDOBRO) {
+        if(tipo_origem == T_pINT) fprintf(s, "  scvtf d0, w0\n");
+        else if(tipo_origem == T_pLONGO) fprintf(s, "  scvtf d0, x0\n");
+        else if(tipo_origem == T_pFLU) fprintf(s, "  fcvt d0, s0\n");
+        else if(tipo_origem == T_pCAR) {
+            fprintf(s, "  sxtb w0, w0\n");
+            fprintf(s, "  scvtf d0, w0\n");
+        }
+    } else if(tipo_destino == T_pCAR) {
+        if(tipo_origem == T_pINT || tipo_origem == T_pLONGO) {
+            fprintf(s, "  and w0, w0, 0xFF\n");
+        } else if(tipo_origem == T_pFLU) {
+            fprintf(s, "  fcvtzs w0, s0\n");
+            fprintf(s, "  and w0, w0, 0xFF\n");
+        } else if(tipo_origem == T_pDOBRO) {
+            fprintf(s, "  fcvtzs w0, d0\n");
+            fprintf(s, "  and w0, w0, 0xFF\n");
+        }
+    } else if(tipo_destino == T_pBOOL) {
+        // qualquer valor != 0 vira 1(verdade), 0 permanece 0(falso)
+        if(tipo_origem == T_pINT || tipo_origem == T_pLONGO || 
+           tipo_origem == T_pCAR) {
+            fprintf(s, "  cmp w0, 0\n");
+            fprintf(s, "  cset w0, ne\n");
+        } else if(tipo_origem == T_pFLU) {
+            fprintf(s, "  fcmp s0, #0.0\n");
+            fprintf(s, "  cset w0, ne\n");
+        } else if(tipo_origem == T_pDOBRO) {
+            fprintf(s, "  fcmp d0, #0.0\n");
+            fprintf(s, "  cset w0, ne\n");
+        }
+    }
+}
+
 void escrever_valor(FILE* s, TipoToken tipo) {
     if(tipo == T_pFLU) fprintf(s, "  bl _escrever_flu\n");
     else if(tipo == T_pCAR) fprintf(s, "  bl _escrever_car\n");
@@ -2034,6 +2119,26 @@ int add_tex(const char* valor) {
 }
 
 TipoToken fator(FILE* s, int escopo) {
+    if(L.tk.tipo == T_CONVERT) {
+        char* tipo_destino_str = L.tk.lex;
+        TipoToken tipo_destino;
+        // converte texto pra TipoToken
+        if(strcmp(tipo_destino_str, "car") == 0) tipo_destino = T_pCAR;
+        else if(strcmp(tipo_destino_str, "int") == 0) tipo_destino = T_pINT;
+        else if(strcmp(tipo_destino_str, "flu") == 0) tipo_destino = T_pFLU;
+        else if(strcmp(tipo_destino_str, "dobro") == 0) tipo_destino = T_pDOBRO;
+        else if(strcmp(tipo_destino_str, "longo") == 0) tipo_destino = T_pLONGO;
+        else if(strcmp(tipo_destino_str, "bool") == 0) tipo_destino = T_pBOOL;
+        else fatal("[fator] tipo inválido no conversão");
+        
+        proximoToken(); // consome o token de conversão
+        // processa a expressão a ser convertida
+        TipoToken tipo_origem = fator(s, escopo);
+        // gera codigo de conversão
+        gerar_convert(s, tipo_origem, tipo_destino);
+        
+        return tipo_destino;
+    }
     if(L.tk.tipo == T_ARROBA) {
         // operador de endereço @
         proximoToken();

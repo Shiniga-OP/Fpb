@@ -1,6 +1,6 @@
-// #def MAX 10;
+#incluir "biblis/impressao.asm";
 
 vazio inicio() {
-    final int tam = 10;
-    int[tam] arr;
+    car a = (car)65;
+    escrever(a);
 }

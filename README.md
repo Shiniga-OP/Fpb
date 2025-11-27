@@ -231,6 +231,19 @@ vazio testeMatrizes() {
     escrever("matriz 2D flu m2f[0][1]: ", m2f[0][1], "\n");
 }
 ```
+## info extra:
+ponteiros são automaticamente dereferenciados. Logo, qualquer operação com ponteiros é uma operação do valor.
+para capturar o *endereço* do ponteiro, se usa o operador '@' ANTES do identificador:
+```Fpb
+int* p = @variavel;
+```
+isso cria um ponteiro diretamente com o endereço.
+
+mas caso você queira alterar o endereço do ponteiron *diretamente* e não apenas apontar para uma varíavel local, você pode usar por exemplo:
+```Fpb
+int* p;
+@p = 0x000000;
+```
 ## como compilar
 para compilar, você deve usar:
 ```Bash

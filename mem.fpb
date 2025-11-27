@@ -1,6 +1,3 @@
-#incluir "biblis/impressao.asm";
-
 vazio inicio() {
-    car a = (car)65;
-    escrever(a);
+    escrever("teste");
 }

@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 22/11/2025.
+* [ATUAL]: 26/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,7 +31,8 @@ typedef enum {
     // mutação:
     T_FINAL,
     // tipos:
-    T_ID, T_INT, T_TEX, T_CAR, T_FLU, T_BOOL, T_DOBRO, T_LONGO,
+    T_ID, T_INT, T_TEX, T_CAR, T_FLU, T_BOOL, T_DOBRO,
+    T_LONGO, T_BYTE,
     T_COMENTARIO,
     // simbolos:
     T_PAREN_ESQ, T_PAREN_DIR,  
@@ -50,7 +51,7 @@ typedef enum {
     T_POR, T_ENQ,
     // retornos:
     T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, 
-    T_pLONGO, T_PONTEIRO,
+    T_pLONGO, T_pBYTE, T_PONTEIRO,
     T_pVAZIO,
     // definições:
     T_DEF, T_FIM, T_RETORNAR, T_INCLUIR, 
@@ -194,6 +195,7 @@ const char* token_str(TipoToken t) {
         case T_FLU: return "flutuante";
         case T_BOOL: return "booleano";
         case T_DOBRO: return "dobro";
+        case T_BYTE: return "byte";
         case T_COMENTARIO: return "comentário";
         case T_FINAL: return "final";
         case T_PAREN_ESQ: return "(";
@@ -227,6 +229,7 @@ const char* token_str(TipoToken t) {
         case T_pFLU: return "flu";
         case T_pBOOL: return "bool";
         case T_pDOBRO: return "dobro";
+        case T_pBYTE: return "byte";
         case T_PONTEIRO: return "ponteiro";
         case T_pVAZIO: return "vazio";
         case T_RETORNAR: return "retorne";
@@ -259,7 +262,7 @@ void excessao(TipoToken t) {
 // [UTIL]:
 int tam_tipo(TipoToken t) {
     switch(t) {
-        case T_pCAR: case T_pBOOL: return 1;
+        case T_pBYTE: case T_pCAR: case T_pBOOL: return 1;
         case T_pINT: case T_pFLU: return 4;
         case T_pDOBRO: case T_pLONGO: case T_PONTEIRO: return 8;
         default: return 0;
@@ -268,6 +271,7 @@ int tam_tipo(TipoToken t) {
 
 int tipos_compativeis(TipoToken tipo1, TipoToken tipo2) {
     if(tipo1 == tipo2) return 1;
+    if((tipo1 == T_pBYTE && (tipo2 == T_pCAR || tipo2 == T_pINT)) || (tipo2 == T_pBYTE && (tipo1 == T_pCAR || tipo1 == T_pINT))) return 1;
     if((tipo1 == T_pCAR && tipo2 == T_pINT) || (tipo1 == T_pINT && tipo2 == T_pCAR)) return 1;
     if((tipo1 == T_pINT && tipo2 == T_pLONGO) || (tipo1 == T_pLONGO && tipo2 == T_pINT)) return 1;
     return 0;
@@ -370,10 +374,9 @@ void proximoToken() {
         // reconhece tipos e outros
         if(strcmp(L.tk.lex, "car") == 0) L.tk.tipo = T_pCAR;
         else if(strcmp(L.tk.lex, "int") == 0) L.tk.tipo = T_pINT;
+        else if(strcmp(L.tk.lex, "byte") == 0) L.tk.tipo = T_pBYTE;
         else if(strcmp(L.tk.lex, "flu") == 0) L.tk.tipo = T_pFLU;
-        else if(strcmp(L.tk.lex, "bool") == 0 ||
-        strcmp(L.tk.lex, "verdade") == 0 ||
-        strcmp(L.tk.lex, "falso") == 0) L.tk.tipo = T_pBOOL;
+        else if(strcmp(L.tk.lex, "bool") == 0) L.tk.tipo = T_pBOOL;
         else if(strcmp(L.tk.lex, "dobro") == 0) L.tk.tipo = T_pDOBRO;
         else if(strcmp(L.tk.lex, "longo") == 0) L.tk.tipo = T_pLONGO;
         else if(strcmp(L.tk.lex, "vazio") == 0) L.tk.tipo = T_pVAZIO;
@@ -385,6 +388,32 @@ void proximoToken() {
         else if(strcmp(L.tk.lex, "final") == 0) L.tk.tipo = T_FINAL;
         else if(strcmp(L.tk.lex, "->") == 0) L.tk.tipo = T_LAMBDA;
         else L.tk.tipo = T_ID;
+        return;
+    }
+    // reconhecer bytes(hexadecimal: 0xAB ou binario: 0b1010)
+    if(c == '0' && (L.fonte[L.pos + 1] == 'x' || L.fonte[L.pos + 1] == 'b')) {
+        int eh_hex = (L.fonte[L.pos + 1] == 'x');
+        L.pos += 2; 
+        L.coluna_atual += 2;
+        i = 0;
+        L.tk.lex[i++] = '0';
+        L.tk.lex[i++] = eh_hex ? 'x' : 'b';
+        
+        c = L.fonte[L.pos];
+        while(c && ((eh_hex && isxdigit((unsigned char)c)) || (!eh_hex && (c == '0' || c == '1')))) {
+            if(i < MAX_TOK - 1) L.tk.lex[i++] = c;
+            L.pos++; 
+            L.coluna_atual++;
+            c = L.fonte[L.pos];
+        }
+        L.tk.lex[i] = 0;
+        // converte pra valor(garantir que é so 1 byte)
+        if(eh_hex) {
+            L.tk.valor_l = strtol(L.tk.lex + 2, NULL, 16) & 0xFF;
+        } else {
+            L.tk.valor_l = strtol(L.tk.lex + 2, NULL, 2) & 0xFF;
+        }
+        L.tk.tipo = T_BYTE;
         return;
     }
     if((c == '-' && isdigit((unsigned char)L.fonte[L.pos + 1])) || isdigit((unsigned char)c) || c == '.') {
@@ -600,6 +629,22 @@ TipoToken tratar_texto(FILE* s) {
 TipoToken tratar_id(FILE* s, int escopo) {
     char id[32];
     strcpy(id, L.tk.lex);
+    if(id[0] == '@') {
+        char var_nome[32];
+        strcpy(var_nome, id + 1); // remove o @
+        
+        Variavel* var = buscar_var(var_nome, escopo);
+        if(!var) fatal("[tratar_id] variável não encontrada após @");
+        // se for ponteiro, retorna o valor do ponteiro(endereço armazenado)
+        if(var->eh_ponteiro) {
+            fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+        } else {
+            // se for variável normal, retorna endereço onde ta armazenada
+            fprintf(s, "  add x0, x29, %d\n", var->pos);
+        }
+        proximoToken();
+        return T_PONTEIRO;
+    }
     Variavel* var = buscar_var(id, escopo);
     
     if(!var) {
@@ -609,22 +654,20 @@ TipoToken tratar_id(FILE* s, int escopo) {
             excessao(T_PAREN_ESQ);
             return tratar_chamada_funcao(s, escopo, id, fn);
         } else {
-            // NOVO: Verifica se é uma macro
             Macro* macro = buscar_macro(id);
             if(macro) {
-                // Trata como um literal T_INT (substituição)
+                // trata como um literal T_INT
                 L.tk.tipo = T_INT;
                 L.tk.valor_l = macro->valor;
-                // Deixa tratar_inteiro consumir o token e gerar o código
+                // deixa tratar_inteiro consumir o token e gerar o codigo
                 return tratar_inteiro(s);
             }
-            
             fatal("variável, função ou macro não declarada");
         }
     }
     proximoToken();
     if(var->eh_ponteiro && var->tipo_base == T_pCAR) {
-        // Ponteiro para char - carrega o endereço da string
+        // ponteiro pra caractere, carrega o endereço do texto
         fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
         return T_PONTEIRO;
     }
@@ -649,7 +692,6 @@ TipoToken tratar_id(FILE* s, int escopo) {
             // pra cada dimensão, calcula o pos parcial
             for(int i = 0; i < dim_atual; i++) {
                 fprintf(s, "  ldr w1, [sp], 16\n"); // w1 = indice atual
-                
                 // calcula stride pra essa dimensão
                 int stride = tam_tipo(var->tipo_base);
                 for(int j = i + 1; j < var->num_dims; j++) {
@@ -781,7 +823,6 @@ TipoToken tratar_inteiro(FILE* s) {
     if(L.tk.tipo == T_ID && (strcmp(L.tk.lex, "L") == 0 || strcmp(L.tk.lex, "l") == 0)) {
         // é um numero longo
         proximoToken();
-        
         // pra numeros longos, sempre usa constante para valores maiores que 16 bits
         if(l_val <= 0xFFFF) {
             // numero pequeno cabe em mov imediato
@@ -822,6 +863,16 @@ TipoToken tratar_caractere(FILE* s) {
     proximoToken();
     fprintf(s, "  mov w0, %d\n", val);
     return T_pCAR;
+}
+
+TipoToken tratar_byte(FILE* s) {
+    char num[32];
+    strcpy(num, L.tk.lex);
+    long byte_val = L.tk.valor_l;
+    proximoToken();
+    // bytes sempre usam valor imediato(são pequenos)
+    fprintf(s, "  mov w0, %ld // byte: %s\n", byte_val, num);
+    return T_pBYTE;
 }
 // [BUSCA]:
 Variavel* buscar_var(const char* nome, int escopo) {
@@ -1132,7 +1183,6 @@ void verificar_espaco(FILE* s) {
     proximoToken();
     
     excessao(T_CHAVE_ESQ);
-    
     // ignora tudo dentro do espaço
     while(L.tk.tipo != T_CHAVE_DIR && L.tk.tipo != T_FIM) {
         proximoToken();
@@ -1159,6 +1209,25 @@ void verificar_retorno(FILE* s, int escopo) {
 }
 
 void verificar_atribuicao(FILE* s, const char* id, int escopo) {
+    if(id[0] == '@') {
+        char var_nome[32];
+        strcpy(var_nome, id + 1); // remove o @
+        
+        Variavel* var = buscar_var(var_nome, escopo);
+        if(!var || !var->eh_ponteiro) {
+            fatal("[verificar_atribuicao] @ só pode ser usado com ponteiros");
+        }
+        
+        excessao(T_IGUAL);
+        TipoToken tipo_exp = expressao(s, escopo);
+        
+        if(tipo_exp != T_pINT && tipo_exp != T_pLONGO) {
+            fatal("[verificar_atribuicao] endereço deve ser inteiro ou longo");
+        }
+        // atribui o endereço diretamente no ponteiro
+        fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+        return;
+    }
     Variavel* var = buscar_var(id, escopo);
     if(!var) fatal("[verificar_atribuicao] variável não declarada");
     
@@ -1431,6 +1500,38 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         eh_final = 1;
         proximoToken();
     }
+    // na parte que trata @id = expressão:
+    if(L.tk.tipo == T_ARROBA) {
+        proximoToken(); // consome @
+        
+        if(L.tk.tipo != T_ID) fatal("[verificar_stmt] identificador esperado após @");
+        char id[32];
+        strcpy(id, L.tk.lex);
+        proximoToken(); // consome o id
+        excessao(T_IGUAL);
+        Variavel* var = buscar_var(id, escopo);
+        
+        if(!var || !var->eh_ponteiro) {
+            fatal("[verificar_stmt] @ só pode ser usado com ponteiros");
+        }
+        TipoToken tipo_exp = expressao(s, escopo);
+        // conversão baseada no tipo
+        if(tipo_exp == T_pBYTE) {
+            // byte -> ponteiro: estende sem sinal paa 64 bits
+            fprintf(s, "  and w0, w0, 0xFF\n"); // Garante que é byte
+            fprintf(s, "  uxtw x0, w0\n"); // estende sem sinal pra 64 bits
+        } else if(tipo_exp == T_pINT) {
+            // int -> pnteiro: estende sem sinal pra 64 bits  
+            fprintf(s, "  uxtw x0, w0\n"); // Estende sem sinal para 64 bits
+        } else if(tipo_exp == T_pLONGO) {
+            // longo -> ponteiro: ja é 64 bits, não precisa conversão
+        } else {
+            fatal("[verificar_stmt] endereço deve ser byte, inteiro ou longo");
+        }
+        fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+        excessao(T_PONTO_VIRGULA);
+        return;
+    }
     if(L.tk.tipo == T_SE) {
         verificar_se(s, escopo);
         return;
@@ -1481,9 +1582,9 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         verificar_retorno(s, escopo);
         return;
     }
-    TipoToken tipos[] = {T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, T_pLONGO, T_PONTEIRO};
+    TipoToken tipos[] = {T_pBYTE, T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, T_pLONGO, T_PONTEIRO};
     int eh_tipo = 0;
-    for(int i=0; i<6; i++) {
+    for(int i=0; i<8; i++) {
         if(L.tk.tipo == tipos[i]) {
             eh_tipo = 1;
             break;
@@ -1542,7 +1643,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                     fprintf(s, "  add x2, x2, x1, lsl 3\n");
                 }
                 // armazena o valor no item do array
-                if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL) fprintf(s, "  strb w0, [x2]\n");
+                if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE) fprintf(s, "  strb w0, [x2]\n");
                 else if(var->tipo_base == T_pINT) fprintf(s, "  str w0, [x2]\n");  // usa str para inteiros de 4 bytes
                 else if(var->tipo_base == T_pFLU) fprintf(s, "  str s0, [x2]\n");
                 else if(var->tipo_base == T_pDOBRO) fprintf(s, "  str d0, [x2]\n");
@@ -1962,6 +2063,16 @@ void gerar_convert(FILE* s, TipoToken tipo_origem, TipoToken tipo_destino) {
         else if(tipo_origem == T_pLONGO) fprintf(s, "  mov w0, w0\n"); // Trunca
         else if(tipo_origem == T_pCAR) fprintf(s, "  sxtb w0, w0\n");
         else if(tipo_origem == T_pBOOL) fprintf(s, "  and w0, w0, 1\n");
+    } else if(tipo_destino == T_pBYTE) {
+        if(tipo_origem == T_pINT || tipo_origem == T_pLONGO) {
+            fprintf(s, "  and w0, w0, 0xFF  // truncar para byte\n");
+        } else if(tipo_origem == T_pFLU) {
+            fprintf(s, "  fcvtzs w0, s0\n");
+            fprintf(s, "  and w0, w0, 0xFF\n");
+        } else if(tipo_origem == T_pDOBRO) {
+            fprintf(s, "  fcvtzs w0, d0\n");
+            fprintf(s, "  and w0, w0, 0xFF\n");
+        }
     } else if(tipo_destino == T_pLONGO) {
         if(tipo_origem == T_pINT) fprintf(s, "  sxtw x0, w0\n");
         else if(tipo_origem == T_pFLU) fprintf(s, "  fcvtzs x0, s0\n");
@@ -2129,6 +2240,7 @@ TipoToken fator(FILE* s, int escopo) {
         else if(strcmp(tipo_destino_str, "dobro") == 0) tipo_destino = T_pDOBRO;
         else if(strcmp(tipo_destino_str, "longo") == 0) tipo_destino = T_pLONGO;
         else if(strcmp(tipo_destino_str, "bool") == 0) tipo_destino = T_pBOOL;
+        else if(strcmp(tipo_destino_str, "byte") == 0) tipo_destino = T_pBYTE;
         else fatal("[fator] tipo inválido no conversão");
         
         proximoToken(); // consome o token de conversão
@@ -2169,6 +2281,7 @@ TipoToken fator(FILE* s, int escopo) {
         excessao(T_PAREN_DIR);
         return tipo;
     } else if(L.tk.tipo == T_ID) return tratar_id(s, escopo);
+    else if(L.tk.tipo == T_BYTE) return tratar_byte(s);
     else if(L.tk.tipo == T_INT) return tratar_inteiro(s);
     else if(L.tk.tipo == T_FLU || L.tk.tipo == T_DOBRO) return tratar_flutuante(s);
     else if(L.tk.tipo == T_CAR) return tratar_caractere(s);

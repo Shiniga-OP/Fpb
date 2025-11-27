@@ -46,6 +46,8 @@ vazio inicio() {
     escrever("\nbooleano: ", marca);
     longo numLongo = obter_tempo_milis();
     escrever("\nlongo: ", numLongo);
+    byte byteBranco = 0xFF;
+    escrever("\nbyte: ", byteBranco, " (0xFF)");
 
     escrever("\n\nTestando função soma:\n");
     int s = somar(5, 7);

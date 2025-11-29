@@ -1,11 +1,13 @@
-# sobre FPB (compilador):
-essa foi uma tentativa de compilador que fiz para minha linguagem de alto nível, a implementação usa assembly aarch64 para traduzir código .fpb e assim usar **as** para compilar para .o, usando **ld** para linkagem e execução do binário compilado.
+# FPB (Fácil Programação Baixo nivel)
 
 ## estado:
 em desenvolvimento.
 
 ## sintaxe
 este é um código que testa maior parte dos recursos e margem de erros:
+
+## descrição:
+FPB é uma linguagem de programação de alto nivel, com compatibilidade direta com Assembly ARM64.
 
 ```Fpb
 /*
@@ -256,7 +258,7 @@ fpb ola
 # ou
 fpb ola -s /caminho/arquivo
 ```
-não precisa da extensão, o compilador gera o binário com o nome específico automaticamente, por isso não a extensão.
+não precisa da extensão, o compilador gera o binário com o nome específico automaticamente, mas agora pode passar a extensão se quiser.
 
 # configuração extra
 caso você queira o código assembly intermediário, utilize:
@@ -287,7 +289,7 @@ caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador,
 1. reutilização de constantes.
 2. reutilização de texs.
 3. primeiros 8 parametros sendo passados por registradores.
-4. usando a marcação -O1 após o nome do arquivo, será ativado a eliminação de funções não usadas e labels, + reorganização de sintaxe. (beta)
+4. usando a marcação -O1, será ativado a eliminação de funções não usadas e labels, + reorganização de sintaxe. (beta)
 5. a marcação -O2 otimiza ainda mais o código juntando textos chamados para serem imprimidos em sequencia, incluindo a eliminação de código morto da O1. (beta)
 # requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.

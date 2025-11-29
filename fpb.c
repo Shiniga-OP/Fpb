@@ -2585,25 +2585,62 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
 int main(int argc, char** argv) {
     if(argc < 2) {
         printf("FPB: sem arquivos de entrada\n");
+        printf("Use \"fpb -ajuda\" para mais informações\n");
         return 0;
     }
-    if(strcmp(argv[1], "-ajuda") == 0) {
+    // variaveis de configuração
+    char arquivoEntrada[256] = "";
+    char arquivoSaida[256] = "";
+    int manter_asm = 0;
+    int semLinkar = 0;
+    int otimizar1 = 0;
+    int otimizar2 = 0;
+    int modoAjuda = 0;
+    int modoVersao = 0;
+    int modoConfig = 0;
+
+    // processa argumentos
+    for(int i = 1; i < argc; i++) {
+        if(strcmp(argv[i], "-ajuda") == 0) modoAjuda = 1;
+        else if(strcmp(argv[i], "-v") == 0) modoVersao = 1;
+        else if(strcmp(argv[i], "-c") == 0) modoConfig = 1;
+        else if(strcmp(argv[i], "-asm") == 0) manter_asm = 1;
+        else if(strcmp(argv[i], "-sl") == 0) semLinkar = 1;
+        else if(strcmp(argv[i], "-O1") == 0) otimizar1 = 1;
+        else if(strcmp(argv[i], "-O2") == 0) otimizar2 = 1;
+        else if(strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            // proximo arg é o nome do arquivo de saida
+            snprintf(arquivoSaida, sizeof(arquivoSaida), "%s", argv[++i]);
+        } else if(strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
+            // compatibilidade com -s
+            snprintf(arquivoSaida, sizeof(arquivoSaida), "%s", argv[++i]);
+        } else if(argv[i][0] != '-') {
+            // é um arquivo de entrada
+            if(strlen(arquivoEntrada) == 0) {
+                snprintf(arquivoEntrada, sizeof(arquivoEntrada), "%s", argv[i]);
+            }
+        }
+    }
+    // modos de informação
+    if(modoAjuda) {
         printf("[informação]:\n");
         printf("fpb -v : versão e o distribuidor\n");
-        printf("fpb -O1 : otimização nivel 1, eliminação de código morto\n");
         printf("fpb -c : configurações do compilador\n");
+        printf("fpb -O1 : otimização nivel 1, eliminação de código morto\n");
+        printf("fpb -O2 : otimização nivel 2, mais agressiva\n");
         printf("[compilação]:\n");
-        printf("fpb exemplo : compila um arquivo.fpb e gera o binário na pasta atual\n");
-        printf("fpb exemplo -s pasta/exemplo : compila um arquivo.fpb e cria um arquivo em um caminho personalizavel\n");
-        printf("fpb exemplo -asm : compila mantendo o ASM intermediario na pasta atual\n");
-        printf("fpb exemplo -s pasta/exemplo -asm : compila mantendo o ASM intermediario na pasta do binário\n");
+        printf("fpb exemplo.fpb : compila arquivo e gera binário\n");
+        printf("fpb exemplo.fpb -o saida : compila com nome personalizado\n");
+        printf("fpb exemplo.fpb -asm : mantém ASM intermediário\n");
+        printf("fpb exemplo.fpb -sl : não linka o código\n");
+        printf("fpb exemplo.fpb -O2 -asm -o programa : combina opções\n");
         return 0;
     }
-    if(strcmp(argv[1], "-v") == 0) {
+    if(modoVersao) {
         printf("[FOCA-DO ESTÚDIOS]\nFPB (Fácil Programação Baixo nivel) - v0.0.1 (alpha)\n");
         return 0;
     }
-    if(strcmp(argv[1], "-c") == 0) {
+    if(modoConfig) {
         printf("[configuração]:\n");
         printf("max codigo: %i\n", MAX_CODIGO);
         printf("max variaveis: %i\n", MAX_VAR);
@@ -2613,12 +2650,37 @@ int main(int argc, char** argv) {
         printf("max dimensões: %i\n", MAX_DIMS);
         return 0;
     }
-    char asm_s[128], asm_o[128], cmd[256], nomeArquivo[256];
-    arquivoAtual = argv[1];
-    
-    int manter_asm = ((argc >= 3 && strcmp(argv[2], "-asm") == 0) || (argc >= 4 && strcmp(argv[3], "-asm") == 0) || (argc >= 5 && strcmp(argv[4], "-asm") == 0));
-
-    snprintf(nomeArquivo, sizeof(nomeArquivo), "%s.fpb", argv[1]);
+    // verificar se tem arquivo de entrada
+    if(strlen(arquivoEntrada) == 0) {
+        printf("FPB: [ERRO] nenhum arquivo de entrada especificado\n");
+        return 2;
+    }
+    // processa extensão .fpb se não tiver
+    char nomeArquivo[256];
+    if(strstr(arquivoEntrada, ".fpb") == NULL) {
+        snprintf(nomeArquivo, sizeof(nomeArquivo), "%s.fpb", arquivoEntrada);
+    } else {
+        snprintf(nomeArquivo, sizeof(nomeArquivo), "%s", arquivoEntrada);
+    }
+    // determina o nome de saida
+    char asm_s[256], asm_o[256], cmd[512];
+    if(strlen(arquivoSaida) > 0) {
+        // usa nome sem extensão
+        snprintf(asm_s, sizeof(asm_s), "%s.asm", arquivoSaida);
+        snprintf(asm_o, sizeof(asm_o), "%s.o", arquivoSaida);
+    } else {
+        // usa o nome base do arquivo de entrada
+        char nomeBase[256];
+        strcpy(nomeBase, arquivoEntrada);
+        char *ponto = strstr(nomeBase, ".fpb");
+        if(ponto) *ponto = '\0'; // remove extensão
+        
+        snprintf(asm_s, sizeof(asm_s), "%s.asm", nomeBase);
+        snprintf(asm_o, sizeof(asm_o), "%s.o", nomeBase);
+        snprintf(arquivoSaida, sizeof(arquivoSaida), "%s", nomeBase);
+    }
+    // abre e compila arquivo
+    arquivoAtual = arquivoEntrada;
     FILE* en = fopen(nomeArquivo, "r");
     if(!en) {
         printf("FPB: [ERRO] não foi possível abrir %s\n", nomeArquivo);
@@ -2633,14 +2695,12 @@ int main(int argc, char** argv) {
     L.pos = 0;
     proximoToken();
 
-    if(argc >= 4 && strcmp(argv[2], "-s") == 0) snprintf(asm_s, sizeof(asm_s), "%s.asm", argv[3]);
-    else snprintf(asm_s, sizeof(asm_s), "%s.asm", argv[1]);
-
     FILE* s = fopen(asm_s, "w");
     gerar_prelude(s);
     
     if(!s) {
         printf("FPB: [ERRO] não foi possível criar o ASM intermediario\n");
+        free(buf);
         return 1;
     }
     while(L.tk.tipo != T_FIM) {
@@ -2654,32 +2714,25 @@ int main(int argc, char** argv) {
     }
     gerar_consts(s);
     gerar_texs(s);
-
     fclose(s);
-    
-    int otimizar1 = 0;
-    if(argc >= 3 && strcmp(argv[2], "-O1") == 0) otimizar1 = 1;
-
-    for(int i=1; i<argc; i++) {
-        if(strcmp(argv[i], "-O1") == 0) otimizar1 = 1;
-    }
-    int otimizar2 = 0;
-    if(argc >= 3 && strcmp(argv[2], "-O2") == 0) otimizar2 = 1;
-
-    for(int i=1; i<argc; i++) {
-        if(strcmp(argv[i], "-O2") == 0) otimizar2 = 1;
-    }
+    // aplica otimizações
     if(otimizar1) otimizarO1(asm_s);
     if(otimizar2) otimizarO2(asm_s);
-
-    snprintf(asm_o, sizeof(asm_o), "%s.o", argv[1]);
+    // montagem do objeto
     snprintf(cmd, sizeof(cmd), "as %s -o %s", asm_s, asm_o);
-    if(system(cmd)) return 3;
-
-    if(argc >= 4 && strcmp(argv[2], "-s") == 0) snprintf(cmd, sizeof(cmd), "ld -e inicio %s -o %s", asm_o, argv[3]);
-    else snprintf(cmd, sizeof(cmd), "ld -e inicio %s -o %s", asm_o, argv[1]);
-    if(system(cmd)) return 4;
-
+    if(system(cmd)) {
+        free(buf);
+        return 3;
+    }
+    // linkar(se não for -sl)
+    if(!semLinkar) {
+        snprintf(cmd, sizeof(cmd), "ld -e inicio %s -o %s", asm_o, arquivoSaida);
+        if(system(cmd)) {
+            free(buf);
+            return 4;
+        }
+    }
+    // limpeza
     if(!manter_asm) remove(asm_s);
     remove(asm_o);
     free(buf);

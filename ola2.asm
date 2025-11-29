@@ -393,6 +393,7 @@ obter_tempo_milis:
 // fim de biblis/sistema.asm
 
 .global inicio
+// fn: [somar] (vars: 0, total: 176)
 .align 2
 somar:
   sub sp, sp, 176
@@ -426,6 +427,8 @@ somar:
   ldp x29, x30, [sp, 160]
   add sp, sp, 176
   ret
+// fim: [somar]
+// fn: [inicio] (vars: 112, total: 240)
 .align 2
 inicio:
   sub sp, sp, 240
@@ -519,6 +522,8 @@ inicio:
   mov x8, 93
   svc 0
   ret
+// fim: [inicio]
+// fn: [testeAlteracoes] (vars: 32, total: 208)
 .align 2
 testeAlteracoes:
   sub sp, sp, 208
@@ -618,6 +623,8 @@ testeAlteracoes:
   ldp x29, x30, [sp, 192]
   add sp, sp, 208
   ret
+// fim: [testeAlteracoes]
+// fn: [testeOperacoes] (vars: 32, total: 160)
 .align 2
 testeOperacoes:
   sub sp, sp, 160
@@ -723,6 +730,8 @@ testeOperacoes:
   ldp x29, x30, [sp, 144]
   add sp, sp, 160
   ret
+// fim: [testeOperacoes]
+// fn: [testeComparacoes] (vars: 64, total: 192)
 .align 2
 testeComparacoes:
   sub sp, sp, 192
@@ -904,6 +913,8 @@ testeComparacoes:
   ldp x29, x30, [sp, 176]
   add sp, sp, 192
   ret
+// fim: [testeComparacoes]
+// fn: [testeMemoria] (vars: 192, total: 320)
 .align 2
 testeMemoria:
   sub sp, sp, 320
@@ -1182,6 +1193,8 @@ testeMemoria:
   ldp x29, x30, [sp, 304]
   add sp, sp, 320
   ret
+// fim: [testeMemoria]
+// fn: [testeLoops] (vars: 32, total: 160)
 .align 2
 testeLoops:
   sub sp, sp, 160
@@ -1243,6 +1256,8 @@ testeLoops:
   ldp x29, x30, [sp, 144]
   add sp, sp, 160
   ret
+// fim: [testeLoops]
+// fn: [testeMatrizes] (vars: 32, total: 160)
 .align 2
 testeMatrizes:
   sub sp, sp, 160
@@ -1328,6 +1343,7 @@ testeMatrizes:
   ldp x29, x30, [sp, 144]
   add sp, sp, 160
   ret
+// fim: [testeMatrizes]
   .section .rodata
   .align 8
 const_0:

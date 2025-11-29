@@ -1,5 +1,4 @@
 .section .text
-.global inicio
 
 // inicio de biblis/texint.asm
 .section .text
@@ -74,21 +73,6 @@ _escrever_int:
     .fill   32, 1, 0
 // fim de biblis/texint.asm
 
-.align 2
-inicio:
-  sub sp, sp, 128
-  stp x29, x30, [sp, 112]
-  add x29, sp, 112
-  ldr x0, = .tex_0
-  bl _escrever_tex
-  b 1f
-// epilogo
-1:
-  ldp x29, x30, [sp, 112]
-  add sp, sp, 128
-  mov x0, 0
-  mov x8, 93
-  svc 0
 .section .rodata
 .align 2
 .tex_0: .asciz "olá mundo\n"

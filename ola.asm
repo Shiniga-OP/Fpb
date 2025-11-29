@@ -1,11 +1,5 @@
 .section .text
-.global _start
-.align 2
-_start:
-  bl inicio
-  mov x0, 0
-  mov x8, 93
-  svc 0
+.global inicio
 
 // inicio de biblis/texint.asm
 .section .text
@@ -80,7 +74,6 @@ _escrever_int:
     .fill   32, 1, 0
 // fim de biblis/texint.asm
 
-// fn: [inicio] (vars: 0, total: 128)
 .align 2
 inicio:
   sub sp, sp, 128
@@ -88,12 +81,14 @@ inicio:
   add x29, sp, 112
   ldr x0, = .tex_0
   bl _escrever_tex
-  b .epilogo_0
-.epilogo_0:
+  b 1f
+// epilogo
+1:
   ldp x29, x30, [sp, 112]
   add sp, sp, 128
-  ret
-// fim: [inicio]
+  mov x0, 0
+  mov x8, 93
+  svc 0
 .section .rodata
 .align 2
 .tex_0: .asciz "olá mundo\n"

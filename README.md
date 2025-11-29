@@ -20,6 +20,7 @@ suportados
 
 // macro:
 #def TAM 14;
+#global inicio();
 
 /* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);
@@ -56,6 +57,8 @@ vazio inicio() {
     escrever("\nbooleano: ", marca);
     longo numLongo = obter_tempo_milis();
     escrever("\nlongo: ", numLongo);
+    byte byteBranco = 0xFF;
+    escrever("\nbyte: ", byteBranco, " (0xFF)");
 
     escrever("\n\nTestando função soma:\n");
     int s = somar(5, 7);
@@ -244,6 +247,8 @@ mas caso você queira alterar o endereço do ponteiron *diretamente* e não apen
 int* p;
 @p = 0x000000;
 ```
+
+funções globais NÃO SÃO APAGADAS, mesmo se não forem usadas no mesmo código com a otimização nivel 1.
 ## como compilar
 para compilar, você deve usar:
 ```Bash

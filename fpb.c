@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 26/11/2025.
+* [ATUAL]: 29/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,7 +55,7 @@ typedef enum {
     T_pVAZIO,
     // definições:
     T_DEF, T_FIM, T_RETORNAR, T_INCLUIR, 
-    T_ESPACO,
+    T_ESPACO, T_GLOBAL,
     // bits:
     T_MAIOR_MAIOR, T_MENOR_MENOR, T_TAMBEM, T_NAO
 } TipoToken;
@@ -98,7 +98,8 @@ typedef struct {
     int var_conta;
     int escopo_atual;
     int frame_tam;
-    int param_pos; 
+    int param_pos;
+    int eh_global;
 } Funcao;
 
 typedef struct {
@@ -189,6 +190,7 @@ int calcular_pos_matriz(Variavel* var, int indices[]);
 const char* token_str(TipoToken t) {
     switch(t) {
         case T_ID: return "identificador";
+        case T_GLOBAL: return "identificador";
         case T_INT: return "inteiro";
         case T_TEX: return "texto";
         case T_CAR: return "caractere";
@@ -360,6 +362,10 @@ void proximoToken() {
         }
         if(strcmp(L.tk.lex, "def") == 0) {
             L.tk.tipo = T_DEF;
+            return;
+        }
+        if(strcmp(L.tk.lex, "global") == 0) {
+            L.tk.tipo = T_GLOBAL;
             return;
         }
         fatal("diretiva desconhecida");
@@ -1149,6 +1155,29 @@ int processar_variaveis_tam(int escopo) {
     return tamanho_total;
 }
 // [VERIFICAÇÃO]:
+void verificar_global(FILE* s) {
+    excessao(T_GLOBAL);
+    
+    if(L.tk.tipo != T_ID) fatal("[verificar_global] nome de função esperado");
+    
+    char fnome[32];
+    strcpy(fnome, L.tk.lex);
+    proximoToken();
+    
+    excessao(T_PAREN_ESQ);
+    excessao(T_PAREN_DIR);
+    excessao(T_PONTO_VIRGULA);
+    
+    fprintf(s, ".global %s\n", fnome);
+    
+    for(int i = 0; i < fn_cnt; i++) {
+        if(strcmp(funcs[i].nome, fnome) == 0) {
+            funcs[i].eh_global = 1;
+            break;
+        }
+    }
+}
+
 void verificar_def(void) {
     excessao(T_DEF); // Consome #def
     
@@ -1578,6 +1607,25 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         fclose(arquivo_incluir);
         return;
     }
+    if(L.tk.tipo == T_GLOBAL) {
+        proximoToken(); // consome 'global'
+        
+        // Deve ser seguido por declaração de função
+        if(L.tk.tipo != T_pVAZIO && 
+           L.tk.tipo != T_pINT && 
+           L.tk.tipo != T_pFLU && 
+           L.tk.tipo != T_pCAR && 
+           L.tk.tipo != T_pBOOL && 
+           L.tk.tipo != T_pDOBRO && 
+           L.tk.tipo != T_pLONGO && 
+           L.tk.tipo != T_PONTEIRO) {
+            fatal("[verificar_stmt] tipo de retorno esperado após 'global'");
+        }
+        
+        // Processa a função normalmente, mas marca como global
+        verificar_fn(s);
+        return;
+    }
     if(L.tk.tipo == T_RETORNAR) {
         verificar_retorno(s, escopo);
         return;
@@ -1750,6 +1798,7 @@ void verificar_fn(FILE* s) {
     funcs[fn_cnt].escopo_atual = 0;
     funcs[fn_cnt].frame_tam = 0;
     funcs[fn_cnt].param_pos = 16;
+    funcs[fn_cnt].eh_global = 0;
     strcpy(funcs[fn_cnt++].nome, fnome);
     proximoToken();
 
@@ -1782,6 +1831,7 @@ void verificar_fn(FILE* s) {
         funcs[fn_cnt - 1].frame_tam = frame_tam;
         // >>>>>>PROLOGO<<<<<<
         fprintf(s, "// fn: [%s] (vars: %d, total: %d)\n", fnome, tam_vars_locais, frame_tam);
+            
         fprintf(s, ".align 2\n");
         fprintf(s, "%s:\n", fnome);
         fprintf(s, "  sub sp, sp, %d\n", frame_tam);
@@ -1819,6 +1869,11 @@ void verificar_fn(FILE* s) {
         }
         fprintf(s, "  ldp x29, x30, [sp, %d]\n", frame_tam - 16);
         fprintf(s, "  add sp, sp, %d\n", frame_tam);
+        if(strcmp(fnome, "inicio") == 0) {
+            fprintf(s, "  mov x0, 0\n");
+            fprintf(s, "  mov x8, 93\n");
+            fprintf(s, "  svc 0\n");
+        }
         fprintf(s, "  ret\n");
         fprintf(s, "// fim: [%s]\n", fnome);
         proximoToken(); 
@@ -1826,15 +1881,7 @@ void verificar_fn(FILE* s) {
 }
 // [GERAÇÃO]:
 void gerar_prelude(FILE* s) {
-    fprintf(s,
-        ".section .text\n"
-        ".global _start\n"
-         ".align 2\n"
-        "_start:\n"
-        "  bl inicio\n"
-        "  mov x0, 0\n"
-        "  mov x8, 93\n"
-        "  svc 0\n");
+    fprintf(s,".section .text\n");
 }
 
 void gerar_texs(FILE* s) {
@@ -2602,6 +2649,7 @@ int main(int argc, char** argv) {
             verificar_stmt(s, &pos, 0);
         } else if(L.tk.tipo == T_DEF) verificar_def();
         else if(L.tk.tipo == T_ESPACO) verificar_espaco(s);
+        else if(L.tk.tipo == T_GLOBAL) verificar_global(s);
         else verificar_fn(s);
     }
     gerar_consts(s);
@@ -2628,8 +2676,8 @@ int main(int argc, char** argv) {
     snprintf(cmd, sizeof(cmd), "as %s -o %s", asm_s, asm_o);
     if(system(cmd)) return 3;
 
-    if(argc >= 4 && strcmp(argv[2], "-s") == 0) snprintf(cmd, sizeof(cmd), "ld %s -o %s", asm_o, argv[3]);
-    else snprintf(cmd, sizeof(cmd), "ld %s -o %s", asm_o, argv[1]);
+    if(argc >= 4 && strcmp(argv[2], "-s") == 0) snprintf(cmd, sizeof(cmd), "ld -e inicio %s -o %s", asm_o, argv[3]);
+    else snprintf(cmd, sizeof(cmd), "ld -e inicio %s -o %s", asm_o, argv[1]);
     if(system(cmd)) return 4;
 
     if(!manter_asm) remove(asm_s);

@@ -10,6 +10,7 @@ suportados
 
 // macro:
 #def TAM 14;
+#global inicio();
 
 /* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);

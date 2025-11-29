@@ -53,28 +53,28 @@ void economiaReg(const char* arquivo_asm) {
                 sscanf(atual_lin, " ldr %[^,], [sp], 16", reg_dst);
 
                 if(reg_dst[0] != '\0') {
-                    // >>>padrão detectado: PUSH seguido de POP<<<
+                    // >>>padrão detectado: push seguido de pop<<<
                     otimizado = 1;
                     instrucoes_rm += 2;
                     // caso 1: o registrador é o mesmo(str w0... ldr w0...)
-                    // Ação: apenas ignora ambas as linhas(não escreve nada)
+                    // ação: apenas ignora ambas as linhas(não escreve nada)
                     if(strcmp(reg_codigo, reg_dst) == 0) {
                         if(debug1) printf("  [Otimi1] Removido store/load redundante de %s\n", reg_codigo);
                     } 
                     // caso 2: registradores diferentes(str w0... ldr w1...)
                     // ação: substitui o acesso a memoria por um mov direto
                     else {
-                        if(debug1) printf("  [Otimi1] Substituído pilha por MOV: %s -> %s\n", reg_codigo, reg_dst);
+                        if(debug1) printf("  [Otimi1] substituido pilha por mov: %s -> %s\n", reg_codigo, reg_dst);
                         // detecta se é ponto flutuante(começa com "s" ou "d") ou inteiro("w" ou "x")
                         if(reg_codigo[0] == 's' || reg_codigo[0] == 'd') {
-                            fprintf(saida, "  fmov %s, %s // otimizado (era pilha)\n", reg_dst, reg_codigo);
+                            fprintf(saida, "  fmov %s, %s // otimizado(era pilha)\n", reg_dst, reg_codigo);
                         } else {
-                            fprintf(saida, "  mov %s, %s // otimizado (era pilha)\n", reg_dst, reg_codigo);
+                            fprintf(saida, "  mov %s, %s // otimizado(era pilha)\n", reg_dst, reg_codigo);
                         }
                     }
                     // limpa o buffer anterior pra não processá-lo na proxima iteração
                     prev_lin[0] = '\0'; 
-                    continue; // pula pra a proxima leitura sem escrever 'atual_lin' nem 'prev_lin'
+                    continue; // pula pra a proxima leitura sem escrever "atual_lin" nem "prev_lin"
                 }
             }
         }
@@ -118,7 +118,7 @@ void otimizarO1(const char* arquivo_asm) {
     int num_funcoes = 0;
     
     long posicao_atual = 0;
-    // primeira passagem: identificar todas as funções
+    // primeira passagem: identifica todas as funções
     while(fgets(linha, sizeof(linha), arquivo)) {
         posicao_atual = ftell(arquivo);
         // verifica se é inicio de função
@@ -143,7 +143,23 @@ void otimizarO1(const char* arquivo_asm) {
             funcoes[num_funcoes].referenciada = false;
             funcoes[num_funcoes].inicio = posicao_atual - strlen(linha);
             funcoes[num_funcoes].dentro_funcao = true;
-            if(debug1) printf("Encontrada função: '%s'\n", funcoes[num_funcoes].nome);
+            // verifica se a função é global
+            // procura pela declaração .global no arquivo
+            long pos_salvo = ftell(arquivo);
+            char busca_global[256];
+            snprintf(busca_global, sizeof(busca_global), ".global %s", funcoes[num_funcoes].nome);
+            rewind(arquivo);
+            char linha_global[256];
+            while(fgets(linha_global, sizeof(linha_global), arquivo)) {
+                if(strstr(linha_global, busca_global) != NULL) {
+                    funcoes[num_funcoes].referenciada = true; // Marca como referenciada
+                    if(debug1) printf("Função global encontrada: '%s'\n", funcoes[num_funcoes].nome);
+                    break;
+                }
+            }
+            fseek(arquivo, pos_salvo, SEEK_SET); // volta pra posição original
+            if(debug1) printf("Encontrada função: '%s' (%s)\n", funcoes[num_funcoes].nome, 
+            funcoes[num_funcoes].referenciada ? "GLOBAL" : "local");
             num_funcoes++;
         }
         // verifica se é fim de função

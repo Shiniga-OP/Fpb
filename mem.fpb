@@ -1,3 +1,5 @@
-vazio inicio() {
+// #global fpb();
+
+vazio fpb() {
     escrever("teste");
 }

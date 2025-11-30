@@ -1,5 +1,8 @@
-// #global fpb();
+#incluir "biblis/impressao.asm";
+#global inicio();
 
-vazio fpb() {
-    escrever("teste");
+vazio inicio() {
+    por(int x = 0; x < 10; x = x + 1) {
+        escrever(x);
+    }
 }

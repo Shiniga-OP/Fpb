@@ -204,12 +204,12 @@ vazio testeMemoria() {
     
     int[] num = { 0, 1, 2, 5 };
     escrever("\nArray de inteiros: \n\n");
-    por(int j = 0; j < 4; j = j + 1) {
+    por(int j = 0; j < 4; j++) {
         escrever("no indice: ", j, " valor: ", num[j], "\n");
     }
     flu[] flutuante = { 0.2, 1.5, 5.1, 5.1 };
     escrever("\nArray de flutuantes: \n\n");
-    por(int j = 0; j < 4; j = j + 1) {
+    por(int j = 0; j < 4; j++) {
         escrever("no indice: ", j, " valor: ", flutuante[j], "\n");
     }
 }
@@ -220,10 +220,10 @@ vazio testeLoops() {
     int i = 0;
     enq(i < 10) {
         escrever("\nvalor de i: ", i);
-        i = i + 1;
+        i++;
     }
     escrever("\n\nPor:\n");
-    por(int i = 0; i < 10; i = i + 1) {
+    por(int i = 0; i < 10; i++) {
         escrever("indice: ", i, "\n");
     }
 }
@@ -251,6 +251,9 @@ int* p;
 ```
 
 funções globais NÃO SÃO APAGADAS, mesmo se não forem usadas no mesmo código com a otimização nivel 1.
+## documentação (beta)
+você pode encontrar mais explicações em doc.txt
+
 ## como compilar
 para compilar, você deve usar:
 ```Bash

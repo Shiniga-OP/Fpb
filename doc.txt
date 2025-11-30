@@ -1,0 +1,159 @@
+documentação da FPB.
+
+## BÁSICO ##
+
+para começar, um código padrão de "Olá mundo":
+
+[código]
+#incluir "biblis/impressao.asm";
+#global inicio();
+
+vazio inicio() {
+      escrever("Olá mundo\n");
+}
+[código]
+
+"#incluir" é da categoria de diretivas (#), ela serve para colar códigos Assembly no seu código intermediário. Assim você poderá utilizar funções definidas no Assembly.
+
+"#global" é da categoria "#", e serve para expôr uma função para outros códigos que desejem chamar funções do seu código externamente. Utilizamos essa função para que o sistema operacional possa executar nosso código começando por "inicio()".
+
+"vazio" é da categoria de retornos, significa que o valor que sua função retorna é nulo, ou seja, nada. Ele não é um tipo de variável, então não é possível atribuir um valor nulo diretamente a um variável que não seja por retorno.
+
+"inicio()" é o nome da função, que serve para identificar, diferenciar, e chamá-la no código em si.
+
+"escrever();" é da categoria de funções nativas do compilador, ela é uma abstração padrão que divide o trabalho em outras funções do sistema. Quando você faz:
+
+[código]
+escrever("texto", 15, 15.0f);
+[código]
+
+na verdade isso vira: "_escrever_tex();", "_escrever_int();", e "_escrever_flu();" em sequência.
+
+"biblis/impressao.asm" é a biblioteca de impressão que contém as funções de impressão padrão, como as anteriores e "_escrever_car();", "_escrever_longo();", a mais.
+
+## TIPAGEM ##
+
+FPB é uma linguagem fortemente tipada, isso significa que você precisa definir os tipos das variáveis antes de declarar elas, e não pode passar valores.
+
+[código]
+car caractere = 'A';
+int inteiro = 1;
+flu flutuante = 1.0f;
+bool booleano = 1;
+longo numeroLongo = 999999999L;
+byte hexadecimal = 0x000000;
+[código]
+
+e ponteiros:
+
+[código]
+car* texto = "ponteiro de texto";
+int* inteiro = 15;
+flu* flutuante = 1.5f;
+bool* booleano = 1;
+longo* numeroLongo = 999999999999L;
+byte* hexadecimal = 0x000000;
+[código]
+
+arrays:
+
+[código]
+car[] texto = "array de texto";
+int[] inteiros = { 1, 1, 1 };
+flu[] flutuantes = { 1f, 1f, 1f };
+bool[] booleanos = { (bool)1, (bool)1, (bool)1 };
+longo[] longos = { 1L, 1L, 1L };
+byte[] bytes = { 0xFF, 0xFF, 0xFF };
+[código]
+
+## ARRAYS ##
+
+você pode utilizar arrays de várias maneiras, e uma peculiaridade especial da FPB são seus arrays de texto mutáveis, diferente de outras linguagens onde um array de caracteres é um ponteiro imutável, na FPB os arrays de caracteres são totalmente temporários:
+
+[código]
+car[30] array = "array de caracteres temporário"; // mutável
+array[0] = 'A'; // funciona
+car* ponteiro = "ponteiro de texto permanente"; // texto imutável
+ponteiro[0] = 'A'; // erro
+[código]
+
+arrays não podem ser reatribuidos diretamente nem serem retornados de funções. Por isso, funções utilizam arrays como ponteiros, e toda alteração feita neles de qualquer parte do código onde são passados como referência.
+
+[código]
+#incluir "biblis/impressao.asm";
+#global inicio();
+
+vazio modificar(int[] arr) {
+       arr[0] = 1;
+}
+
+vazio inicio() {
+        int[] arr = { 5 };
+        modificar(arr);
+        escrever(arr[0]); // vai imprimir 1
+}
+[código]
+
+## PONTEIROS ##
+
+os ponteiros da FPB tem dereferência automática. Isso significa que você não precisa adicionar uma expressão explícita para manipular seu valor.
+
+comparação:
+
+em C:
+
+[código]
+int x = 10;
+int* p = &x;
+*p = *p + 1;
+[código]
+
+em FPB:
+
+[código]
+int x = 10;
+int* p = @x;
+p = p + 1;
+[código]
+
+o operador "@" serve para acessar diretamente o endereço de uma variável ou ponteiro, isso significa que ao usar "@variavel", você estará acessando o endereço da memória ou pilha, não o valor da variável.
+
+ponteiros também podem ter seus endereços mudados manualmente, mesmo que em suas declarações, você possa passar o endereço sem "@", caso você queira alterar o endereço de um ponteiro já declarado, poderá usar o operador "@" também para isto:
+
+[código]
+int x = 10;
+int* p;
+@p = @x;
+[código]
+
+assim você estará alterando manualmente o endereço do ponteiro declarado.
+
+## LOOPS ##
+
+você pode criar loops de 3 formas:
+
+1. A mais fácil é simplesmente chamar a função de forma recursiva.
+
+[código]
+vazio loop() {
+      loop();
+}
+[código]
+
+2. loop enq, é um loop condicional que executa até a condição ser atendida.
+
+[código]
+int x = 0;
+enq(x > 10) {
+       escrever(x, "\n");
+       x++;
+}
+[código]
+
+3. loop por, é um loop condicional incremental, o que significa que ele pode declarar uma variável temporária e executar até a condição seja atendida enquanto faz alguma alteração na variável temporária.
+
+[código]
+por(int i = 0; i < 10; i++) {
+        escrever(i, "\n");
+}
+[código]

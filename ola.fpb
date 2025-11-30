@@ -1,4 +1,6 @@
-#incluir "biblis/texint.asm";
+#incluir "biblis/impressao.asm";
+
+#global inicio();
 
 vazio inicio() {
     escrever("olá mundo\n");

@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 29/11/2025.
+* [ATUAL]: 30/11/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -213,6 +213,8 @@ const char* token_str(TipoToken t) {
         case T_VIRGULA: return ",";
         case T_IGUAL: return "=";
         case T_MAIS: return "+";
+        case T_MAIS_MAIS: return "++";
+        case T_MENOS_MENOS: return "--";
         case T_MENOS: return "-";
         case T_VEZES: return "*";
         case T_DIV: return "/";
@@ -556,8 +558,20 @@ void proximoToken() {
                 L.coluna_atual++;
             } else L.tk.tipo = T_IGUAL;
         break;
-        case '+': L.tk.tipo = T_MAIS; break;
-        case '-': L.tk.tipo = T_MENOS; break;
+        case '+': 
+            if(L.fonte[L.pos + 1] == '+') {
+                L.tk.tipo = T_MAIS_MAIS;
+                L.pos++;
+                L.coluna_atual++;
+            } else L.tk.tipo = T_MAIS;
+        break;
+        case '-': 
+            if(L.fonte[L.pos + 1] == '-') {
+                L.tk.tipo = T_MENOS_MENOS;
+                L.pos++;
+                L.coluna_atual++;
+            } else L.tk.tipo = T_MENOS;
+        break;
         case '*': L.tk.tipo = T_VEZES; break;
         case '/': L.tk.tipo = T_DIV; break;
         case '%': L.tk.tipo = T_PORCEN; break;
@@ -672,6 +686,45 @@ TipoToken tratar_id(FILE* s, int escopo) {
         }
     }
     proximoToken();
+    if(L.tk.tipo == T_MAIS_MAIS || L.tk.tipo == T_MENOS_MENOS) {
+        TipoToken op = L.tk.tipo;
+        proximoToken();
+        
+        // Carrega o valor atual da variável
+        carregar_valor(s, var);
+        
+        // Incrementa ou decrementa
+        if(op == T_MAIS_MAIS) {
+            if(var->tipo_base == T_pFLU) {
+                fprintf(s, "  fmov s1, #1.0\n");
+                fprintf(s, "  fadd s0, s0, s1\n");
+            } else if(var->tipo_base == T_pDOBRO) {
+                fprintf(s, "  fmov d1, #1.0\n");
+                fprintf(s, "  fadd d0, d0, d1\n");
+            } else if(var->tipo_base == T_pLONGO) {
+                fprintf(s, "  add x0, x0, #1\n");
+            } else {
+                fprintf(s, "  add w0, w0, #1\n");
+            }
+        } else { // T_MENOS_MENOS
+            if(var->tipo_base == T_pFLU) {
+                fprintf(s, "  fmov s1, #1.0\n");
+                fprintf(s, "  fsub s0, s0, s1\n");
+            } else if(var->tipo_base == T_pDOBRO) {
+                fprintf(s, "  fmov d1, #1.0\n");
+                fprintf(s, "  fsub d0, d0, d1\n");
+            } else if(var->tipo_base == T_pLONGO) {
+                fprintf(s, "  sub x0, x0, #1\n");
+            } else {
+                fprintf(s, "  sub w0, w0, #1\n");
+            }
+        }
+        
+        // Armazena o novo valor de volta
+        armazenar_valor(s, var);
+        
+        return var->tipo_base;
+    }
     if(var->eh_ponteiro && var->tipo_base == T_pCAR) {
         // ponteiro pra caractere, carrega o endereço do texto
         fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
@@ -717,7 +770,7 @@ TipoToken tratar_id(FILE* s, int escopo) {
             fprintf(s, "  add x2, x2, x0\n"); // adiciona pos calculado
             
             // carrega o valor baseado no tipo
-            if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL) 
+            if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE) 
                 fprintf(s, "  ldrb w0, [x2]\n");
             else if(var->tipo_base == T_pINT)
                 fprintf(s, "  ldr w0, [x2]\n");
@@ -738,7 +791,7 @@ TipoToken tratar_id(FILE* s, int escopo) {
         fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
         // carrega endereço do ponteiro
         // agora dereferencia baseado no tipo base
-        if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL) {
+        if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE) {
             fprintf(s, "  ldrb w0, [x1]\n");
         } else if(var->tipo_base == T_pINT) {
             fprintf(s, "  ldr w0, [x1]\n"); 
@@ -1067,7 +1120,7 @@ TipoToken processar_condicao(FILE* s, int escopo) {
 
 int processar_variaveis_tam(int escopo) {
     Lexer salvo = L;
-    int tamanho_total = 0;
+    int tam_total = 0;
     int nivel_chaves = 0;
     
     if(L.tk.tipo == T_CHAVE_ESQ) {
@@ -1088,7 +1141,7 @@ int processar_variaveis_tam(int escopo) {
             proximoToken();
             continue;
         }
-        TipoToken tipos[] = {T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, T_pLONGO, T_PONTEIRO};
+        TipoToken tipos[] = {T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pBYTE, T_pDOBRO, T_pLONGO, T_PONTEIRO};
         int eh_tipo = 0;
         for(int i = 0; i < 7; i++) {
             if(L.tk.tipo == tipos[i]) {
@@ -1135,7 +1188,7 @@ int processar_variaveis_tam(int escopo) {
                 int tam_base = eh_ponteiro ? 8 : tam_tipo(tipo_base);
                 int tam_bytes = total_elementos * tam_base;
                 // alinhamento
-                tamanho_total += (tam_bytes + 15) & ~15;
+                tam_total += (tam_bytes + 15) & ~15;
                 // pula resto da declaração até ; ou }
                 while(L.tk.tipo != T_PONTO_VIRGULA && L.tk.tipo != T_FIM && L.tk.tipo != T_CHAVE_DIR) {
                      if(L.tk.tipo == T_CHAVE_ESQ) {
@@ -1152,7 +1205,7 @@ int processar_variaveis_tam(int escopo) {
         } else proximoToken();
     }
     L = salvo;
-    return tamanho_total;
+    return tam_total;
 }
 // [VERIFICAÇÃO]:
 void verificar_global(FILE* s) {
@@ -1179,21 +1232,21 @@ void verificar_global(FILE* s) {
 }
 
 void verificar_def(void) {
-    excessao(T_DEF); // Consome #def
+    excessao(T_DEF); // consome #def
     
     if(L.tk.tipo != T_ID) fatal("nome do macro esperado");
     
     char nome_macro[32];
     strcpy(nome_macro, L.tk.lex);
-    proximoToken(); // Consome o nome do macro
+    proximoToken(); // consome o nome do macro
     
-    // Suporta inteiros ou longos
+    // suporta inteiros ou longos
     if(L.tk.tipo != T_INT && L.tk.tipo != T_LONGO) fatal("valor inteiro ou longo esperado para o macro");
     
     long valor = L.tk.valor_l;
-    proximoToken(); // Consome o valor
+    proximoToken(); // consome o valor
     
-    excessao(T_PONTO_VIRGULA); // Consome o ;
+    excessao(T_PONTO_VIRGULA); // consome o ;
     
     if(macro_cnt >= MAX_MACROS) fatal("[verificar_def] excesso de macros");
     
@@ -1320,7 +1373,7 @@ void verificar_matriz(FILE* s, Variavel* var, int escopo, int indices[], int niv
             // resultado continua negativo(dentro do frame)
             int pos_absoluta = var->pos + pos_bytes;
             // agora tudo é negativo
-            if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL) {
+            if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE) {
                 fprintf(s, "  strb w0, [x29, %d]\n", pos_absoluta);
             } else if(var->tipo_base == T_pINT) {
                 fprintf(s, "  str w0, [x29, %d]\n", pos_absoluta);
@@ -1382,49 +1435,62 @@ void verificar_por(FILE* s, int escopo) {
     excessao(T_PAREN_ESQ);
     
     int novo_escopo = ++escopo_global;
-    // declaração
-    if(L.tk.tipo == T_pINT) {
+    
+    // processa inicialização
+    if(L.tk.tipo == T_pINT || L.tk.tipo == T_pLONGO || L.tk.tipo == T_pCAR || 
+       L.tk.tipo == T_pFLU || L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO) {
         declaracao_var(s, &funcs[fn_cnt - 1].frame_tam, novo_escopo, 0, 0);
-        excessao(T_PONTO_VIRGULA);
     } else if(L.tk.tipo == T_ID) {
         char id[32];
         strcpy(id, L.tk.lex);
-        Variavel* var = buscar_var(id, escopo);
-        if(!var) fatal("[verificar_por] variável não declarada");
-        
         proximoToken();
         if(L.tk.tipo == T_IGUAL) {
             verificar_atribuicao(s, id, escopo);
         }
-        excessao(T_PONTO_VIRGULA);
-    } else {
-        excessao(T_PONTO_VIRGULA);
     }
-    // condição
+    // consome ponto e virgula apos iniciar
+    excessao(T_PONTO_VIRGULA);
+    
     int rotulo_inicio = escopo_global++;
     int rotulo_fim = escopo_global++;
     
     fprintf(s, ".B%d:\n", rotulo_inicio);
-    TipoToken tipo_cond = expressao(s, novo_escopo);
-    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
-        fatal("[verificar_por] condição do loop deve ser inteiro ou booleano");
-    }
-    fprintf(s, "  cmp w0, 0\n");
-    fprintf(s, "  beq .B%d\n", rotulo_fim);
-    excessao(T_PONTO_VIRGULA);
-    // salva tokens do incremento
-    Token incremento_tokens[32];
-    int incremento_conta = 0;
     
-    while(L.tk.tipo != T_PAREN_DIR && L.tk.tipo != T_FIM && incremento_conta < 31) {
-        incremento_tokens[incremento_conta] = L.tk;
-        incremento_conta++;
+    // processa condição
+    if(L.tk.tipo != T_PONTO_VIRGULA) {
+        TipoToken tipo_cond = expressao(s, novo_escopo);
+        
+        if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
+            // Tenta converter para booleano
+            if(tipo_cond == T_pFLU) {
+                fprintf(s, "  fcmp s0, #0.0\n");
+                fprintf(s, "  cset w0, ne\n");
+            } else if(tipo_cond == T_pDOBRO) {
+                fprintf(s, "  fcmp d0, #0.0\n");
+                fprintf(s, "  cset w0, ne\n");
+            } else {
+                fatal("[verificar_por] condição do loop deve ser inteiro ou booleano");
+            }
+        }
+        fprintf(s, "  cmp w0, 0\n");
+        fprintf(s, "  beq .B%d\n", rotulo_fim);
+    }
+    // consome ponto e virgula apos condição
+    excessao(T_PONTO_VIRGULA);
+    
+    // salva posição do incremento pra processar depois do corpo
+    size_t pos_incremento = L.pos;
+    int linha_incremento = L.linha_atual;
+    int coluna_incremento = L.coluna_atual;
+    Token tk_incremento = L.tk;
+    
+    // pula incremento por agora(ate encontrar PAREN_DIR)
+    while(L.tk.tipo != T_PAREN_DIR && L.tk.tipo != T_FIM) {
         proximoToken();
     }
-    incremento_tokens[incremento_conta].tipo = T_FIM;
-    
     excessao(T_PAREN_DIR);
-    // corpo do loop
+    
+    // processa corpo do loop
     if(L.tk.tipo == T_CHAVE_ESQ) {
         proximoToken();
         while(L.tk.tipo != T_CHAVE_DIR) {
@@ -1434,60 +1500,27 @@ void verificar_por(FILE* s, int escopo) {
     } else {
         verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
     }
-    // gera codigo do incremento
-    fprintf(s, "  // incremento\n");
-    // salva estado atual
-    Lexer salvo = L;
-    // processa tokens do incremento
-    for(int i = 0; i < incremento_conta; i++) {
-        L.tk = incremento_tokens[i];
-        
-        if(L.tk.tipo == T_ID && i + 1 < incremento_conta && incremento_tokens[i + 1].tipo == T_IGUAL) {
-            // se é uma atribuição:
-            char id[32];
-            strcpy(id, L.tk.lex);
-            i++; // pula o '='
-            // processa o valor
-            i++; // vai pro proximo token apos '='
-            while(i < incremento_conta && incremento_tokens[i].tipo != T_VIRGULA && incremento_tokens[i].tipo != T_FIM) {
-                L.tk = incremento_tokens[i];
-                
-                if(L.tk.tipo == T_ID) {
-                    Variavel* var = buscar_var(L.tk.lex, novo_escopo);
-                    if(var) carregar_valor(s, var);
-                    else fatal("[verificar_por] variável não encontrada");
-                } else if(L.tk.tipo == T_INT) {
-                    fprintf(s, "  mov w0, %ld\n", L.tk.valor_l);
-                } else if(L.tk.tipo == T_MAIS) {
-                    // processa adição
-                    i++;
-                    L.tk = incremento_tokens[i];
-                    if(L.tk.tipo == T_INT) {
-                        fprintf(s, "  add w0, w0, %ld\n", L.tk.valor_l);
-                    } else if(L.tk.tipo == T_ID) {
-                        Variavel* var = buscar_var(L.tk.lex, novo_escopo);
-                        if(var) {
-                            carregar_valor(s, var);
-                            fprintf(s, "  add w0, w0, w1\n");
-                        } else {
-                            fatal("[verificar_por] variável não encontrada");
-                        }
-                    }
-                }
-                i++;
-            }
-            // armazena resultado
-            Variavel* dest_var = buscar_var(id, novo_escopo);
-            if(dest_var) {
-                fprintf(s, "  str w0, [x29, %d]\n", dest_var->pos);
-            } else {
-                fatal("[verificar_por] variável destino não encontrada");
-            }
-            break; // processa apenas uma atribuição
-        }
+    // processa incremento depois do corpo
+    size_t pos_atual = L.pos;
+    int linha_atual = L.linha_atual;
+    int coluna_atual = L.coluna_atual;
+    Token tk_atual = L.tk;
+    
+    // restaura para processar o incremento
+    L.pos = pos_incremento;
+    L.linha_atual = linha_incremento;
+    L.coluna_atual = coluna_incremento;
+    L.tk = tk_incremento;
+    // processa o incremento como um statement completo
+    if(L.tk.tipo != T_PAREN_DIR) {
+        // usa verificar_stmt pra processar o incremento
+        verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
     }
-    // restaura estado
-    L = salvo;
+    // restaura posição atual
+    L.pos = pos_atual;
+    L.linha_atual = linha_atual;
+    L.coluna_atual = coluna_atual;
+    L.tk = tk_atual;
     
     fprintf(s, "  b .B%d\n", rotulo_inicio);
     fprintf(s, ".B%d:\n", rotulo_fim);
@@ -1582,9 +1615,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         strcpy(caminho, L.tk.lex);
         proximoToken();
         
-        if(L.tk.tipo != T_PONTO_VIRGULA) fatal("[verificar_stmt] ponto e vírgula esperado após o caminho do arquivo");
-        
-        proximoToken();
+        if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         
         FILE* arquivo_incluir = fopen(caminho, "r");
         if(!arquivo_incluir) {
@@ -1621,7 +1652,6 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
            L.tk.tipo != T_PONTEIRO) {
             fatal("[verificar_stmt] tipo de retorno esperado após 'global'");
         }
-        
         // Processa a função normalmente, mas marca como global
         verificar_fn(s);
         return;
@@ -1640,7 +1670,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
     }
     if(eh_tipo || eh_final) {
         declaracao_var(s, pos, escopo, 0, eh_final);
-        excessao(T_PONTO_VIRGULA);
+        if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         return;
     }
     if(L.tk.tipo == T_ID) {
@@ -1650,7 +1680,47 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         
         if(L.tk.tipo == T_IGUAL) {
             verificar_atribuicao(s, idn, escopo);
-            excessao(T_PONTO_VIRGULA);
+            if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
+            return;
+        } else if(L.tk.tipo == T_MAIS_MAIS || L.tk.tipo == T_MENOS_MENOS) {
+            Variavel* var = buscar_var(idn, escopo);
+            if(!var) fatal("[verificar_stmt] variável não declarada");
+            if(var->eh_final) fatal("[verificar_stmt] não é possível modificar variável final");
+            
+            TipoToken op = L.tk.tipo;
+            proximoToken();
+            // carrega valor atual
+            carregar_valor(s, var);
+            // incrementa ou decrementa
+            if(op == T_MAIS_MAIS) {
+                if(var->tipo_base == T_pFLU) {
+                    fprintf(s, "  fmov s1, #1.0\n");
+                    fprintf(s, "  fadd s0, s0, s1\n");
+                } else if(var->tipo_base == T_pDOBRO) {
+                    fprintf(s, "  fmov d1, #1.0\n");
+                    fprintf(s, "  fadd d0, d0, d1\n");
+                } else if(var->tipo_base == T_pLONGO) {
+                    fprintf(s, "  add x0, x0, #1\n");
+                } else {
+                    fprintf(s, "  add w0, w0, #1\n");
+                }
+            } else { // T_MENOS_MENOS
+                if(var->tipo_base == T_pFLU) {
+                    fprintf(s, "  fmov s1, #1.0\n");
+                    fprintf(s, "  fsub s0, s0, s1\n");
+                } else if(var->tipo_base == T_pDOBRO) {
+                    fprintf(s, "  fmov d1, #1.0\n");
+                    fprintf(s, "  fsub d0, d0, d1\n");
+                } else if(var->tipo_base == T_pLONGO) {
+                    fprintf(s, "  sub x0, x0, #1\n");
+                } else {
+                    fprintf(s, "  sub w0, w0, #1\n");
+                }
+            }
+            // armazena de volta
+            armazenar_valor(s, var);
+            
+            if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
             return;
         } else if(L.tk.tipo == T_COL_ESQ) {
             // >>>>>>ACESSO A ELEMENTO DE ARRAY<<<<<<
@@ -1699,7 +1769,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             } else {
                 fatal("[verificar_stmt] acesso a elemento de array deve ser usado em expressão ou atribuição");
             }
-            excessao(T_PONTO_VIRGULA);
+            if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
             return;
         } else if(L.tk.tipo == T_PAREN_ESQ) {
             excessao(T_PAREN_ESQ);
@@ -1748,14 +1818,14 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                     break;
                 }
                 excessao(T_PAREN_DIR);
-                excessao(T_PONTO_VIRGULA);
+                if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
                 return;
             } else {
                 // >>>>>CHAMADA DE FUNÇÃO NORMAL<<<<<
                 Funcao* fn = buscar_fn(idn);
                 if(!fn) fatal("[verificar_stmt] função não declarada");
                 tratar_chamada_funcao(s, escopo, idn, fn);
-                excessao(T_PONTO_VIRGULA);
+                if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
                 return;
             }
         } else fatal("[verificar_stmt] declaração inválida");
@@ -1968,16 +2038,16 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
             } else if(tipo == T_pLONGO || tipo == T_PONTEIRO) {
                 // &&: w0 = (w1 != 0) && (w0 != 0)
                 fprintf(s, "  cmp x1, 0\n");
-                fprintf(s, "  cset x1, ne\n");  // w1 = (w1 != 0) ? 1 : 0
+                fprintf(s, "  cset x1, ne\n"); // w1 = (w1 != 0) ? 1 : 0
                 fprintf(s, "  cmp x0, 0\n");
-                fprintf(s, "  cset x0, ne\n");  // w0 = (w0 != 0) ? 1 : 0
+                fprintf(s, "  cset x0, ne\n"); // w0 = (w0 != 0) ? 1 : 0
                 fprintf(s, "  and x0, x1, x0\n"); // w0 = w1 & w0
             } else {
                 // &&: w0 = (w1 != 0) && (w0 != 0)
                 fprintf(s, "  cmp w1, 0\n");
-                fprintf(s, "  cset w1, ne\n");  // w1 = (w1 != 0) ? 1 : 0
+                fprintf(s, "  cset w1, ne\n"); // w1 = (w1 != 0) ? 1 : 0
                 fprintf(s, "  cmp w0, 0\n");
-                fprintf(s, "  cset w0, ne\n");  // w0 = (w0 != 0) ? 1 : 0
+                fprintf(s, "  cset w0, ne\n"); // w0 = (w0 != 0) ? 1 : 0
                 fprintf(s, "  and w0, w1, w0\n"); // w0 = w1 & w0
             }
         break;
@@ -2159,10 +2229,10 @@ void gerar_convert(FILE* s, TipoToken tipo_origem, TipoToken tipo_destino) {
             fprintf(s, "  cmp w0, 0\n");
             fprintf(s, "  cset w0, ne\n");
         } else if(tipo_origem == T_pFLU) {
-            fprintf(s, "  fcmp s0, #0.0\n");
+            fprintf(s, "  fcmp s0, 0.0\n");
             fprintf(s, "  cset w0, ne\n");
         } else if(tipo_origem == T_pDOBRO) {
-            fprintf(s, "  fcmp d0, #0.0\n");
+            fprintf(s, "  fcmp d0, 0.0\n");
             fprintf(s, "  cset w0, ne\n");
         }
     }
@@ -2312,6 +2382,54 @@ TipoToken fator(FILE* s, int escopo) {
         proximoToken();
         return T_PONTEIRO;
     }
+    if(L.tk.tipo == T_MAIS_MAIS || L.tk.tipo == T_MENOS_MENOS) {
+        TipoToken op = L.tk.tipo;
+        proximoToken();
+        
+        if(L.tk.tipo != T_ID) fatal("[fator] identificador esperado após operador ++/--");
+        
+        Variavel* var = buscar_var(L.tk.lex, escopo);
+        if(!var) fatal("[fator] variável não declarada");
+        if(var->eh_final) fatal("[fator] não é possível modificar variável final");
+        
+        proximoToken();
+        // carrega valor atual
+        carregar_valor(s, var);
+        
+        // incrementa ou decrementa
+        if(op == T_MAIS_MAIS) {
+            if(var->tipo_base == T_pFLU) {
+                fprintf(s, "  fmov s1, #1.0\n");
+                fprintf(s, "  fadd s0, s0, s1\n");
+            } else if(var->tipo_base == T_pDOBRO) {
+                fprintf(s, "  fmov d1, #1.0\n");
+                fprintf(s, "  fadd d0, d0, d1\n");
+            } else if(var->tipo_base == T_pLONGO) {
+                fprintf(s, "  add x0, x0, #1\n");
+            } else {
+                fprintf(s, "  add w0, w0, #1\n");
+            }
+        } else { // T_MENOS_MENOS
+            if(var->tipo_base == T_pFLU) {
+                fprintf(s, "  fmov s1, #1.0\n");
+                fprintf(s, "  fsub s0, s0, s1\n");
+            } else if(var->tipo_base == T_pDOBRO) {
+                fprintf(s, "  fmov d1, #1.0\n");
+                fprintf(s, "  fsub d0, d0, d1\n");
+            } else if(var->tipo_base == T_pLONGO) {
+                fprintf(s, "  sub x0, x0, #1\n");
+            } else {
+                fprintf(s, "  sub w0, w0, #1\n");
+            }
+        }
+        // armazena o novo valor
+        armazenar_valor(s, var);
+        
+        // carrega denovo pra retornar o valor(pre fixado retorna o novo valor)
+        carregar_valor(s, var);
+        
+        return var->tipo_base;
+    }
     if(L.tk.tipo == T_MENOS) {
         proximoToken();
         TipoToken tipo = fator(s, escopo);
@@ -2369,6 +2487,34 @@ TipoToken termo(FILE* s, int escopo) {
 }
 
 TipoToken expressao(FILE* s, int escopo) {
+    if(L.tk.tipo == T_ID) {
+        char id[32];
+        strcpy(id, L.tk.lex);
+        // dalva a posição atual
+        size_t pos_salvo = L.pos;
+        int linha_salvo = L.linha_atual;
+        int coluna_salvo = L.coluna_atual;
+        Token tk_salvo = L.tk;
+        
+        // avança para ver se tem '='
+        proximoToken();
+        if(L.tk.tipo == T_IGUAL) {
+            // é uma atribuição, processa normalmente
+            L.pos = pos_salvo;
+            L.linha_atual = linha_salvo;
+            L.coluna_atual = coluna_salvo;
+            L.tk = tk_salvo;
+            
+            verificar_atribuicao(s, id, escopo);
+            return buscar_var(id, escopo)->tipo_base;
+        } else {
+            // não é atribuição, volta e processa como expressão normal
+            L.pos = pos_salvo;
+            L.linha_atual = linha_salvo;
+            L.coluna_atual = coluna_salvo;
+            L.tk = tk_salvo;
+        }
+    }
     TipoToken tipo = termo(s, escopo);
     
     while(L.tk.tipo == T_MAIS || L.tk.tipo == T_MENOS || L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU || L.tk.tipo == T_MENOR_MENOR) {

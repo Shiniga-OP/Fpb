@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 30/11/2025.
+* [ATUAL]: 01/12/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +21,7 @@
 #define MAX_TOK 8192 // maximo de tolens
 #define MAX_CODIGO 8192 // maximo de codhgk
 #define MAX_FN 252 // maximo de funções
-#define MAX_VAR 128 // maximo de variaveis
+#define MAX_VAR 252 // maximo de variaveis
 #define MAX_CONST 252 // maxmio de constantes
 #define MAX_PARAMS 8 // maximo de parametros
 #define MAX_TEX 252 // mqximo de textos
@@ -139,6 +139,8 @@ static Tex texs[MAX_TEX];
 static int tex_cnt = 0;
 static Macro macros[MAX_MACROS];
 static int macro_cnt = 0;
+static Variavel globais[MAX_VAR];
+static int global_cnt = 0;
 static char* arquivoAtual;
 
 // buscar
@@ -149,7 +151,7 @@ Macro* buscar_macro(const char* nome);
 void carregar_valor(FILE* s, Variavel* var);
 void carregar_const(FILE* s, int titulo);
 // declaracao
-void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_final);
+void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_final, int eh_global);
 // tratar
 TipoToken tratar_id(FILE* s, int escopo);
 TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* fn);
@@ -279,6 +281,16 @@ int tipos_compativeis(TipoToken tipo1, TipoToken tipo2) {
     if((tipo1 == T_pBYTE && (tipo2 == T_pCAR || tipo2 == T_pINT)) || (tipo2 == T_pBYTE && (tipo1 == T_pCAR || tipo1 == T_pINT))) return 1;
     if((tipo1 == T_pCAR && tipo2 == T_pINT) || (tipo1 == T_pINT && tipo2 == T_pCAR)) return 1;
     if((tipo1 == T_pINT && tipo2 == T_pLONGO) || (tipo1 == T_pLONGO && tipo2 == T_pINT)) return 1;
+    return 0;
+}
+
+int eh_tipo(TipoToken tipo) {
+    TipoToken tipos[] = {
+        T_pVAZIO, T_pINT, T_pFLU, T_pCAR, T_pBOOL,
+        T_pDOBRO, T_pLONGO, T_PONTEIRO, T_pBYTE};
+    for(int i = 0; i < sizeof(tipos)/sizeof(tipos[0]); i++) {
+        if(tipo == tipos[i]) return 1;
+    }
     return 0;
 }
 
@@ -691,37 +703,36 @@ TipoToken tratar_id(FILE* s, int escopo) {
         TipoToken op = L.tk.tipo;
         proximoToken();
         
-        // Carrega o valor atual da variável
+        // carrega o valor atual da variavel
         carregar_valor(s, var);
         
-        // Incrementa ou decrementa
+        // incrementa ou decrementa
         if(op == T_MAIS_MAIS) {
             if(var->tipo_base == T_pFLU) {
-                fprintf(s, "  fmov s1, #1.0\n");
+                fprintf(s, "  fmov s1, 1.0\n");
                 fprintf(s, "  fadd s0, s0, s1\n");
             } else if(var->tipo_base == T_pDOBRO) {
-                fprintf(s, "  fmov d1, #1.0\n");
+                fprintf(s, "  fmov d1, 1.0\n");
                 fprintf(s, "  fadd d0, d0, d1\n");
             } else if(var->tipo_base == T_pLONGO) {
-                fprintf(s, "  add x0, x0, #1\n");
+                fprintf(s, "  add x0, x0, 1\n");
             } else {
-                fprintf(s, "  add w0, w0, #1\n");
+                fprintf(s, "  add w0, w0, 1\n");
             }
         } else { // T_MENOS_MENOS
             if(var->tipo_base == T_pFLU) {
-                fprintf(s, "  fmov s1, #1.0\n");
+                fprintf(s, "  fmov s1, 1.0\n");
                 fprintf(s, "  fsub s0, s0, s1\n");
             } else if(var->tipo_base == T_pDOBRO) {
-                fprintf(s, "  fmov d1, #1.0\n");
+                fprintf(s, "  fmov d1, 1.0\n");
                 fprintf(s, "  fsub d0, d0, d1\n");
             } else if(var->tipo_base == T_pLONGO) {
-                fprintf(s, "  sub x0, x0, #1\n");
+                fprintf(s, "  sub x0, x0, 1\n");
             } else {
-                fprintf(s, "  sub w0, w0, #1\n");
+                fprintf(s, "  sub w0, w0, 1\n");
             }
         }
-        
-        // Armazena o novo valor de volta
+        // armazena o novo valor de volta
         armazenar_valor(s, var);
         
         return var->tipo_base;
@@ -936,13 +947,23 @@ TipoToken tratar_byte(FILE* s) {
 }
 // [BUSCA]:
 Variavel* buscar_var(const char* nome, int escopo) {
-    if(fn_cnt == 0) return NULL;
-    Funcao* f = &funcs[fn_cnt - 1];
-    for(int i = f->var_conta - 1; i >= 0; i--) {
-        if(strcmp(f->vars[i].nome, nome) == 0 && f->vars[i].escopo <= escopo) {
-            return &f->vars[i];
+    // Primeiro procurar em variáveis locais (como antes)
+    if(fn_cnt > 0) {
+        Funcao* f = &funcs[fn_cnt - 1];
+        for(int i = f->var_conta - 1; i >= 0; i--) {
+            if(strcmp(f->vars[i].nome, nome) == 0 && f->vars[i].escopo <= escopo) {
+                return &f->vars[i];
+            }
         }
     }
+    
+    // Depois procurar em variáveis globais
+    for(int i = 0; i < global_cnt; i++) {
+        if(strcmp(globais[i].nome, nome) == 0) {
+            return &globais[i];
+        }
+    }
+    
     return NULL;
 }
 
@@ -1006,7 +1027,7 @@ void processar_args(FILE* s, Funcao* f) {
             var->eh_array = eh_array_param;
             if(eh_array_param) var->tipo_base = salvo.tipo;
         }
-        declaracao_var(s, &pilha_pos, 0, 1, 0);
+        declaracao_var(s, &pilha_pos, 0, 1, 0, 0);
         
         if(L.tk.tipo == T_VIRGULA) proximoToken();
         else break;
@@ -1229,23 +1250,29 @@ int processar_variaveis_tam(int escopo) {
 // [VERIFICAÇÃO]:
 void verificar_global(FILE* s) {
     excessao(T_GLOBAL);
-    
-    if(L.tk.tipo != T_ID) fatal("[verificar_global] nome de função esperado");
-    
-    char fnome[32];
-    strcpy(fnome, L.tk.lex);
-    proximoToken();
-    
-    excessao(T_PAREN_ESQ);
-    excessao(T_PAREN_DIR);
-    excessao(T_PONTO_VIRGULA);
-    
-    fprintf(s, ".global %s\n", fnome);
-    
-    for(int i = 0; i < fn_cnt; i++) {
-        if(strcmp(funcs[i].nome, fnome) == 0) {
-            funcs[i].eh_global = 1;
-            break;
+    if(eh_tipo(L.tk.tipo)) {
+        // verifica se é função: tem parenteses apos o nome
+        char nome[32];
+        strcpy(nome, L.tk.lex);
+        // processa declaração
+        int pos = 0;
+        declaracao_var(s, &pos, -1, 0, 0, 1);
+        if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
+    } else {
+        if(L.tk.tipo != T_ID) fatal("[verificar_global] nome de função esperado");
+        char fnome[32];
+        strcpy(fnome, L.tk.lex);
+        proximoToken();
+        excessao(T_PAREN_ESQ);
+        excessao(T_PAREN_DIR);
+        if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
+        
+        fprintf(s, ".global %s\n", fnome);
+        for(int i = 0; i < fn_cnt; i++) {
+            if(strcmp(funcs[i].nome, fnome) == 0) {
+                funcs[i].eh_global = 1;
+                break;
+            }
         }
     }
 }
@@ -1458,7 +1485,7 @@ void verificar_por(FILE* s, int escopo) {
     // processa inicialização
     if(L.tk.tipo == T_pINT || L.tk.tipo == T_pLONGO || L.tk.tipo == T_pCAR || 
        L.tk.tipo == T_pFLU || L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO) {
-        declaracao_var(s, &funcs[fn_cnt - 1].frame_tam, novo_escopo, 0, 0);
+        declaracao_var(s, &funcs[fn_cnt - 1].frame_tam, novo_escopo, 0, 0, 0);
     } else if(L.tk.tipo == T_ID) {
         char id[32];
         strcpy(id, L.tk.lex);
@@ -1703,7 +1730,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         }
     }
     if(eh_tipo || eh_final) {
-        declaracao_var(s, pos, escopo, 0, eh_final);
+        declaracao_var(s, pos, escopo, 0, eh_final, 0);
         if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         return;
     }
@@ -2272,6 +2299,78 @@ void gerar_convert(FILE* s, TipoToken tipo_origem, TipoToken tipo_destino) {
     }
 }
 
+void gerar_globais(FILE* s) {
+    if(global_cnt == 0) return;
+    
+    fprintf(s, "\n.section .data\n");
+    fprintf(s, ".align 3\n");
+    
+    for(int i = 0; i < global_cnt; i++) {
+        Variavel* var = &globais[i];
+        fprintf(s, "global_%s:\n", var->nome);
+        
+        if(var->eh_array) {
+            int total_bytes = var->bytes;
+            if(var->tipo_base == T_pCAR && var->valor >= 0) {
+                // array de caracteres definindo com texto
+                // var->valor tem o ID do texto
+                const char* texto_valor = texs[var->valor].valor;
+                fprintf(s, "  .asciz \"%s\"\n", texto_valor);
+                // lreenche o resto com zeros se precisar
+                int tam_texto = strlen(texto_valor) + 1; // +1 pra o \0
+                if(tam_texto < total_bytes) {
+                    fprintf(s, "  .space %d\n", total_bytes - tam_texto);
+                }
+            } else {
+                fprintf(s, "  .space %d\n", total_bytes);
+            }
+        } else if(var->eh_ponteiro) {
+            if(var->valor >= 0) {
+                // ponteiro definido com endereço de texto
+                fprintf(s, "  .quad %s\n", texs[var->valor].nome);
+            } else {
+                fprintf(s, "  .quad 0\n"); // ponteiros são 8 bytes
+            }
+        } else {
+            switch(var->tipo_base) {
+                case T_pBYTE:
+                case T_pCAR:
+                case T_pBOOL:
+                    if(var->valor != 0) {
+                        fprintf(s, "  .byte %d\n", var->valor);
+                    } else {
+                        fprintf(s, "  .byte 0\n");
+                    }
+                    break;
+                case T_pINT:
+                    if(var->valor != 0) {
+                        fprintf(s, "  .word %d\n", var->valor);
+                    } else {
+                        fprintf(s, "  .word 0\n");
+                    }
+                    break;
+                case T_pFLU:
+                    // pra flutuante, inicializa com 0.0
+                    fprintf(s, "  .float 0.0\n");
+                    break;
+                case T_pDOBRO:
+                    fprintf(s, "  .double 0.0\n");
+                    break;
+                case T_pLONGO:
+                    if(var->valor != 0) {
+                        fprintf(s, "  .quad %ld\n", (long)var->valor);
+                    } else {
+                        fprintf(s, "  .quad 0\n");
+                    }
+                    break;
+                default:
+                    fprintf(s, "  .space %d\n", var->bytes);
+            }
+        }
+    }
+    fprintf(s, "\n.section .text\n");
+}
+
 void escrever_valor(FILE* s, TipoToken tipo) {
     if(tipo == T_pFLU) fprintf(s, "  bl _escrever_flu\n");
     else if(tipo == T_pCAR) fprintf(s, "  bl _escrever_car\n");
@@ -2282,49 +2381,111 @@ void escrever_valor(FILE* s, TipoToken tipo) {
 }
 
 void carregar_valor(FILE* s, Variavel* var) {
-    if(var->eh_ponteiro) fatal("[carregar_valor] erro interno: carregar_valor chamado para ponteiro");
-    else if(var->eh_array) fprintf(s, "  add x0, x29, %d\n", var->pos);
-    else {
-        switch(tam_tipo(var->tipo_base)) {
-            case 1: 
+    if(var->escopo == -1) { // variavel global
+        fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+        if(!var->eh_ponteiro && !var->eh_array) {
+            // carrega o valor da variavel global
+            switch(tam_tipo(var->tipo_base)) {
+                case 1: 
+                    fprintf(s, "  ldrb w0, [x0]\n"); 
+                    break;
+                case 4: 
+                    if(var->tipo_base == T_pFLU) 
+                        fprintf(s, "  ldr s0, [x0]\n");
+                    else 
+                        fprintf(s, "  ldr w0, [x0]\n");
+                    break;
+                case 8:
+                    if(var->tipo_base == T_pDOBRO) 
+                        fprintf(s, "  ldr d0, [x0]\n");
+                    else 
+                        fprintf(s, "  ldr x0, [x0]\n");
+                    break;
+            }
+        } else if(var->eh_array) {
+            // pra arrays globais, retorna o endereço
+            fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+        } else if(var->eh_ponteiro) {
+            // pra ponteiros globais, carrega o valor do ponteiro
+            fprintf(s, "  ldr x0, [x0]\n");
+        }
+    } else {
+        if(var->eh_ponteiro) fatal("[carregar_valor] erro interno: carregar_valor chamado para ponteiro");
+        else if(var->eh_array) fprintf(s, "  add x0, x29, %d\n", var->pos);
+        else {
+            switch(tam_tipo(var->tipo_base)) {
+                case 1: 
                 fprintf(s, "  ldrb w0, [x29, %d]\n", var->pos); 
-            break;
-            case 4: 
+                break;
+                case 4: 
                 if(var->tipo_base == T_pFLU) 
-                    fprintf(s, "  ldr s0, [x29, %d]\n", var->pos);
+                fprintf(s, "  ldr s0, [x29, %d]\n", var->pos);
                 else 
-                    fprintf(s, "  ldr w0, [x29, %d]\n", var->pos);
-            break;
-            case 8:
+                fprintf(s, "  ldr w0, [x29, %d]\n", var->pos);
+                break;
+                case 8:
                 if(var->tipo_base == T_pDOBRO) 
-                    fprintf(s, "  ldr d0, [x29, %d]\n", var->pos);
+                fprintf(s, "  ldr d0, [x29, %d]\n", var->pos);
                 else 
-                    fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-            break;
+                fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+                break;
+            }
         }
     }
 }
 
 void armazenar_valor(FILE* s, Variavel* var) {
-    if(var->eh_ponteiro) fprintf(s, "  str x0, [x29, %d]\n", var->pos);
-    else if(var->eh_array) fatal("[armazenar_valor] não é possível armazenar valor direto em array");
-    else {
-        switch(tam_tipo(var->tipo_base)) {
-            case 1: 
-                fprintf(s, "  strb w0, [x29, %d]\n", var->pos); 
-            break;
-            case 4:
-                if(var->tipo_base == T_pFLU) 
-                    fprintf(s, "  str s0, [x29, %d]\n", var->pos);
-                else 
-                    fprintf(s, "  str w0, [x29, %d]\n", var->pos);
-            break;
-            case 8:
-                if(var->tipo_base == T_pDOBRO) 
-                    fprintf(s, "  str d0, [x29, %d]\n", var->pos);
-                else 
-                    fprintf(s, "  str x0, [x29, %d]\n", var->pos);
-            break;
+    if(var->escopo == -1) { // variavel global
+        fprintf(s, "  ldr x1, = global_%s\n", var->nome);
+        
+        if(var->eh_ponteiro) {
+            // armazena o valor do ponteiro(x0) na variavel global
+            fprintf(s, "  str x0, [x1]\n");
+        } else if(var->eh_array) {
+            fatal("[armazenar_valor] não é possível armazenar valor direto em array global");
+        } else {
+            // armazena o valor na variavel global
+            switch(tam_tipo(var->tipo_base)) {
+                case 1: 
+                    fprintf(s, "  strb w0, [x1]\n"); 
+                    break;
+                case 4: 
+                    if(var->tipo_base == T_pFLU) 
+                        fprintf(s, "  str s0, [x1]\n");
+                    else 
+                        fprintf(s, "  str w0, [x1]\n");
+                    break;
+                case 8:
+                    if(var->tipo_base == T_pDOBRO) 
+                        fprintf(s, "  str d0, [x1]\n");
+                    else 
+                        fprintf(s, "  str x0, [x1]\n");
+                    break;
+            }
+        }
+    } else { // variavel local
+        if(var->eh_ponteiro) {
+            fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+        } else if(var->eh_array) {
+            fatal("[armazenar_valor] não é possível armazenar valor direto em array");
+        } else {
+            switch(tam_tipo(var->tipo_base)) {
+                case 1: 
+                    fprintf(s, "  strb w0, [x29, %d]\n", var->pos); 
+                    break;
+                case 4:
+                    if(var->tipo_base == T_pFLU) 
+                        fprintf(s, "  str s0, [x29, %d]\n", var->pos);
+                    else 
+                        fprintf(s, "  str w0, [x29, %d]\n", var->pos);
+                    break;
+                case 8:
+                    if(var->tipo_base == T_pDOBRO) 
+                        fprintf(s, "  str d0, [x29, %d]\n", var->pos);
+                    else 
+                        fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                    break;
+            }
         }
     }
 }
@@ -2458,7 +2619,6 @@ TipoToken fator(FILE* s, int escopo) {
         }
         // armazena o novo valor
         armazenar_valor(s, var);
-        
         // carrega denovo pra retornar o valor(pre fixado retorna o novo valor)
         carregar_valor(s, var);
         
@@ -2613,7 +2773,7 @@ TipoToken expressao(FILE* s, int escopo) {
     return tipo;
 }
 
-void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_final) {
+void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_final, int eh_global) {
     TipoToken tipo_base = L.tk.tipo;
     int eh_ponteiro = 0;
     int num_dims = 0;
@@ -2631,11 +2791,9 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
             long tam_array = 0;
             
             if(L.tk.tipo == T_INT) {
-                // caso 1: literal inteiro
                 tam_array = L.tk.valor_l;
                 proximoToken();
             } else if(L.tk.tipo == T_ID) { 
-                // caso 2: identificador(variavel constante)
                 char id_tam[32];
                 strcpy(id_tam, L.tk.lex);
                 
@@ -2669,97 +2827,149 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
         }
     }
     if(L.tk.tipo != T_ID) fatal("[declaracao_var] nome de variável esperado");
-
-    Funcao* f = &funcs[fn_cnt - 1];
-    if(f->var_conta >= MAX_VAR) fatal("[declaracao_var] excesso de variáveis");
-
-    Variavel* var = &f->vars[f->var_conta];
-    strcpy(var->nome, L.tk.lex);
-    var->tipo_base = tipo_base;
-    var->eh_ponteiro = eh_ponteiro;
-    var->eh_array = (num_dims > 0);
-    var->num_dims = num_dims;
-    var->eh_final = eh_final;
-    var->valor = 0;
-    memcpy(var->dims, dims, sizeof(dims));
     
-    int tam_elemento = tam_tipo(tipo_base);
-    int tam_total = tam_elemento;
-    
-    for(int i = 0; i < num_dims; i++) {
-        if(dims[i] > 0) {
-            tam_total *= dims[i];
+    char nome_var[32];
+    strcpy(nome_var, L.tk.lex); // salva o nome da variavel
+    proximoToken(); // consome o nome da variavel
+
+    if(eh_global) {
+        if(global_cnt >= MAX_VAR) fatal("[declaracao_var] excesso de variáveis globais");
+        Variavel* var = &globais[global_cnt++];
+        
+        strcpy(var->nome, nome_var);
+        var->tipo_base = tipo_base;
+        var->eh_ponteiro = eh_ponteiro;
+        var->eh_array = (num_dims > 0);
+        var->num_dims = num_dims;
+        var->eh_final = eh_final;
+        var->valor = 0; // valor padrão
+        memcpy(var->dims, dims, sizeof(dims));
+        var->escopo = -1;
+        var->eh_parametro = 0;
+        
+        int tam_elemento = tam_tipo(tipo_base);
+        int tam_total = tam_elemento;
+        for(int i = 0; i < num_dims; i++) {
+            if(dims[i] > 0) tam_total *= dims[i];
         }
-    }
-    if(eh_ponteiro) tam_total = 8;
-    
-    if(!eh_parametro) {
-        // pos negativo
-        *pos = *pos - tam_total;
-        *pos = *pos & ~15; // alinhamento
-        var->pos = *pos;
-    } else {
-        var->pos = *pos;
-    }
-    var->escopo = escopo;
-    var->eh_parametro = eh_parametro;
-    var->bytes = tam_total;
-    f->var_conta++;
-
-    proximoToken();
-
-    if(L.tk.tipo == T_IGUAL) {
-        proximoToken();
-        // caso: array de caracteres com texto literal "texto"
-        if(num_dims > 0 && tipo_base == T_pCAR && L.tk.tipo == T_TEX) {
-            const char* texto_valor = L.tk.lex;
-            int tam = strlen(texto_valor);
-            if(dims[0] > 0 && tam + 1 > dims[0]) {
-                fatal("[declaracao_var] texto muito longo pra o array");
-            }
-            for(int i = 0; i <= tam; i++) {
-                fprintf(s, "  mov w1, %d\n", texto_valor[i]);
-                fprintf(s, "  strb w1, [x29, %d]\n", var->pos + i);
-            }
+        if(eh_ponteiro) tam_total = 8;
+        var->bytes = tam_total;
+        
+        if(L.tk.tipo == T_IGUAL) {
             proximoToken();
-        } 
-        // caso: array com definição {1, 2, etc}
-        else if(num_dims > 0) {
-            excessao(T_CHAVE_ESQ);
-            int indices[MAX_DIMS] = {0};
-            verificar_matriz(s, var, escopo, indices, 0);
-            excessao(T_CHAVE_DIR);
-        } 
-        // caso: ponteiro recebendo texto literal car* p = "texto"
-        else if(eh_ponteiro && L.tk.tipo == T_TEX) {
-            int id_tex = add_tex(L.tk.lex);
-            fprintf(s, "  ldr x0, = %s\n", texs[id_tex].nome);
-            fprintf(s, "  str x0, [x29, %d]\n", var->pos);
-            proximoToken();
-        } 
-        // caso: ponteiro normal ou variavel normal
-        else {
-            Token token_valor = L.tk;
             
-            TipoToken tipo_exp = expressao(s, escopo);
-            if(eh_final) {
-                if(token_valor.tipo == T_INT) {
-                    var->valor = (int)token_valor.valor_l;
-                } else if(token_valor.tipo == T_CAR && token_valor.lex[0] != 0) {
-                    var->valor = (int)token_valor.lex[0];
+            if(num_dims > 0 && tipo_base == T_pCAR && L.tk.tipo == T_TEX) {
+                // array de caracteres com texto literal
+                const char* texto_valor = L.tk.lex;
+                int tam = strlen(texto_valor);
+                if(dims[0] > 0 && tam + 1 > dims[0]) {
+                    fatal("[declaracao_var] texto muito longo para o array");
                 }
-            }
-            if(eh_ponteiro) {
-                if(tipo_exp == T_pINT) {
-                    fprintf(s, "  sxtw x0, w0\n");
-                }
-                fprintf(s, "  str x0, [x29, %d]\n", var->pos); 
+                // guarda o texto como constante
+                int id_tex = add_tex(texto_valor);
+                var->valor = id_tex; // guarda o ID do texto
+                proximoToken();
+            } else if(num_dims > 0) {
+                fatal("[declaracao_var] inicialização de array global com {} não implementada");
+            } else if(eh_ponteiro && L.tk.tipo == T_TEX) {
+                // ponteiro para texto literal
+                int id_tex = add_tex(L.tk.lex);
+                var->valor = id_tex; // guarda o ID do texto
+                proximoToken();
             } else {
-                armazenar_valor(s, var);
+                // definição simples com constante
+                if(L.tk.tipo == T_INT) {
+                    var->valor = (int)L.tk.valor_l;
+                } else if(L.tk.tipo == T_CAR && L.tk.lex[0] != 0) {
+                    var->valor = (int)L.tk.lex[0];
+                } else if(L.tk.tipo == T_BYTE) {
+                    var->valor = (int)L.tk.valor_l;
+                } else {
+                    fatal("[declaracao_var] inicialização global deve ser constante");
+                }
+                proximoToken();
             }
         }
+    } else {
+        // codigo para variáveis locais
+        Funcao* f = &funcs[fn_cnt - 1];
+        if(f->var_conta >= MAX_VAR) fatal("[declaracao_var] excesso de variáveis");
+        Variavel* var = &f->vars[f->var_conta];
+        strcpy(var->nome, nome_var);
+        var->tipo_base = tipo_base;
+        var->eh_ponteiro = eh_ponteiro;
+        var->eh_array = (num_dims > 0);
+        var->num_dims = num_dims;
+        var->eh_final = eh_final;
+        var->valor = 0;
+        memcpy(var->dims, dims, sizeof(dims));
+        int tam_elemento = tam_tipo(tipo_base);
+        int tam_total = tam_elemento;
+        
+        for(int i = 0; i < num_dims; i++) {
+            if(dims[i] > 0) {
+                tam_total *= dims[i];
+            }
+        }
+        if(eh_ponteiro) tam_total = 8;
+        
+        if(!eh_parametro) {
+            *pos = *pos - tam_total;
+            *pos = *pos & ~15;
+            var->pos = *pos;
+        } else {
+            var->pos = *pos;
+        }
+        var->escopo = escopo;
+        var->eh_parametro = eh_parametro;
+        var->bytes = tam_total;
+        f->var_conta++;
+        
+        if(L.tk.tipo == T_IGUAL) {
+            proximoToken();
+            if(num_dims > 0 && tipo_base == T_pCAR && L.tk.tipo == T_TEX) {
+                const char* texto_valor = L.tk.lex;
+                int tam = strlen(texto_valor);
+                if(dims[0] > 0 && tam + 1 > dims[0]) {
+                    fatal("[declaracao_var] texto muito longo para o array");
+                }
+                for(int i = 0; i <= tam; i++) {
+                    fprintf(s, "  mov w1, %d\n", texto_valor[i]);
+                    fprintf(s, "  strb w1, [x29, %d]\n", var->pos + i);
+                }
+                proximoToken();
+            } else if(num_dims > 0) {
+                excessao(T_CHAVE_ESQ);
+                int indices[MAX_DIMS] = {0};
+                verificar_matriz(s, var, escopo, indices, 0);
+                excessao(T_CHAVE_DIR);
+            } else if(eh_ponteiro && L.tk.tipo == T_TEX) {
+                int id_tex = add_tex(L.tk.lex);
+                fprintf(s, "  ldr x0, = %s\n", texs[id_tex].nome);
+                fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                proximoToken();
+            } else {
+                Token token_valor = L.tk;
+                TipoToken tipo_exp = expressao(s, escopo);
+                if(eh_final) {
+                    if(token_valor.tipo == T_INT) {
+                        var->valor = (int)token_valor.valor_l;
+                    } else if(token_valor.tipo == T_CAR && token_valor.lex[0] != 0) {
+                        var->valor = (int)token_valor.lex[0];
+                    }
+                }
+                if(eh_ponteiro) {
+                    if(tipo_exp == T_pINT) {
+                        fprintf(s, "  sxtw x0, w0\n");
+                    }
+                    fprintf(s, "  str x0, [x29, %d]\n", var->pos); 
+                } else {
+                    armazenar_valor(s, var);
+                }
+            }
+        }
+        if(eh_parametro) *pos += 8;
     }
-    if(eh_parametro) *pos += 8;
 }
 
 int main(int argc, char** argv) {
@@ -2788,11 +2998,8 @@ int main(int argc, char** argv) {
         else if(strcmp(argv[i], "-sl") == 0) semLinkar = 1;
         else if(strcmp(argv[i], "-O1") == 0) otimizar1 = 1;
         else if(strcmp(argv[i], "-O2") == 0) otimizar2 = 1;
-        else if(strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+        else if(strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
             // proximo arg é o nome do arquivo de saida
-            snprintf(arquivoSaida, sizeof(arquivoSaida), "%s", argv[++i]);
-        } else if(strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
-            // compatibilidade com -s
             snprintf(arquivoSaida, sizeof(arquivoSaida), "%s", argv[++i]);
         } else if(argv[i][0] != '-') {
             // é um arquivo de entrada
@@ -2810,11 +3017,11 @@ int main(int argc, char** argv) {
         printf("fpb -O2 : otimização nivel 2, mais agressiva\n");
         printf("[compilação]:\n");
         printf("fpb exemplo.fpb : compila arquivo e gera binário\n");
-        printf("fpb exemplo.fpb -o saida : compila com nome personalizado\n");
-        printf("fpb exemplo.fpb -asm : mantém ASM intermediário\n");
+        printf("fpb exemplo.fpb -s saida : compila com nome personalizado\n");
+        printf("fpb exemplo.fpb -asm : mantem ASM intermediario\n");
         printf("fpb exemplo.fpb -sl : não linka o código\n");
         printf("fpb exemplo.fpb -O2 -asm -o programa : combina opções\n");
-        printf("\npara definir o diretorio das bibliotecas, modifique a variavel de ambiente \"$FPB_DIR\"\n");
+        printf("\npara definir o diretorio das bibliotecas.\nmodifique a variavel de ambiente \"$FPB_DIR\"\n");
         return 0;
     }
     if(modoVersao) {
@@ -2829,6 +3036,7 @@ int main(int argc, char** argv) {
         printf("max texs: %i\n", MAX_TEX);
         printf("max funcoes: %i\n", MAX_FN);
         printf("max dimensões: %i\n", MAX_DIMS);
+        printf("max macros: %i\n", MAX_MACROS);
         return 0;
     }
     // verificar se tem arquivo de entrada
@@ -2895,6 +3103,7 @@ int main(int argc, char** argv) {
     }
     gerar_consts(s);
     gerar_texs(s);
+    gerar_globais(s);
     fclose(s);
     // aplica otimizações
     if(otimizar1) otimizarO1(asm_s);

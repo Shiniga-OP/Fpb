@@ -1,8 +1,8 @@
 #incluir "biblis/impressao.asm";
 #global inicio();
+#global int teste = 1;
 
 vazio inicio() {
-    por(int x = 0; x < 10; x = x + 1) {
-        escrever(x);
-    }
+    teste = 5;
+    escrever(teste);
 }

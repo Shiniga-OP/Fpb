@@ -11,3 +11,5 @@ cp /storage/emulated/0/pacotes/fpb/$ARQ.fpb ./
 cp $ARQ.asm /storage/emulated/0/pacotes/fpb/
 cp f.sh /storage/emulated/0/pacotes/fpb/
 time ./$ARQ
+cp fpb /data/data/com.termux/files/usr/bin
+cp -rf biblis /data/data/com.termux/files/usr/bin

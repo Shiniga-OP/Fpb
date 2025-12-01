@@ -13,6 +13,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <unistd.h>
 
 #include "util/otimi1.h"
 #include "util/otimi2.h"
@@ -958,8 +959,8 @@ Macro* buscar_macro(const char* nome) {
     }
     return NULL;
 }
-
-void coletar_args(FILE* s, Funcao* f) {
+// [PROCESSAMENTO]:
+void processar_args(FILE* s, Funcao* f) {
     int int_reg_idc = 0;
     int fp_reg_idc = 0;
     int pilha_pos = 0;
@@ -1011,7 +1012,25 @@ void coletar_args(FILE* s, Funcao* f) {
         else break;
     }
 }
-// [PROCESSAMENTO]:
+
+char* processar_caminho() {
+    static char caminho[512] = "";
+    // tenta primeiro da variavel de ambiente FPB_DIR
+    char* amb_dir = getenv("FPB_DIR");
+    if(amb_dir != NULL && strlen(amb_dir) > 0) {
+        strncpy(caminho, amb_dir, sizeof(caminho) - 1);
+        caminho[sizeof(caminho) - 1] = '\0';
+        return caminho;
+    }
+    // senão, usa o diretorio atual
+    if(getcwd(caminho, sizeof(caminho)) != NULL) {
+        return caminho;
+    }
+    // ultimo: diretorio vazio
+    strcpy(caminho, "");
+    return caminho;
+}
+
 TipoToken processar_condicao(FILE* s, int escopo) {
     TipoToken tipo_final = T_pBOOL;
     int primeiro = 1;
@@ -1617,10 +1636,25 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         
         if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         
-        FILE* arquivo_incluir = fopen(caminho, "r");
+        FILE* arquivo_incluir = NULL;
+        
+        // tenta primeiro com o caminho relativo ao FPB_DIR
+        char* base_dir = processar_caminho();
+        if(strlen(base_dir) > 0) {
+            char caminho_completo[512];
+            snprintf(caminho_completo, sizeof(caminho_completo), 
+                    "%s/%s", base_dir, caminho);
+            arquivo_incluir = fopen(caminho_completo, "r");
+        }
+        // se não encontrou, tenta no diretorio atual
+        if(!arquivo_incluir) {
+            arquivo_incluir = fopen(caminho, "r");
+        }
         if(!arquivo_incluir) {
             char mensagem_erro[300];
-            snprintf(mensagem_erro, sizeof(mensagem_erro), "[verificar_stmt] não foi possível abrir: %s", caminho);
+            snprintf(mensagem_erro, sizeof(mensagem_erro), 
+                    "[verificar_stmt] não foi possível abrir: %s (FPB_DIR=%s)", 
+                    caminho, processar_caminho());
             fatal(mensagem_erro);
         }
         fprintf(s, "\n// inicio de %s\n", caminho);
@@ -1639,9 +1673,9 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         return;
     }
     if(L.tk.tipo == T_GLOBAL) {
-        proximoToken(); // consome 'global'
+        proximoToken(); // consome "global"
         
-        // Deve ser seguido por declaração de função
+        // deve ser seguido por declaração de função
         if(L.tk.tipo != T_pVAZIO && 
            L.tk.tipo != T_pINT && 
            L.tk.tipo != T_pFLU && 
@@ -1652,7 +1686,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
            L.tk.tipo != T_PONTEIRO) {
             fatal("[verificar_stmt] tipo de retorno esperado após 'global'");
         }
-        // Processa a função normalmente, mas marca como global
+        // processa a função normalmente, mas marca como global
         verificar_fn(s);
         return;
     }
@@ -1873,7 +1907,7 @@ void verificar_fn(FILE* s) {
     proximoToken();
 
     excessao(T_PAREN_ESQ);
-    coletar_args(s, &funcs[fn_cnt - 1]);
+    processar_args(s, &funcs[fn_cnt - 1]);
     excessao(T_PAREN_DIR);
 
     if(L.tk.tipo == T_PONTO_VIRGULA) {
@@ -2780,10 +2814,11 @@ int main(int argc, char** argv) {
         printf("fpb exemplo.fpb -asm : mantém ASM intermediário\n");
         printf("fpb exemplo.fpb -sl : não linka o código\n");
         printf("fpb exemplo.fpb -O2 -asm -o programa : combina opções\n");
+        printf("\npara definir o diretorio das bibliotecas, modifique a variavel de ambiente \"$FPB_DIR\"\n");
         return 0;
     }
     if(modoVersao) {
-        printf("[FOCA-DO ESTÚDIOS]\nFPB (Fácil Programação Baixo nivel) - v0.0.1 (alpha)\n");
+        printf("[FOCA-DO ESTÚDIOS]\nFPB (Fácil Programação Baixo nivel) - v0.0.1 (beta)\n");
         return 0;
     }
     if(modoConfig) {

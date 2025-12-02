@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 01/12/2025.
+* [ATUAL]: 02/12/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -699,6 +699,23 @@ TipoToken tratar_id(FILE* s, int escopo) {
         }
     }
     proximoToken();
+    
+    if(var->escopo == -1) { // variavel global
+        if(var->eh_array && var->tipo_base == T_pCAR) {
+            // array de caracteres global
+            fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+            return T_PONTEIRO; // retorna como texto
+        } else if(var->eh_ponteiro && var->tipo_base == T_pCAR) {
+            // ponteiro pra caractere global
+            fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+            fprintf(s, "  ldr x0, [x0]\n"); // carrega o ponteiro
+            return T_PONTEIRO;
+        } else {
+            // outras variaveis globais
+            carregar_valor(s, var);
+            return var->tipo_base;
+        }
+    }
     if(L.tk.tipo == T_MAIS_MAIS || L.tk.tipo == T_MENOS_MENOS) {
         TipoToken op = L.tk.tipo;
         proximoToken();
@@ -776,9 +793,12 @@ TipoToken tratar_id(FILE* s, int escopo) {
                 fprintf(s, "  add w0, w0, w1\n");
             }
             // carrega o valor
-            if(var->eh_parametro) fprintf(s, "  ldr x2, [x29, %d]\n", var->pos);
-            else fprintf(s, "  add x2, x29, %d\n", var->pos);
-            
+            if(var->escopo == -1) {
+                fprintf(s, "  ldr x2, = global_%s\n", var->nome);
+            } else {
+                if(var->eh_parametro) fprintf(s, "  ldr x2, [x29, %d]\n", var->pos);
+                else fprintf(s, "  add x2, x29, %d\n", var->pos);
+            }
             fprintf(s, "  add x2, x2, x0\n"); // adiciona pos calculado
             
             // carrega o valor baseado no tipo
@@ -947,7 +967,7 @@ TipoToken tratar_byte(FILE* s) {
 }
 // [BUSCA]:
 Variavel* buscar_var(const char* nome, int escopo) {
-    // Primeiro procurar em variáveis locais (como antes)
+    // primeiro procura em variaveis locais
     if(fn_cnt > 0) {
         Funcao* f = &funcs[fn_cnt - 1];
         for(int i = f->var_conta - 1; i >= 0; i--) {
@@ -956,14 +976,12 @@ Variavel* buscar_var(const char* nome, int escopo) {
             }
         }
     }
-    
-    // Depois procurar em variáveis globais
+    // depois procura em variaveis globais
     for(int i = 0; i < global_cnt; i++) {
         if(strcmp(globais[i].nome, nome) == 0) {
             return &globais[i];
         }
     }
-    
     return NULL;
 }
 
@@ -1755,27 +1773,27 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             // incrementa ou decrementa
             if(op == T_MAIS_MAIS) {
                 if(var->tipo_base == T_pFLU) {
-                    fprintf(s, "  fmov s1, #1.0\n");
+                    fprintf(s, "  fmov s1, 1.0\n");
                     fprintf(s, "  fadd s0, s0, s1\n");
                 } else if(var->tipo_base == T_pDOBRO) {
-                    fprintf(s, "  fmov d1, #1.0\n");
+                    fprintf(s, "  fmov d1, 1.0\n");
                     fprintf(s, "  fadd d0, d0, d1\n");
                 } else if(var->tipo_base == T_pLONGO) {
-                    fprintf(s, "  add x0, x0, #1\n");
+                    fprintf(s, "  add x0, x0, 1\n");
                 } else {
-                    fprintf(s, "  add w0, w0, #1\n");
+                    fprintf(s, "  add w0, w0, 1\n");
                 }
             } else { // T_MENOS_MENOS
                 if(var->tipo_base == T_pFLU) {
-                    fprintf(s, "  fmov s1, #1.0\n");
+                    fprintf(s, "  fmov s1, 1.0\n");
                     fprintf(s, "  fsub s0, s0, s1\n");
                 } else if(var->tipo_base == T_pDOBRO) {
-                    fprintf(s, "  fmov d1, #1.0\n");
+                    fprintf(s, "  fmov d1, 1.0\n");
                     fprintf(s, "  fsub d0, d0, d1\n");
                 } else if(var->tipo_base == T_pLONGO) {
-                    fprintf(s, "  sub x0, x0, #1\n");
+                    fprintf(s, "  sub x0, x0, 1\n");
                 } else {
-                    fprintf(s, "  sub w0, w0, #1\n");
+                    fprintf(s, "  sub w0, w0, 1\n");
                 }
             }
             // armazena de volta
@@ -1807,8 +1825,12 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                     fatal(msg);
                 }
                 // se for parametro, carrega o endereço base da pilha(é um ponteiro)
-                if(var->eh_parametro) fprintf(s, "  ldr x2, [x29, %d]\n", var->pos); // carrega o endereço base do array
-                else fprintf(s, "  add x2, x29, %d\n", var->pos); // endereço base do array(local)
+                if(var->escopo == -1) {
+                    fprintf(s, "  ldr x2, = global_%s\n", var->nome);
+                } else {
+                    if(var->eh_parametro) fprintf(s, "  ldr x2, [x29, %d]\n", var->pos); // carrega o endereço base do array
+                    else fprintf(s, "  add x2, x29, %d\n", var->pos); // endereço base do array(local)
+                }
                 // calcula o pos: indice * tam_elemento
                 int tam_elemento = tam_tipo(var->tipo_base);
                 if(tam_elemento == 1) {
@@ -1840,8 +1862,13 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                         Variavel* var = buscar_var(L.tk.lex, escopo);
                         if(var && var->eh_ponteiro) {
                             if(var->tipo_base == T_pCAR) {
-                                fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-                                escrever_valor(s, T_TEX); // Escrever como string
+                                if(var->escopo == -1) { // global    
+                                    fprintf(s, "  ldr x0, = global_%s\n", var->nome);    
+                                    fprintf(s, "  ldr x0, [x0]\n"); // carrega o ponteiro    
+                                } else { // local    
+                                    fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+                                }    
+                                escrever_valor(s, T_TEX); // escrever como texto
                             } else {
                                 fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
                                 // carrega o valor apontado baseado no tipo base
@@ -1860,8 +1887,12 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                             }
                             proximoToken();
                         } else if(var && var->eh_array && var->tipo_base == T_pCAR) {
-                            if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-                            else fprintf(s, "  add x0, x29, %d\n", var->pos);
+                            if(var->escopo == -1) {
+                                fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+                            } else {
+                                if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+                                else fprintf(s, "  add x0, x29, %d\n", var->pos);
+                            }
                             escrever_valor(s, T_TEX);
                             proximoToken();
                         } else {
@@ -2381,10 +2412,15 @@ void escrever_valor(FILE* s, TipoToken tipo) {
 }
 
 void carregar_valor(FILE* s, Variavel* var) {
-    if(var->escopo == -1) { // variavel global
+    if(var->escopo == -1) { // variável global
         fprintf(s, "  ldr x0, = global_%s\n", var->nome);
-        if(!var->eh_ponteiro && !var->eh_array) {
-            // carrega o valor da variavel global
+        
+        if(var->eh_ponteiro) {
+            // pra ponteiros globais, carrega o valor do ponteiro
+            fprintf(s, "  ldr x0, [x0]\n");
+        } else if(var->eh_array) {}
+        else {
+            // pra variaveis simples globais, carrega o valor
             switch(tam_tipo(var->tipo_base)) {
                 case 1: 
                     fprintf(s, "  ldrb w0, [x0]\n"); 
@@ -2402,12 +2438,6 @@ void carregar_valor(FILE* s, Variavel* var) {
                         fprintf(s, "  ldr x0, [x0]\n");
                     break;
             }
-        } else if(var->eh_array) {
-            // pra arrays globais, retorna o endereço
-            fprintf(s, "  ldr x0, = global_%s\n", var->nome);
-        } else if(var->eh_ponteiro) {
-            // pra ponteiros globais, carrega o valor do ponteiro
-            fprintf(s, "  ldr x0, [x0]\n");
         }
     } else {
         if(var->eh_ponteiro) fatal("[carregar_valor] erro interno: carregar_valor chamado para ponteiro");

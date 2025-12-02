@@ -1,8 +1,13 @@
 #incluir "biblis/impressao.asm";
+#incluir "biblis/texs.asm";
+
 #global inicio();
-#global int teste = 1;
+#global car[] teste = "teste";
+#global car* teste2 = "teste";
+int texcmp(car* p1, car* p2);
 
 vazio inicio() {
-    teste = 5;
-    escrever(teste);
+    se(texcmp(teste, teste2) == 1) {
+        escrever(teste);
+    }
 }

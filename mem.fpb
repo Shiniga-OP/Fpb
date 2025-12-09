@@ -1,13 +1,9 @@
 #incluir "biblis/impressao.asm";
-#incluir "biblis/texs.asm";
 
 #global inicio();
-#global car[] teste = "teste";
-#global car* teste2 = "teste";
-int texcmp(car* p1, car* p2);
+#global final flu teste = 0.1f;
 
 vazio inicio() {
-    se(texcmp(teste, teste2) == 1) {
-        escrever(teste);
-    }
+    teste = 0.2f;
+    escrever(teste);
 }

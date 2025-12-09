@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 02/12/2025.
+* [ATUAL]: 09/12/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,7 +88,8 @@ typedef struct {
     int bytes;
     int pos;
     int escopo;
-    int valor;
+    int valor; // inteiros
+    double valor_f; // flutuantes
     char reg[8];
 } Variavel;
 
@@ -1268,23 +1269,39 @@ int processar_variaveis_tam(int escopo) {
 // [VERIFICAÇÃO]:
 void verificar_global(FILE* s) {
     excessao(T_GLOBAL);
-    if(eh_tipo(L.tk.tipo)) {
-        // verifica se é função: tem parenteses apos o nome
-        char nome[32];
-        strcpy(nome, L.tk.lex);
-        // processa declaração
+    
+    // Verifica se é um tipo (variável global) ou identificador (função global)
+    if(eh_tipo(L.tk.tipo) || L.tk.tipo == T_FINAL || L.tk.tipo == T_pBYTE) {
+        // É uma declaração de variável global (com ou sem 'final')
+        // Usamos um escopo especial (-1) para variáveis globais
         int pos = 0;
-        declaracao_var(s, &pos, -1, 0, 0, 1);
-        if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
+        
+        // Processa como statement, mas com escopo -1 (global)
+        // Salva o escopo atual
+        int escopo_atual = escopo_global;
+        escopo_global = -1; // Marca como processamento global
+        
+        // Chama verificar_stmt que sabe lidar com declarações
+        verificar_stmt(s, &pos, -1);
+        
+        // Restaura escopo
+        escopo_global = escopo_atual;
+        
+        // Nota: verificar_stmt já consome o ponto e vírgula
     } else {
+        // É uma função global
         if(L.tk.tipo != T_ID) fatal("[verificar_global] nome de função esperado");
+        
         char fnome[32];
         strcpy(fnome, L.tk.lex);
         proximoToken();
+        
         excessao(T_PAREN_ESQ);
         excessao(T_PAREN_DIR);
+        
         if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         
+        // Marca a função como global
         fprintf(s, ".global %s\n", fnome);
         for(int i = 0; i < fn_cnt; i++) {
             if(strcmp(funcs[i].nome, fnome) == 0) {
@@ -1748,7 +1765,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         }
     }
     if(eh_tipo || eh_final) {
-        declaracao_var(s, pos, escopo, 0, eh_final, 0);
+        declaracao_var(s, pos, escopo, 0, eh_final, (escopo == -1) ? 1 : 0);
         if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         return;
     }
@@ -2332,70 +2349,127 @@ void gerar_convert(FILE* s, TipoToken tipo_origem, TipoToken tipo_destino) {
 
 void gerar_globais(FILE* s) {
     if(global_cnt == 0) return;
-    
-    fprintf(s, "\n.section .data\n");
-    fprintf(s, ".align 3\n");
-    
+    // primeiro, gerar constantes (.rodata)
+    int tem_constantes = 0;
     for(int i = 0; i < global_cnt; i++) {
-        Variavel* var = &globais[i];
-        fprintf(s, "global_%s:\n", var->nome);
-        
-        if(var->eh_array) {
-            int total_bytes = var->bytes;
-            if(var->tipo_base == T_pCAR && var->valor >= 0) {
-                // array de caracteres definindo com texto
-                // var->valor tem o ID do texto
-                const char* texto_valor = texs[var->valor].valor;
-                fprintf(s, "  .asciz \"%s\"\n", texto_valor);
-                // lreenche o resto com zeros se precisar
-                int tam_texto = strlen(texto_valor) + 1; // +1 pra o \0
-                if(tam_texto < total_bytes) {
-                    fprintf(s, "  .space %d\n", total_bytes - tam_texto);
+        if(globais[i].eh_final) {
+            tem_constantes = 1;
+            break;
+        }
+    }
+    if(tem_constantes) {
+        fprintf(s, "\n.section .rodata\n");
+        fprintf(s, ".align 3\n");
+        for(int i = 0; i < global_cnt; i++) {
+            Variavel* var = &globais[i];
+            if(!var->eh_final) continue;
+            
+            fprintf(s, "global_%s:\n", var->nome);
+            
+            if(var->eh_array) {
+                int total_bytes = var->bytes;
+                if(var->tipo_base == T_pCAR && var->valor >= 0) {
+                    // array de caracteres definindo com texto
+                    const char* texto_valor = texs[var->valor].valor;
+                    fprintf(s, "  .asciz \"%s\"\n", texto_valor);
+                    int tam_texto = strlen(texto_valor) + 1;
+                    if(tam_texto < total_bytes) {
+                        fprintf(s, "  .space %d\n", total_bytes - tam_texto);
+                    }
+                } else {
+                    fprintf(s, "  .space %d\n", total_bytes);
+                }
+            } else if(var->eh_ponteiro) {
+                if(var->valor >= 0) {
+                    // ponteiro constante para texto
+                    fprintf(s, "  .quad %s\n", texs[var->valor].nome);
+                } else {
+                    fprintf(s, "  .quad 0\n");
                 }
             } else {
-                fprintf(s, "  .space %d\n", total_bytes);
-            }
-        } else if(var->eh_ponteiro) {
-            if(var->valor >= 0) {
-                // ponteiro definido com endereço de texto
-                fprintf(s, "  .quad %s\n", texs[var->valor].nome);
-            } else {
-                fprintf(s, "  .quad 0\n"); // ponteiros são 8 bytes
-            }
-        } else {
-            switch(var->tipo_base) {
-                case T_pBYTE:
-                case T_pCAR:
-                case T_pBOOL:
-                    if(var->valor != 0) {
+                switch(var->tipo_base) {
+                    case T_pBYTE:
+                    case T_pCAR:
+                    case T_pBOOL:
                         fprintf(s, "  .byte %d\n", var->valor);
-                    } else {
-                        fprintf(s, "  .byte 0\n");
-                    }
-                    break;
-                case T_pINT:
-                    if(var->valor != 0) {
+                        break;
+                    case T_pINT:
                         fprintf(s, "  .word %d\n", var->valor);
-                    } else {
-                        fprintf(s, "  .word 0\n");
-                    }
-                    break;
-                case T_pFLU:
-                    // pra flutuante, inicializa com 0.0
-                    fprintf(s, "  .float 0.0\n");
-                    break;
-                case T_pDOBRO:
-                    fprintf(s, "  .double 0.0\n");
-                    break;
-                case T_pLONGO:
-                    if(var->valor != 0) {
+                        break;
+                    case T_pFLU:
+                        fprintf(s, "  .float %f\n", (float)var->valor_f);
+                        break;
+                    case T_pDOBRO:
+                        fprintf(s, "  .double %f\n", var->valor_f);
+                        break;
+                    case T_pLONGO:
                         fprintf(s, "  .quad %ld\n", (long)var->valor);
-                    } else {
-                        fprintf(s, "  .quad 0\n");
+                        break;
+                    default:
+                        fprintf(s, "  .space %d\n", var->bytes);
+                }
+            }
+        }
+    }
+    // depois, gerar variaveis mutaveis(.data)
+    int tem_variaveis = 0;
+    for(int i = 0; i < global_cnt; i++) {
+        if(!globais[i].eh_final) {
+            tem_variaveis = 1;
+            break;
+        }
+    }
+    if(tem_variaveis) {
+        fprintf(s, "\n.section .data\n");
+        fprintf(s, ".align 3\n");
+        
+        for(int i = 0; i < global_cnt; i++) {
+            Variavel* var = &globais[i];
+            if(var->eh_final) continue;
+            
+            fprintf(s, "global_%s:\n", var->nome);
+            
+            if(var->eh_array) {
+                int total_bytes = var->bytes;
+                if(var->tipo_base == T_pCAR && var->valor >= 0) {
+                    const char* texto_valor = texs[var->valor].valor;
+                    fprintf(s, "  .asciz \"%s\"\n", texto_valor);
+                    int tam_texto = strlen(texto_valor) + 1;
+                    if(tam_texto < total_bytes) {
+                        fprintf(s, "  .space %d\n", total_bytes - tam_texto);
                     }
-                    break;
-                default:
-                    fprintf(s, "  .space %d\n", var->bytes);
+                } else {
+                    fprintf(s, "  .space %d\n", total_bytes);
+                }
+            } else if(var->eh_ponteiro) {
+                if(var->valor >= 0) {
+                    fprintf(s, "  .quad %s\n", texs[var->valor].nome);
+                } else {
+                    fprintf(s, "  .quad 0\n");
+                }
+            } else {
+                // variaveis mutaveis são iniciadas com 0
+                switch(var->tipo_base) {
+                    case T_pBYTE:
+                    case T_pCAR:
+                    case T_pBOOL:
+                        fprintf(s, "  .byte 0\n");
+                        break;
+                    case T_pINT:
+                        fprintf(s, "  .word 0\n");
+                        break;
+                    case T_pFLU:
+                        fprintf(s, "  .float 0.0\n");
+                        break;
+                    case T_pDOBRO:
+                        fprintf(s, "  .double 0.0\n");
+                        break;
+                    case T_pLONGO:
+                        fprintf(s, "  .quad 0\n");
+                        break;
+                    default:
+                        fprintf(s, "  .space %d\n", var->bytes);
+                }
             }
         }
     }
@@ -2907,21 +2981,34 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 var->valor = id_tex; // guarda o ID do texto
                 proximoToken();
             } else {
-                // definição simples com constante
+                // inicia simples com constante
                 if(L.tk.tipo == T_INT) {
                     var->valor = (int)L.tk.valor_l;
+                    var->valor_f = (double)L.tk.valor_l;
+                    proximoToken();
                 } else if(L.tk.tipo == T_CAR && L.tk.lex[0] != 0) {
                     var->valor = (int)L.tk.lex[0];
+                    var->valor_f = (double)L.tk.lex[0];
+                    proximoToken();
                 } else if(L.tk.tipo == T_BYTE) {
                     var->valor = (int)L.tk.valor_l;
+                    var->valor_f = (double)L.tk.valor_l;
+                    proximoToken();
+                } else if(L.tk.tipo == T_FLU) {
+                    var->valor_f = L.tk.valor_d;
+                    var->valor = 0; // não usa pra flutuantes
+                    proximoToken();
+                } else if(L.tk.tipo == T_DOBRO) {
+                    var->valor_f = L.tk.valor_d;
+                    var->valor = 0;
+                    proximoToken();
                 } else {
                     fatal("[declaracao_var] inicialização global deve ser constante");
                 }
-                proximoToken();
             }
         }
     } else {
-        // codigo para variáveis locais
+        // pra variáveis locais
         Funcao* f = &funcs[fn_cnt - 1];
         if(f->var_conta >= MAX_VAR) fatal("[declaracao_var] excesso de variáveis");
         Variavel* var = &f->vars[f->var_conta];

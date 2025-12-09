@@ -9,7 +9,7 @@ para começar, um código padrão de "Olá mundo":
 #global inicio();
 
 vazio inicio() {
-      escrever("Olá mundo\n");
+    escrever("Olá mundo\n");
 }
 [código]
 
@@ -84,13 +84,13 @@ arrays não podem ser reatribuidos diretamente nem serem retornados de funções
 #global inicio();
 
 vazio modificar(int[] arr) {
-       arr[0] = 1;
+    arr[0] = 1;
 }
 
 vazio inicio() {
-        int[] arr = { 5 };
-        modificar(arr);
-        escrever(arr[0]); // vai imprimir 1
+    int[] arr = { 5 };
+    modificar(arr);
+    escrever(arr[0]); // vai imprimir 1
 }
 [código]
 
@@ -124,9 +124,15 @@ ponteiros também podem ter seus endereços mudados manualmente, mesmo que em su
 int x = 10;
 int* p;
 @p = @x;
+
+// ou:
+
+@p = 0x000000;
 [código]
 
 assim você estará alterando manualmente o endereço do ponteiro declarado.
+
+o operador "*" pode somente ser usado para multiplicações e para declaração de ponteiros. Nunca em uma expressão complexa.
 
 ## LOOPS ##
 
@@ -136,7 +142,7 @@ você pode criar loops de 3 formas:
 
 [código]
 vazio loop() {
-      loop();
+    loop();
 }
 [código]
 
@@ -145,8 +151,8 @@ vazio loop() {
 [código]
 int x = 0;
 enq(x > 10) {
-       escrever(x, "\n");
-       x++;
+    escrever(x, "\n");
+    x++;
 }
 [código]
 
@@ -154,6 +160,86 @@ enq(x > 10) {
 
 [código]
 por(int i = 0; i < 10; i++) {
-        escrever(i, "\n");
+    escrever(i, "\n");
 }
 [código]
+
+## CONVERSORES ##
+
+para converter código, você pode utilizar "(tipo)" antes da atribuição ou passagem.
+
+exemplo:
+
+[código]
+escrever((car)45);
+[código]
+
+será imprimido um caractere convertido para hexadecimal.
+
+ponteiros não são tipos de conversão.
+
+## RETORNOS ##
+
+você pode usar:
+
+[código]
+retorne
+[código]
+
+## OPERADORES ##
+
+os matematicos são:
+
+"+" soma.
+"-" subtrai.
+"*" multiplica.
+"/" divide.
+"%" captura o resto da porcentagem.
+"<<" multiplica pela potência de 2.
+">>" divide pela potência de 2.
+"&" captura o resto da porcentagem pela potência de 2
+"|" se qualquer um dos dois bits for 1, adiciona o bit 1 ao resultado final.
+"()" altera a ordem de precêdencia.
+
+os condicionais são:
+
+"==" se for igual.
+"!=" se for diferente.
+">=" se for maior ou igual.
+"<=" se for menor ou igual.
+">" se for somente maior.
+"<" se for somente menor.
+"&&" somente se for também verdadeiro.
+"||" se algum dos dois for verdadeiro.
+
+os de memória são:
+
+"@" aponta o endereço na memória (não funciona com valores não armazenados).
+
+## MACROS ##
+
+você pode usar #def para definir macros númericos de inteiro ou longo.
+
+[código]
+#def INTEIRO 172834;
+[código]
+
+## BIBLIOTECAS ##
+
+importe bibliotecas padrão da FPB com: "#include caminho;".
+
+que não dependem de chamadas do sistema:
+
+"biblis/texs.asm": contém:
+
+// retorna 1 se os textos forem verdadeiros e 0 senão.
+int texcmp(car* p1, car* p2);
+
+// substitui um caractere de um array por outro
+vazio subscar(car[] arr, car cAlvo, car novoC);
+
+// retorna o tamanho em bytes de um texto
+int textam(car* p);
+
+// retorna 1 se o texto tem o caractere e 0 senão
+int texcar(car* p, car c);

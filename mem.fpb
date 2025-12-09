@@ -1,9 +1,9 @@
 #incluir "biblis/impressao.asm";
+#incluir "biblis/texs.asm";
 
 #global inicio();
-#global final flu teste = 0.1f;
 
 vazio inicio() {
-    teste = 0.2f;
-    escrever(teste);
+    escrever(1 | 0);
+    escrever(1 | 2);
 }

@@ -18,15 +18,15 @@
 #include "util/otimi1.h"
 #include "util/otimi2.h"
 
-#define MAX_TOK 8192 // maximo de tolens
-#define MAX_CODIGO 8192 // maximo de codhgk
-#define MAX_FN 252 // maximo de funções
-#define MAX_VAR 252 // maximo de variaveis
-#define MAX_CONST 252 // maxmio de constantes
+#define MAX_TOK 18192 // maximo de tolens
+#define MAX_CODIGO 18192 // maximo de codhgk
+#define MAX_FN 552 // maximo de funções
+#define MAX_VAR 552 // maximo de variaveis
+#define MAX_CONST 552 // maxmio de constantes
 #define MAX_PARAMS 8 // maximo de parametros
-#define MAX_TEX 252 // mqximo de textos
+#define MAX_TEX 552 // mqximo de textos
 #define MAX_DIMS 4  // máximo de dimensões para matrizes
-#define MAX_MACROS 256 // maximo de macros
+#define MAX_MACROS 556 // maximo de macros
 
 typedef enum {
     // mutação:
@@ -247,9 +247,10 @@ const char* token_str(TipoToken t) {
         case T_ESPACO: return "#espaco";
         case T_DEF: return "#def";
         case T_FIM: return "fim";
-        case T_TAMBEM: return "&";
         case T_MAIOR_MAIOR: return ">>";
         case T_MENOR_MENOR: return "<<";
+        case T_OU: return "|";
+        case T_TAMBEM: return "&";
         default: return "desconhecido";
     }
 }
@@ -405,8 +406,8 @@ void proximoToken() {
         else if(strcmp(L.tk.lex, "se") == 0) L.tk.tipo = T_SE;
         else if(strcmp(L.tk.lex, "senao") == 0) L.tk.tipo = T_SENAO;
         else if(strcmp(L.tk.lex, "por") == 0) L.tk.tipo = T_POR;
-        else if(strcmp(L.tk.lex, "enq") == 0) L.tk.tipo = T_ENQ;
-        else if(strcmp(L.tk.lex, "retorne") == 0) L.tk.tipo = T_RETORNAR;
+        else if(strcmp(L.tk.lex, "enq") == 0 || strcmp(L.tk.lex, "enquanto") == 0) L.tk.tipo = T_ENQ;
+        else if(strcmp(L.tk.lex, "retorne") == 0 || strcmp(L.tk.lex, "retornar") == 0) L.tk.tipo = T_RETORNAR;
         else if(strcmp(L.tk.lex, "final") == 0) L.tk.tipo = T_FINAL;
         else if(strcmp(L.tk.lex, "->") == 0) L.tk.tipo = T_LAMBDA;
         else L.tk.tipo = T_ID;
@@ -1269,27 +1270,20 @@ int processar_variaveis_tam(int escopo) {
 // [VERIFICAÇÃO]:
 void verificar_global(FILE* s) {
     excessao(T_GLOBAL);
-    
-    // Verifica se é um tipo (variável global) ou identificador (função global)
+    // verifica se é um tipo(variavel global) ou identificador(função global)
     if(eh_tipo(L.tk.tipo) || L.tk.tipo == T_FINAL || L.tk.tipo == T_pBYTE) {
-        // É uma declaração de variável global (com ou sem 'final')
-        // Usamos um escopo especial (-1) para variáveis globais
+        // se é uma declaração de variavel global
+        // escopo especial (-1) pra variaveis globais
         int pos = 0;
-        
-        // Processa como statement, mas com escopo -1 (global)
         // Salva o escopo atual
         int escopo_atual = escopo_global;
-        escopo_global = -1; // Marca como processamento global
+        escopo_global = -1; // marca como processamento global
         
-        // Chama verificar_stmt que sabe lidar com declarações
         verificar_stmt(s, &pos, -1);
-        
-        // Restaura escopo
+        // restaura escopo
         escopo_global = escopo_atual;
-        
-        // Nota: verificar_stmt já consome o ponto e vírgula
     } else {
-        // É uma função global
+        // se é uma função global
         if(L.tk.tipo != T_ID) fatal("[verificar_global] nome de função esperado");
         
         char fnome[32];
@@ -1301,7 +1295,7 @@ void verificar_global(FILE* s) {
         
         if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         
-        // Marca a função como global
+        // marca a função como global
         fprintf(s, ".global %s\n", fnome);
         for(int i = 0; i < fn_cnt; i++) {
             if(strcmp(funcs[i].nome, fnome) == 0) {
@@ -1327,7 +1321,7 @@ void verificar_def(void) {
     long valor = L.tk.valor_l;
     proximoToken(); // consome o valor
     
-    excessao(T_PONTO_VIRGULA); // consome o ;
+    if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA); // consome o ;
     
     if(macro_cnt >= MAX_MACROS) fatal("[verificar_def] excesso de macros");
     
@@ -1610,27 +1604,44 @@ void verificar_por(FILE* s, int escopo) {
 void verificar_enq(FILE* s, int escopo) {
     excessao(T_ENQ);
     excessao(T_PAREN_ESQ);
-    
+
+    int novo_escopo = ++escopo_global;
     int rotulo_inicio = escopo_global++;
-    int rotulo_fim = escopo_global++;
-    
+    int rotulo_fim    = escopo_global++;
+
     fprintf(s, ".B%d:\n", rotulo_inicio);
-    TipoToken tipo_cond = expressao(s, escopo);
-    
-    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) fatal("[verificar_enq] condição do loop deve ser inteiro ou booleano");
-    
+
+    TipoToken tipo_cond = processar_condicao(s, novo_escopo);
+
+    // tem que ser bool/int, senão converte float/double pra bool
+    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
+        if(tipo_cond == T_pFLU) {
+            fprintf(s, "  fcmp s0, #0.0\n");
+            fprintf(s, "  cset w0, ne\n");
+        } else if(tipo_cond == T_pDOBRO) {
+            fprintf(s, "  fcmp d0, #0.0\n");
+            fprintf(s, "  cset w0, ne\n");
+        } else {
+            fatal("[verificar_enq] condição inválida");
+        }
+    }
+    excessao(T_PAREN_DIR);
+
     fprintf(s, "  cmp w0, 0\n");
     fprintf(s, "  beq .B%d\n", rotulo_fim);
     
-    excessao(T_PAREN_DIR);
-    
     if(L.tk.tipo == T_CHAVE_ESQ) {
         proximoToken();
-        while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
+        while(L.tk.tipo != T_CHAVE_DIR) {
+            verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
+        }
         excessao(T_CHAVE_DIR);
-    } else verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, escopo + 1);
-    
+    } else {
+        verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
+    }
+    // volta para o começo
     fprintf(s, "  b .B%d\n", rotulo_inicio);
+
     fprintf(s, ".B%d:\n", rotulo_fim);
 }
 
@@ -2179,6 +2190,24 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
                 fprintf(s, "  lsr x0, x1, x0\n");
             }
             else fprintf(s, "  lsr w0, w1, w0\n");
+        break;
+        case T_TAMBEM:
+            if(tipo == T_pFLU || tipo == T_pDOBRO) {
+                fatal("[gerar_operacao] operador & não suportado pra tipos flutuante");
+            } else if(tipo == T_pLONGO || tipo == T_PONTEIRO) {
+                fprintf(s, "  and x0, x1, x0\n");
+            } else {
+                fprintf(s, "  and w0, w1, w0\n");
+            }
+        break;
+        case T_OU:
+            if(tipo == T_pFLU || tipo == T_pDOBRO) {
+                fatal("[gerar_operacao] operador | não suportado pra tipos flutuante");
+            } else if(tipo == T_pLONGO || tipo == T_PONTEIRO) {
+                fprintf(s, "  orr x0, x1, x0\n");
+            } else {
+                fprintf(s, "  orr w0, w1, w0\n");
+            }
         break;
         default: fatal("[gerar_operacao] operador inválido");
     }
@@ -2758,7 +2787,9 @@ TipoToken fator(FILE* s, int escopo) {
 TipoToken termo(FILE* s, int escopo) {
     TipoToken tipo = fator(s, escopo);
     
-    while(L.tk.tipo == T_VEZES || L.tk.tipo == T_DIV || L.tk.tipo == T_PORCEN || L.tk.tipo == T_MENOR_MENOR || L.tk.tipo == T_MAIOR_MAIOR) {
+    while(L.tk.tipo == T_VEZES || L.tk.tipo == T_DIV ||
+    L.tk.tipo == T_PORCEN || L.tk.tipo == T_MENOR_MENOR ||
+    L.tk.tipo == T_MAIOR_MAIOR || L.tk.tipo == T_TAMBEM) {
         TipoToken op = L.tk.tipo;
         proximoToken();
         
@@ -2815,7 +2846,9 @@ TipoToken expressao(FILE* s, int escopo) {
     }
     TipoToken tipo = termo(s, escopo);
     
-    while(L.tk.tipo == T_MAIS || L.tk.tipo == T_MENOS || L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU || L.tk.tipo == T_MENOR_MENOR) {
+    while(L.tk.tipo == T_MAIS || L.tk.tipo == T_MENOS ||
+    L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU ||
+    L.tk.tipo == T_MENOR_MENOR || L.tk.tipo == T_OU) {
         TipoToken op = L.tk.tipo;
         proximoToken();
        // salva o primeiro resultado:

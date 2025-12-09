@@ -10,6 +10,8 @@ suportados
 
 // macro:
 #def TAM 14;
+
+// variaveis globais:
 #global inicio();
 #global int varGlobal = 10;
 
@@ -108,6 +110,9 @@ vazio testeOperacoes() {
     escrever("x: ", x, " * y: ", y, ", resultado: ", x * y, "\n");
     escrever("10 << 2, resultado: ", 10 << 2, "\n");
     escrever("10 >> 2, resultado: ", 10 >> 2, "\n");
+    escrever("124 & 15, resultado: ", 124 & 15, "\n");
+    escrever("124 & 0xF, resultado: ", 124 & 0xF, "\n");
+    escrever("1 | 2, resultado: ", 1 | 2, "\n");
 }
 
 vazio testeComparacoes() {
@@ -122,11 +127,9 @@ vazio testeComparacoes() {
     
     int y = 5;
     
-    se(y >= 4 && x > 4) {
-        escrever("y >= 4 && x > 4 é verdadeiro\n");
-    } senao {
-        escrever("y >= 4 && x > 4 é falso\n");
-    }
+    se(y >= 4 && x > 4) escrever("y >= 4 && x > 4 é verdadeiro\n");
+    senao escrever("y >= 4 && x > 4 é falso\n");
+    
     se(y == x || x > 3) {
         escrever("y == x || x > 3 é verdadeiro\n");
     } senao {

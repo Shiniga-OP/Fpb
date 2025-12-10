@@ -1,9 +1,13 @@
-#incluir "biblis/impressao.asm";
+#incluir "biblis/mem.asm";
 #incluir "biblis/texs.asm";
-
 #global inicio();
 
+vazio memcp(car[] arr, car* p, int tam);
+int textam(car* p);
+
 vazio inicio() {
-    escrever(1 | 0);
-    escrever(1 | 2);
+    car[] arr = "exemplo";
+    car* p = "XxXemplo";
+    int tam = textam(arr);
+    memcp(arr, p, tam);
 }

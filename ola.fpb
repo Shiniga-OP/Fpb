@@ -1,5 +1,4 @@
 #incluir "biblis/impressao.asm";
-
 #global inicio();
 
 vazio inicio() {

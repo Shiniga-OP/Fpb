@@ -39,7 +39,7 @@ FPB é uma linguagem fortemente tipada, isso significa que você precisa definir
 car caractere = 'A';
 int inteiro = 1;
 flu flutuante = 1.0f;
-bool booleano = 1;
+bool booleano = falso;
 longo numeroLongo = 999999999L;
 byte hexadecimal = 0x000000;
 [código]
@@ -50,7 +50,7 @@ e ponteiros:
 car* texto = "ponteiro de texto";
 int* inteiro = 15;
 flu* flutuante = 1.5f;
-bool* booleano = 1;
+bool* booleano = verdade;
 longo* numeroLongo = 999999999999L;
 byte* hexadecimal = 0x000000;
 [código]
@@ -61,7 +61,7 @@ arrays:
 car[] texto = "array de texto";
 int[] inteiros = { 1, 1, 1 };
 flu[] flutuantes = { 1f, 1f, 1f };
-bool[] booleanos = { (bool)1, (bool)1, (bool)1 };
+bool[] booleanos = { verdade, verdade, verdade };
 longo[] longos = { 1L, 1L, 1L };
 byte[] bytes = { 0xFF, 0xFF, 0xFF };
 [código]
@@ -162,6 +162,20 @@ enq(x > 10) {
 por(int i = 0; i < 10; i++) {
     escrever(i, "\n");
 }
+[código]
+
+## GLOBAIS ##
+
+funções globais são definidas sem retorno:
+
+[código]
+#global funcao();
+[código]
+
+variaveis globais são definidas normalmente com o tipo e valor:
+
+[código]
+#global int var = 0;
 [código]
 
 ## CONVERSORES ##

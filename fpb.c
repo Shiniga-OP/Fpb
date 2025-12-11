@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 10/12/2025.
+* [ATUAL]: 11/12/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,15 +18,15 @@
 #include "util/otimi1.h"
 #include "util/otimi2.h"
 
-#define MAX_TOK 18192 // maximo de tolens
-#define MAX_CODIGO 18192 // maximo de codhgk
-#define MAX_FN 552 // maximo de funções
-#define MAX_VAR 552 // maximo de variaveis
-#define MAX_CONST 552 // maxmio de constantes
+#define MAX_TOK 8192 // maximo de tolens
+#define MAX_CODIGO 8192 // maximo de codhgk
+#define MAX_FN 1552 // maximo de funções
+#define MAX_VAR 1552 // maximo de variaveis
+#define MAX_CONST 1552 // maxmio de constantes
 #define MAX_PARAMS 8 // maximo de parametros
-#define MAX_TEX 552 // mqximo de textos
+#define MAX_TEX 1552 // mqximo de textos
 #define MAX_DIMS 4  // máximo de dimensões para matrizes
-#define MAX_MACROS 556 // maximo de macros
+#define MAX_MACROS 1556 // maximo de macros
 
 typedef enum {
     // mutação:
@@ -40,7 +40,7 @@ typedef enum {
     T_CHAVE_ESQ, T_CHAVE_DIR,
     T_COL_ESQ, T_COL_DIR,
     T_PONTO_VIRGULA, T_VIRGULA, 
-    T_PONTO, T_LAMBDA, T_ARROBA, T_CONVERT,
+    T_PONTO, T_LAMBDA, T_ARROBA, T_CONVERT, T_PARE,
     // operadores:
     T_IGUAL, T_MAIS, T_MENOS, T_VEZES, T_DIV, T_PORCEN,
     T_MAIS_MAIS, T_MENOS_MENOS,
@@ -152,6 +152,8 @@ static Variavel globais[MAX_VAR];
 static int global_cnt = 0;
 static Espaco espacos[MAX_FN];
 static int espaco_cnt = 0;
+static int rotulos_pare[MAX_FN];  // Pilha de rótulos para 'pare'
+static int rotulo_pare_topo = -1; // Topo da pilha
 static char* arquivoAtual;
 static bool debug_o = false;
 
@@ -178,6 +180,9 @@ void verificar_retorno(FILE* s, int escopo);
 void verificar_atribuicao(FILE* s, const char* id, int escopo);
 void verificar_por(FILE* s, int escopo);
 void verificar_enq(FILE* s, int escopo);
+void verificar_espaco(FILE* s);
+void verificar_global(FILE* s);
+void verificar_def();
 void verificar_matriz(FILE* s, Variavel* var, int escopo, int indices[], int nivel);
 // add
 int add_tex(const char* valor);
@@ -263,6 +268,7 @@ const char* token_str(TipoToken t) {
         case T_MENOR_MENOR: return "<<";
         case T_OU: return "|";
         case T_TAMBEM: return "&";
+        case T_PARE: return "pare";
         default: return "desconhecido";
     }
 }
@@ -312,6 +318,21 @@ int eh_tipo(TipoToken tipo) {
         if(tipo == tipos[i]) return 1;
     }
     return 0;
+}
+
+void empilhar_pare(int rotulo) {
+    if(rotulo_pare_topo >= MAX_FN - 1) fatal("[empilhar_pare] excesso de loops aninhados");
+    rotulos_pare[++rotulo_pare_topo] = rotulo;
+}
+
+int desempilhar_pare() {
+    if(rotulo_pare_topo < 0) fatal("[desempilhar_pare] pilha vazia");
+    return rotulos_pare[rotulo_pare_topo--];
+}
+
+int topo_pare() {
+    if(rotulo_pare_topo < 0) fatal("[topo_pare] nenhum loop ativo");
+    return rotulos_pare[rotulo_pare_topo];
 }
 
 void proximoToken() {
@@ -418,6 +439,7 @@ void proximoToken() {
         else if(strcmp(L.tk.lex, "byte") == 0) L.tk.tipo = T_pBYTE;
         else if(strcmp(L.tk.lex, "flu") == 0) L.tk.tipo = T_pFLU;
         else if(strcmp(L.tk.lex, "bool") == 0) L.tk.tipo = T_pBOOL;
+        else if(strcmp(L.tk.lex, "verdade") == 0 || strcmp(L.tk.lex, "falso") == 0) L.tk.tipo = T_BOOL;
         else if(strcmp(L.tk.lex, "dobro") == 0) L.tk.tipo = T_pDOBRO;
         else if(strcmp(L.tk.lex, "longo") == 0) L.tk.tipo = T_pLONGO;
         else if(strcmp(L.tk.lex, "vazio") == 0) L.tk.tipo = T_pVAZIO;
@@ -426,6 +448,7 @@ void proximoToken() {
         else if(strcmp(L.tk.lex, "por") == 0) L.tk.tipo = T_POR;
         else if(strcmp(L.tk.lex, "enq") == 0 || strcmp(L.tk.lex, "enquanto") == 0) L.tk.tipo = T_ENQ;
         else if(strcmp(L.tk.lex, "retorne") == 0 || strcmp(L.tk.lex, "retornar") == 0) L.tk.tipo = T_RETORNAR;
+        else if(strcmp(L.tk.lex, "pare") == 0) L.tk.tipo = T_PARE;
         else if(strcmp(L.tk.lex, "final") == 0) L.tk.tipo = T_FINAL;
         else if(strcmp(L.tk.lex, "->") == 0) L.tk.tipo = T_LAMBDA;
         else {
@@ -957,65 +980,103 @@ TipoToken tratar_id(FILE* s, int escopo) {
 
 TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* fn) {
     if(fn == NULL) fatal("INTERNO CRITICO, FUNÇÃO INEXISTENTE!");
-    int param_conta = 0;
+    
+    // Guarda valores dos parâmetros
     TipoToken param_tipos[MAX_PARAMS];
+    int param_conta = 0;
+    
+    // **PRIMEIRO PASSO:** Avalia e salva TODOS os parâmetros em temporários
+    int params_pilha = 0;
     
     if(L.tk.tipo != T_PAREN_DIR) {
         do {
             param_tipos[param_conta] = expressao(s, escopo);
-            // salva resultado em temporario na pilha
-            if(param_tipos[param_conta] == T_pFLU) fprintf(s, "  str s0, [sp, -16]!\n");
-            else if(param_tipos[param_conta] == T_pDOBRO) fprintf(s, "  str d0, [sp, -16]!\n");
-            else if(tam_tipo(param_tipos[param_conta]) <= 4) fprintf(s, "  str w0, [sp, -16]!\n");
-            else fprintf(s, "  str x0, [sp, -16]!\n");
             
+            // Salva o valor atual (está em x0/w0/s0/d0)
+            if(param_tipos[param_conta] == T_pFLU) {
+                fprintf(s, "  str s0, [sp, -16]!  // salva param %d (float)\n", param_conta);
+            } else if(param_tipos[param_conta] == T_pDOBRO) {
+                fprintf(s, "  str d0, [sp, -16]!  // salva param %d (double)\n", param_conta);
+            } else if(param_tipos[param_conta] == T_PONTEIRO || param_tipos[param_conta] == T_pLONGO) {
+                fprintf(s, "  str x0, [sp, -16]!  // salva param %d (ponteiro/longo)\n", param_conta);
+            } else {
+                fprintf(s, "  str w0, [sp, -16]!  // salva param %d (int/bool/char/byte)\n", param_conta);
+            }
             param_conta++;
-            if(param_conta >= MAX_PARAMS) fatal("excesso de parâmetros na chamada de função, max: 9");
+            if(param_conta >= MAX_PARAMS) fatal("excesso de parâmetros");
         } while(L.tk.tipo == T_VIRGULA && (proximoToken(), 1));
     }
-    excessao(T_PAREN_DIR); // consome ')'
+    excessao(T_PAREN_DIR);
+    // calcula quantos vão na pilha da função chamada
+    params_pilha = (param_conta > 8) ? (param_conta - 8) : 0;
     
-    int int_reg = 0;
-    int fp_s_reg = 0; // registradores de flutuante(s0-s7)
-    int fp_d_reg = 0; // registradores de dobro(d0-d7)
-    
-    for(int i = 0; i < param_conta; i++) {
-        int pos = (param_conta - i - 1) * 16;
+    // passo 2: prepara pilha para parametros 9+
+    if(params_pilha > 0) {
+        fprintf(s, "  sub sp, sp, %d  // espaço para parâmetros 9+ na pilha\n", params_pilha * 16);
+    }
+    // passo 3: Carrega valores na ordem inversao
+    for(int i = param_conta - 1; i >= 0; i--) {
+        // calcula de onde pegar(estão salvos na pilha em ordem)
+        int pos_salvo = (param_conta - i - 1) * 16;
         
-        if(int_reg < 8 && (param_tipos[i] == T_pINT || param_tipos[i] == T_pLONGO || param_tipos[i] == T_PONTEIRO || param_tipos[i] == T_pCAR || param_tipos[i] == T_pBOOL)) {
-            fprintf(s, "  ldr x%d, [sp, %d]\n", int_reg, pos);
-            int_reg++;
-        } else if(fp_s_reg < 8 && param_tipos[i] == T_pFLU) {
-            fprintf(s, "  ldr s%d, [sp, %d]\n", fp_s_reg, pos);
-            fp_s_reg++;
-        } else if(fp_d_reg < 8 && param_tipos[i] == T_pDOBRO) {
-            fprintf(s, "  ldr d%d, [sp, %d]\n", fp_d_reg, pos);
-            fp_d_reg++;
-        } else {
-            // args 9+ = pilha
+        if(i < 8) {
+            // vai em registrador
             if(param_tipos[i] == T_pFLU) {
-                fprintf(s, "  ldr s0, [sp, %d]\n", pos);
-                fprintf(s, "  str s0, [sp, -16]!\n");
+                fprintf(s, "  ldr s%d, [sp, %d]  // carrega param %d (flu) em s%d\n", 
+                        i, pos_salvo, i, i);
             } else if(param_tipos[i] == T_pDOBRO) {
-                fprintf(s, "  ldr d0, [sp, %d]\n", pos);
-                fprintf(s, "  str d0, [sp, -16]!\n");
-            } else if(tam_tipo(param_tipos[i]) <= 4) {
-                fprintf(s, "  ldr w0, [sp, %d]\n", pos);
-                fprintf(s, "  str w0, [sp, -16]!\n");
+                fprintf(s, "  ldr d%d, [sp, %d]  // carrega param %d (dobro) em d%d\n", 
+                        i, pos_salvo, i, i);
+            } else if(param_tipos[i] == T_PONTEIRO || param_tipos[i] == T_pLONGO) {
+                fprintf(s, "  ldr x%d, [sp, %d]  // carrega param %d (ptr/longo) em x%d\n", 
+                        i, pos_salvo, i, i);
             } else {
-                fprintf(s, "  ldr x0, [sp, %d]\n", pos);
-                fprintf(s, "  str x0, [sp, -16]!\n");
+                // int, bool, car, byte = carrega em w mas passa em x
+                fprintf(s, "  ldr w%d, [sp, %d]  // carrega param %d (int/bool) em w%d\n", 
+                        i, pos_salvo, i, i);
+                fprintf(s, "  mov x%d, x%d  // estende pra 64 bits\n", i, i);
+            }
+        } else {
+            // vai na pilha da função chamada
+            int pilha_pos = (i - 8) * 16;
+            
+            if(param_tipos[i] == T_pFLU) {
+                fprintf(s, "  ldr s0, [sp, %d]  // param %d (float) para pilha\n", pos_salvo, i);
+                fprintf(s, "  str s0, [sp, %d]  // armazena na pilha da função chamada\n", pilha_pos);
+            } else if(param_tipos[i] == T_pDOBRO) {
+                fprintf(s, "  ldr d0, [sp, %d]  // param %d (double) para pilha\n", pos_salvo, i);
+                fprintf(s, "  str d0, [sp, %d]  // armazena na pilha da função chamada\n", pilha_pos);
+            } else if(param_tipos[i] == T_PONTEIRO || param_tipos[i] == T_pLONGO) {
+                fprintf(s, "  ldr x0, [sp, %d]  // param %d (ptr/longo) para pilha\n", pos_salvo, i);
+                fprintf(s, "  str x0, [sp, %d]  // armazena na pilha da função chamada\n", pilha_pos);
+            } else {
+                fprintf(s, "  ldr w0, [sp, %d]  // param %d (int/bool) para pilha\n", pos_salvo, i);
+                fprintf(s, "  str w0, [sp, %d]  // armazena na pilha da função chamada\n", pilha_pos);
             }
         }
     }
-    // limpa temporarios da pilha
-    if(param_conta > 0) fprintf(s, "  add sp, sp, %d\n", param_conta * 16);
+    // passo 4 limpa nossos temporarios
+    fprintf(s, "  add sp, sp, %d  // limpa temporarios\n", param_conta * 16);
     
+    // passo 5: chama a função
     fprintf(s, "  bl %s\n", nome);
-    // se a função retorna flutuante, garante que está no registrador correto
-    if(fn->retorno == T_pFLU) fprintf(s, "  fmov s0, s0\n"); // garante que o retorno ta em s0
-    else if(fn->retorno == T_pDOBRO) fprintf(s, "  fmov d0, d0\n"); // garante que o retorno ta em d0
+    
+    // passo 6: limpa pilha da função chamada(parâmetros 9+)
+    if(params_pilha > 0) {
+        fprintf(s, "  add sp, sp, %d  // limpa parâmetros da pilha\n", params_pilha * 16);
+    }
+    // ajusta retorno se necessario
+    if(fn->retorno == T_pFLU) fprintf(s, "  fmov s0, s0\n");
+    else if(fn->retorno == T_pDOBRO) fprintf(s, "  fmov d0, d0\n");
+    
     return fn->retorno;
+}
+
+TipoToken tratar_bool(FILE* s) {
+    int valor = (strcmp(L.tk.lex, "verdade") == 0) ? 1 : 0;
+    proximoToken();
+    fprintf(s, "  mov w0, %d\n", valor);
+    return T_pBOOL;
 }
 
 TipoToken tratar_inteiro(FILE* s) {
@@ -1258,7 +1319,7 @@ TipoToken processar_condicao(FILE* s, int escopo) {
                 int rotulo_final = escopo_global++;
                 
                 if(op == T_TAMBEM_TAMBEM) {
-                    // E: verifica primeira condição
+                    // TAMBEM: verifica primeira condição
                     fprintf(s, "  cmp w0, 0\n");
                     fprintf(s, "  beq .B%d\n", rotulo_curto);
                 } else { // T_OU_OU
@@ -1272,7 +1333,7 @@ TipoToken processar_condicao(FILE* s, int escopo) {
                     fatal("[processar_condicao] condição deve ser inteiro ou booleano");
                 }
                 if(op == T_TAMBEM_TAMBEM) {
-                    // E: verifica segunda condição
+                    // TAMBEM: verifica segunda condição
                     fprintf(s, "  cmp w0, 0\n");
                     fprintf(s, "  beq .B%d\n", rotulo_curto);
                     fprintf(s, "  mov w0, 1\n");
@@ -1718,18 +1779,18 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
 }
 
 void verificar_matriz(FILE* s, Variavel* var, int escopo, int indices[], int nivel) {
-    int elemento_idc = 0;
+    int item_idc = 0;
     
     while(L.tk.tipo != T_CHAVE_DIR && L.tk.tipo != T_FIM) {
         if(nivel < var->num_dims - 1) {
             // sub-matriz(recursão)
             excessao(T_CHAVE_ESQ);
-            indices[nivel] = elemento_idc;
+            indices[nivel] = item_idc;
             verificar_matriz(s, var, escopo, indices, nivel + 1);
             excessao(T_CHAVE_DIR);
         } else {
             // elemento final
-            indices[nivel] = elemento_idc;
+            indices[nivel] = item_idc;
             int pos_bytes = calcular_pos_matriz(var, indices);
             // gera o codigo para calcular o valor(mov w0, 1)
             TipoToken tipo_valor = expressao(s, escopo);
@@ -1754,7 +1815,7 @@ void verificar_matriz(FILE* s, Variavel* var, int escopo, int indices[], int niv
                 fprintf(s, "  str x0, [x29, %d]\n", pos_absoluta);
             }
         }
-        elemento_idc++;
+        item_idc++;
         if(L.tk.tipo == T_VIRGULA) proximoToken();
         else break;
     }
@@ -1823,8 +1884,10 @@ void verificar_por(FILE* s, int escopo) {
     int rotulo_inicio = escopo_global++;
     int rotulo_fim = escopo_global++;
     
-    fprintf(s, ".B%d:\n", rotulo_inicio);
+    // empilha o rotulo de "pare"(fim do loop)
+    empilhar_pare(rotulo_fim);
     
+    fprintf(s, ".B%d:\n", rotulo_inicio);
     // processa condição
     if(L.tk.tipo != T_PONTO_VIRGULA) {
         TipoToken tipo_cond = expressao(s, novo_escopo);
@@ -1832,10 +1895,10 @@ void verificar_por(FILE* s, int escopo) {
         if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
             // tenta converter pra booleano
             if(tipo_cond == T_pFLU) {
-                fprintf(s, "  fcmp s0, #0.0\n");
+                fprintf(s, "  fcmp s0, 0.0\n");
                 fprintf(s, "  cset w0, ne\n");
             } else if(tipo_cond == T_pDOBRO) {
-                fprintf(s, "  fcmp d0, #0.0\n");
+                fprintf(s, "  fcmp d0, 0.0\n");
                 fprintf(s, "  cset w0, ne\n");
             } else {
                 fatal("[verificar_por] condição do loop deve ser inteiro ou booleano");
@@ -1875,12 +1938,12 @@ void verificar_por(FILE* s, int escopo) {
     int coluna_atual = L.coluna_atual;
     Token tk_atual = L.tk;
     
-    // restaura para processar o incremento
+    // restaura pra processar o incremento
     L.pos = pos_incremento;
     L.linha_atual = linha_incremento;
     L.coluna_atual = coluna_incremento;
     L.tk = tk_incremento;
-    // processa o incremento como um statement completo
+    
     if(L.tk.tipo != T_PAREN_DIR) {
         // usa verificar_stmt pra processar o incremento
         verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
@@ -1893,6 +1956,8 @@ void verificar_por(FILE* s, int escopo) {
     
     fprintf(s, "  b .B%d\n", rotulo_inicio);
     fprintf(s, ".B%d:\n", rotulo_fim);
+    // desempilha o rotulo de "pare" apos o loop
+    desempilhar_pare();
 }
 
 void verificar_enq(FILE* s, int escopo) {
@@ -1903,11 +1968,14 @@ void verificar_enq(FILE* s, int escopo) {
     int rotulo_inicio = escopo_global++;
     int rotulo_fim    = escopo_global++;
 
+    // empilha o rotulo de "pare"
+    empilhar_pare(rotulo_fim);
+
     fprintf(s, ".B%d:\n", rotulo_inicio);
 
     TipoToken tipo_cond = processar_condicao(s, novo_escopo);
 
-    // tem que ser bool/int, senão converte flutuante/dobro pra bool
+    // tem que ser bool/int, senão converte flu/dobro pra bool
     if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
         if(tipo_cond == T_pFLU) {
             fprintf(s, "  fcmp s0, #0.0\n");
@@ -1933,9 +2001,11 @@ void verificar_enq(FILE* s, int escopo) {
     } else {
         verificar_stmt(s, &funcs[fn_cnt-1].frame_tam, novo_escopo);
     }
-    // volta pra o começo
+    // volta pro começo
     fprintf(s, "  b .B%d\n", rotulo_inicio);
     fprintf(s, ".B%d:\n", rotulo_fim);
+    // desempilha o rotulo de "pare"
+    desempilhar_pare();
 }
 
 void verificar_stmt(FILE* s, int* pos, int escopo) {
@@ -2003,7 +2073,6 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         
         FILE* arquivo_incluir = NULL;
-        
         // tenta primeiro com o caminho relativo ao FPB_DIR
         char* base_dir = processar_caminho();
         if(strlen(base_dir) > 0) {
@@ -2132,7 +2201,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
             return;
         } else if(L.tk.tipo == T_COL_ESQ) {
-            // >>>>>>ACESSO A ELEMENTO DE ARRAY<<<<<<
+            // === ACESSO A ELEMENTO DE ARRAY ===
             Variavel* var = buscar_var(idn, escopo);
             if(!var || !var->eh_array) fatal("[verificar_stmt] não é um array");
             excessao(T_COL_ESQ);
@@ -2243,7 +2312,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                 if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
                 return;
             } else {
-                // >>>>>CHAMADA DE FUNÇÃO NORMAL<<<<<
+                // === CHAMADA DE FUNÇÃO NORMAL ===
                 Funcao* fn = buscar_fn(idn);
                 if(!fn) fatal("[verificar_stmt] função não declarada");
                 tratar_chamada_funcao(s, escopo, idn, fn);
@@ -2258,6 +2327,16 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         
         while(L.tk.tipo != T_CHAVE_DIR) verificar_stmt(s, pos, novo_escopo);
         proximoToken();
+        return;
+    }
+    if(L.tk.tipo == T_PARE) {
+        if(rotulo_pare_topo < 0) {
+            fatal("[verificar_stmt] \"pare\" usado fora de loop");
+        }
+        // gera salto pro rotulo de "pare"(fim do loop)
+        fprintf(s, "  b .B%d\n", topo_pare());
+        proximoToken();
+        if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
         return;
     }
     fatal("[verificar_stmt] declaração inválida");
@@ -3068,6 +3147,7 @@ TipoToken fator(FILE* s, int escopo) {
     else if(L.tk.tipo == T_FLU || L.tk.tipo == T_DOBRO) return tratar_flutuante(s);
     else if(L.tk.tipo == T_CAR) return tratar_caractere(s);
     else if(L.tk.tipo == T_TEX) return tratar_texto(s);
+    else if(L.tk.tipo == T_BOOL) return tratar_bool(s);
     else {
         fatal("[fator] fator inválido");
         return T_pINT;
@@ -3552,6 +3632,7 @@ int main(int argc, char** argv) {
     }
     if(modoConfig) {
         printf("[configuração]:\n");
+        printf("arquitetura padrão: ARM64 Linux Android\n");
         printf("max codigo: %i\n", MAX_CODIGO);
         printf("max variaveis: %i\n", MAX_VAR);
         printf("max constantes: %i\n", MAX_CONST);

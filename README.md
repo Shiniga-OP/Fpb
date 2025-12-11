@@ -27,6 +27,12 @@ suportados
 #global inicio();
 #global int varGlobal = 10;
 
+// estrutura de dados:
+#espaco Pessoa {
+    car nome;
+    int idade;
+}
+
 /* pré definição */
 vazio testeAlteracoes(int s, int numero, car letra, bool flag);
 vazio testeOperacoes();
@@ -34,6 +40,7 @@ vazio testeComparacoes();
 vazio testeMemoria();
 vazio testeLoops();
 vazio testeMatrizes();
+vazio testeEspaco();
 
 int textam(car* texto);
 int texcar(car* texto, car alvo);
@@ -58,7 +65,7 @@ vazio inicio() {
     escrever("\ninteiro: ", numero);
     flu pi = 3.14;
     escrever("\nflutuante: ", pi);
-    bool marca = 1;
+    bool marca = verdade;
     escrever("\nbooleano: ", marca);
     longo numLongo = obter_tempo_milis();
     escrever("\nlongo: ", numLongo);
@@ -81,7 +88,7 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     escrever("\n\nTestando atribuições:\n");
     numero = 100;
     letra = 'Z';
-    marca = 0;
+    marca = falso;
     numLongo = 1763400788119L;
     escrever("\nnovo inteiro: ", numero);
     escrever("\nnovo caractere: ", letra);
@@ -104,6 +111,7 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     testeLoops();
     testeMemoria();
     testeMatrizes();
+    testeEspaco();
 }
 
 vazio testeOperacoes() {
@@ -219,14 +227,24 @@ vazio testeMemoria() {
 }
 
 vazio testeLoops() {
-    escrever("\n\nTeste de loops");
+    escrever("\n\nTeste de loops:");
     escrever("\nEnquanto:");
     int i = 0;
     enq(i < 10) {
         escrever("\nvalor de i: ", i);
         i++;
     }
-    escrever("\n\nPor:\n");
+    int x = 0;
+    escrever("\n\nTeste de parada do loop (deve parar em 5)\n");
+    enq(x < 10) {
+        escrever(x, "\n");
+        se(x == 5) {
+            escrever("parando\n");
+            pare;
+        }
+        x++;
+    }
+    escrever("\nLoop Por:\n");
     por(int i = 0; i < 10; i++) {
         escrever("indice: ", i, "\n");
     }
@@ -238,6 +256,20 @@ vazio testeMatrizes() {
     escrever("matriz 2D int m2[0][1]: ", m2[0][1], "\n");
     flu[][] m2f = { {3f, 5f, 7f}, {2f, 9f, 10f} };
     escrever("matriz 2D flu m2f[0][1]: ", m2f[0][1], "\n");
+}
+
+vazio testeEspaco() {
+    escrever("\nTeste de estrutura de dados (#espaco):\n\n");
+    Pessoa p;
+    p.nome = 'A';
+    p.idade = 1991;
+    
+    Pessoa p2;
+    p2.nome = 'B';
+    p2.idade = 1992;
+    
+    escrever("Pessoa 1:\nNome: ", p.nome, "\nIdade: ", p.idade);
+    escrever("\nPessoa 2:\nNome: ", p2.nome, "\nIdade: ", p2.idade, "\n");
 }
 ```
 ## info extra:

@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 11/12/2025.
+* [ATUAL]: 12/12/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,16 +40,16 @@ typedef enum {
     T_CHAVE_ESQ, T_CHAVE_DIR,
     T_COL_ESQ, T_COL_DIR,
     T_PONTO_VIRGULA, T_VIRGULA, 
-    T_PONTO, T_LAMBDA, T_ARROBA, T_CONVERT, T_PARE,
+    T_PONTO, T_LAMBDA, T_ARROBA, T_CONVERT,
     // operadores:
     T_IGUAL, T_MAIS, T_MENOS, T_VEZES, T_DIV, T_PORCEN,
     T_MAIS_MAIS, T_MENOS_MENOS,
     // condicionais:
-    T_SE, T_SENAO, T_IGUAL_IGUAL, T_DIFERENTE,
+    T_SE, T_SENAO, T_IGUAL_IGUAL, T_DIFERENTE, T_DIFERENTE_ABS,
     T_MAIOR, T_MENOR, T_MAIOR_IGUAL, T_MENOR_IGUAL,
-    T_TAMBEM_TAMBEM, T_OU, T_OU_OU,
+    T_TAMBEM_TAMBEM, T_OU, T_OU_OU, T_NAO,
     // loops:
-    T_POR, T_ENQ,
+    T_POR, T_ENQ, T_PARE,
     // retornos:
     T_pCAR, T_pINT, T_pFLU, T_pBOOL, T_pDOBRO, 
     T_pLONGO, T_pBYTE, T_PONTEIRO,
@@ -58,7 +58,7 @@ typedef enum {
     T_DEF, T_FIM, T_RETORNAR, T_INCLUIR, 
     T_ESPACO, T_GLOBAL,
     // bits:
-    T_MAIOR_MAIOR, T_MENOR_MENOR, T_TAMBEM, T_NAO
+    T_MAIOR_MAIOR, T_MENOR_MENOR, T_TAMBEM
 } TipoToken;
 
 typedef struct {
@@ -243,6 +243,8 @@ const char* token_str(TipoToken t) {
         case T_CONVERT: return "(converter)";
         case T_IGUAL_IGUAL: return "==";
         case T_DIFERENTE: return "!=";
+        case T_DIFERENTE_ABS: return "!";
+        case T_NAO: return "!";
         case T_MAIOR: return ">";
         case T_MENOR: return "<";
         case T_MAIOR_IGUAL: return ">=";
@@ -503,7 +505,7 @@ void proximoToken() {
         }
         while((c = L.fonte[L.pos]) && (isdigit((unsigned char)c) || c == '.' || c == 'f' || c == 'F' || c == 'd' || c == 'D')) {
             if(c == '.') {
-                if(ponto) fatal("numero invalido");
+                if(ponto) fatal("numero inválido");
                 ponto = 1;
             }
             if(c == 'f' || c == 'F' || c == 'd' || c == 'D') {
@@ -664,9 +666,12 @@ void proximoToken() {
         case '!':
             if(L.fonte[L.pos + 1] == '=') {
                 L.tk.tipo = T_DIFERENTE;
+                if(L.fonte[L.pos + 2] == '=') {
+                    L.tk.tipo = T_DIFERENTE_ABS;
+                }
                 L.pos++;
                 L.coluna_atual++;
-            }
+            } else L.tk.tipo = T_NAO;
         break;
         case '&':
         if(L.fonte[L.pos + 1] == '&') {
@@ -761,12 +766,11 @@ TipoToken tratar_id(FILE* s, int escopo) {
         if(L.tk.tipo != T_ID) {
             fatal("[tratar_id] nome do campo esperado após ponto");
         }
-        
-        // Guarda o nome do campo
+        // guarda o nome do campo
         char nome_campo[32];
         strcpy(nome_campo, L.tk.lex);
         
-        // Busca o espaço usando o nome armazenado na variável
+        // busca o espaço usando o nome armazenado na variavel
         Espaco* esp = NULL;
         for(int i = 0; i < espaco_cnt; i++) {
             if(strcmp(espacos[i].nome, var->espaco) == 0) {
@@ -774,14 +778,12 @@ TipoToken tratar_id(FILE* s, int escopo) {
                 break;
             }
         }
-        
         if(!esp) {
             char msg[100];
             sprintf(msg, "[tratar_id] espaço '%s' não encontrado", var->espaco);
             fatal(msg);
         }
-        
-        // Busca o campo no espaço
+        // busca o campo no espaço
         Variavel* campo = NULL;
         for(int i = 0; i < esp->campo_cnt; i++) {
             if(strcmp(esp->campos[i].nome, nome_campo) == 0) {
@@ -789,39 +791,35 @@ TipoToken tratar_id(FILE* s, int escopo) {
                 break;
             }
         }
-        
         if(!campo) {
             char msg[100];
             sprintf(msg, "[tratar_id] campo '%s' não encontrado no espaço '%s'", 
                     nome_campo, var->espaco);
             fatal(msg);
         }
+        proximoToken(); // consome o nome do campo
         
-        proximoToken(); // Consome o nome do campo
-        
-        // Calcula endereço do campo
+        // calcula endereço do campo
         if(var->escopo == -1) { // Global
             fprintf(s, "  ldr x0, = global_%s\n", var->nome);
             fprintf(s, "  add x0, x0, %d\n", campo->pos);
         } else { // Local
             fprintf(s, "  add x0, x29, %d\n", var->pos + campo->pos);
         }
-        
-        // Se for um campo que também é espaço, precisa de tratamento especial
+        // se for um campo que tambem é espaço, precisa de tratamento especial
         if(campo->tipo_base == T_ESPACO_ID) {
-            // Retorna endereço do sub-espaço
+            // retorna endereço do sub espaço
             return T_PONTEIRO;
         }
-        
-        // Carrega o valor do campo
+        // carrega o valor do campo
         if(campo->eh_ponteiro) {
             fprintf(s, "  ldr x0, [x0]\n");
             return T_PONTEIRO;
         } else if(campo->eh_array) {
-            // Retorna endereço do array
+            // retorna endereço do array
             return T_PONTEIRO;
         } else {
-            // Carrega baseado no tipo
+            // carrega baseado no tipo
             if(campo->tipo_base == T_pCAR || campo->tipo_base == T_pBOOL || campo->tipo_base == T_pBYTE)
                 fprintf(s, "  ldrb w0, [x0]\n");
             else if(campo->tipo_base == T_pINT)
@@ -1041,10 +1039,10 @@ TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* f
             int pilha_pos = (i - 8) * 16;
             
             if(param_tipos[i] == T_pFLU) {
-                fprintf(s, "  ldr s0, [sp, %d]  // param %d (float) para pilha\n", pos_salvo, i);
+                fprintf(s, "  ldr s0, [sp, %d]  // param %d (flu) para pilha\n", pos_salvo, i);
                 fprintf(s, "  str s0, [sp, %d]  // armazena na pilha da função chamada\n", pilha_pos);
             } else if(param_tipos[i] == T_pDOBRO) {
-                fprintf(s, "  ldr d0, [sp, %d]  // param %d (double) para pilha\n", pos_salvo, i);
+                fprintf(s, "  ldr d0, [sp, %d]  // param %d (dobro) para pilha\n", pos_salvo, i);
                 fprintf(s, "  str d0, [sp, %d]  // armazena na pilha da função chamada\n", pilha_pos);
             } else if(param_tipos[i] == T_PONTEIRO || param_tipos[i] == T_pLONGO) {
                 fprintf(s, "  ldr x0, [sp, %d]  // param %d (ptr/longo) para pilha\n", pos_salvo, i);
@@ -1253,112 +1251,85 @@ char* processar_caminho() {
 }
 
 TipoToken processar_condicao(FILE* s, int escopo) {
-    TipoToken tipo_final = T_pBOOL;
-    int primeiro = 1;
     int rotulo_fim = escopo_global++;
+    TipoToken tipo_final = T_pBOOL;
     
-    while(L.tk.tipo != T_PAREN_DIR && L.tk.tipo != T_FIM) {
-        TipoToken tipo_atual = expressao(s, escopo);
-        
-        if(!primeiro) {
-            // se não é o primeiro termo, deve ser operador lógico
-            if(L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {
-                TipoToken op = L.tk.tipo;
-                proximoToken(); // consome && ou ||
-                
-                int rotulo_curto = escopo_global++;
-                
-                if(op == T_TAMBEM_TAMBEM) {
-                    // caso E: se a primeira condição for falsa, pula pra falso
-                    fprintf(s, "  cmp w0, 0\n");
-                    fprintf(s, "  beq .B%d\n", rotulo_curto);
-                } else { // T_OU_OU
-                    // caso OU: se a primeira condição for verdadeira, pula pra verdadeiro
-                    fprintf(s, "  cmp w0, 1\n");
-                    fprintf(s, "  beq .B%d\n", rotulo_curto);
-                }
-                // processa proxima expressão
-                TipoToken tipo_dir = expressao(s, escopo);
-                tipo_final = converter_tipos(s, tipo_final, tipo_dir);
-                
-                if(op == T_TAMBEM_TAMBEM) {
-                    // E: ambas devem ser verdadeiras
-                    fprintf(s, "  cmp w0, 0\n");
-                    fprintf(s, "  beq .B%d\n", rotulo_curto);
-                    fprintf(s, "  mov w0, 1\n");
-                    fprintf(s, "  b .B%d\n", rotulo_fim);
-                    fprintf(s, ".B%d:\n", rotulo_curto);
-                    fprintf(s, "  mov w0, 0\n");
-                } else { // T_OU_OU
-                    // OU: pelo menos uma deve ser verdadeira
-                    fprintf(s, "  cmp w0, 1\n");
-                    fprintf(s, "  beq .B%d\n", rotulo_fim);
-                    fprintf(s, ".B%d:\n", rotulo_curto);
-                    fprintf(s, "  mov w0, 1\n");
-                    fprintf(s, "  b .B%d\n", rotulo_fim);
-                }
-                fprintf(s, ".B%d:\n", rotulo_fim);
-                tipo_final = T_pBOOL;
-            } else {
-                break; // não é operador lógico, termina
-            }
+    // processa a primeira expressão
+    TipoToken tipo_atual = expressao(s, escopo);
+    
+    if(tipo_atual != T_pINT && tipo_atual != T_pBOOL) {
+        // converte pra booleano se necessario
+        if(tipo_atual == T_pFLU) {
+            fprintf(s, "  fcmp s0, 0.0\n");
+            fprintf(s, "  cset w0, ne\n");
+            tipo_atual = T_pBOOL;
+        } else if(tipo_atual == T_pDOBRO) {
+            fprintf(s, "  fcmp d0, 0.0\n");
+            fprintf(s, "  cset w0, ne\n");
+            tipo_atual = T_pBOOL;
         } else {
-            // primeira expressão = avalia normalmente
-            if(tipo_atual != T_pINT && tipo_atual != T_pBOOL) {
-                fatal("[processar_condicao] condição deve ser inteiro ou booleano");
-            }
-            tipo_final = tipo_atual;
-            primeiro = 0;
-            
-            // se a operador logico apos a primeira expressão, prepara o caso
-            if(L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {
-                TipoToken op = L.tk.tipo;
-                proximoToken(); // consome && ou ||
-                
-                int rotulo_curto = escopo_global++;
-                int rotulo_final = escopo_global++;
-                
-                if(op == T_TAMBEM_TAMBEM) {
-                    // TAMBEM: verifica primeira condição
-                    fprintf(s, "  cmp w0, 0\n");
-                    fprintf(s, "  beq .B%d\n", rotulo_curto);
-                } else { // T_OU_OU
-                    // OU: verifica primeira condição  
-                    fprintf(s, "  cmp w0, 1\n");
-                    fprintf(s, "  beq .B%d\n", rotulo_final);
-                }
-                // processa segunda expressão
-                TipoToken tipo_dir = expressao(s, escopo);
-                if(tipo_dir != T_pINT && tipo_dir != T_pBOOL) {
-                    fatal("[processar_condicao] condição deve ser inteiro ou booleano");
-                }
-                if(op == T_TAMBEM_TAMBEM) {
-                    // TAMBEM: verifica segunda condição
-                    fprintf(s, "  cmp w0, 0\n");
-                    fprintf(s, "  beq .B%d\n", rotulo_curto);
-                    fprintf(s, "  mov w0, 1\n");
-                    fprintf(s, "  b .B%d\n", rotulo_final);
-                    fprintf(s, ".B%d:\n", rotulo_curto);
-                    fprintf(s, "  mov w0, 0\n");
-                } else { // T_OU_OU
-                    // OU: verifica segunda condição
-                    fprintf(s, "  cmp w0, 1\n");
-                    fprintf(s, "  beq .B%d\n", rotulo_final);
-                    fprintf(s, ".B%d:\n", rotulo_curto);
-                    fprintf(s, "  mov w0, 0\n");
-                    fprintf(s, "  b .B%d\n", rotulo_final);
-                    fprintf(s, "  mov w0, 1\n");
-                }
-                fprintf(s, ".B%d:\n", rotulo_final);
-                tipo_final = T_pBOOL;
-                rotulo_fim = rotulo_final;
-            }
+            fatal("[processar_condicao] condição deve ser inteiro ou booleano");
         }
     }
-    return tipo_final;
+    // processa operadores logicos encadeados
+    while(L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {
+        TipoToken op = L.tk.tipo;
+        proximoToken(); // consome && ou ||
+        
+        int rotulo_curto = escopo_global++;
+        
+        // salva o resultado da primeira parte
+        fprintf(s, "  str w0, [sp, -16]!\n");
+        
+        if(op == T_TAMBEM_TAMBEM) {
+            // se for falso, pula direto pra falso
+            fprintf(s, "  cmp w0, 0\n");
+            fprintf(s, "  beq .B%d\n", rotulo_curto);
+        } else { // T_OU_OU
+            // se for verdadeiro, pula direto pra verdadeiro
+            fprintf(s, "  cmp w0, 1\n");
+            fprintf(s, "  beq .B%d\n", rotulo_fim);
+        }
+        // processa a proxima expressão
+        TipoToken tipo_dir = expressao(s, escopo);
+        
+        if(tipo_dir != T_pINT && tipo_dir != T_pBOOL) {
+            // converte pra booleano se necessario
+            if(tipo_dir == T_pFLU) {
+                fprintf(s, "  fcmp s0, 0.0\n");
+                fprintf(s, "  cset w0, ne\n");
+                tipo_dir = T_pBOOL;
+            } else if(tipo_dir == T_pDOBRO) {
+                fprintf(s, "  fcmp d0, 0.0\n");
+                fprintf(s, "  cset w0, ne\n");
+                tipo_dir = T_pBOOL;
+            } else {
+                fatal("[processar_condicao] condição deve ser inteiro ou booleano");
+            }
+        }
+        // recupera o primeiro valor
+        fprintf(s, "  ldr w1, [sp], 16\n");
+        
+        if(op == T_TAMBEM_TAMBEM) {
+            // TAMBEM: ambas devem ser verdadeiras
+            fprintf(s, "  and w0, w1, w0\n");
+        } else { // T_OU_OU
+            // OU: pelo menos uma deve ser verdadeira
+            fprintf(s, "  orr w0, w1, w0\n");
+            fprintf(s, "  cmp w0, 0\n");
+            fprintf(s, "  cset w0, ne\n"); // converte pra 0/1
+        }
+        if(op == T_TAMBEM_TAMBEM) {
+            fprintf(s, "  b .B%d\n", rotulo_fim);
+            fprintf(s, ".B%d:\n", rotulo_curto);
+            fprintf(s, "  mov w0, 0\n");
+        }
+    }
+    fprintf(s, ".B%d:\n", rotulo_fim);
+    return T_pBOOL;
 }
 
-int processar_variaveis_tam(int escopo) {
+int processar_var_tam(int escopo) {
     Lexer salvo = L;
     int tam_total = 0;
     int nivel_chaves = 0;
@@ -1973,20 +1944,8 @@ void verificar_enq(FILE* s, int escopo) {
 
     fprintf(s, ".B%d:\n", rotulo_inicio);
 
-    TipoToken tipo_cond = processar_condicao(s, novo_escopo);
-
-    // tem que ser bool/int, senão converte flu/dobro pra bool
-    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
-        if(tipo_cond == T_pFLU) {
-            fprintf(s, "  fcmp s0, #0.0\n");
-            fprintf(s, "  cset w0, ne\n");
-        } else if(tipo_cond == T_pDOBRO) {
-            fprintf(s, "  fcmp d0, #0.0\n");
-            fprintf(s, "  cset w0, ne\n");
-        } else {
-            fatal("[verificar_enq] condição inválida");
-        }
-    }
+    processar_condicao(s, novo_escopo);
+    
     excessao(T_PAREN_DIR);
 
     fprintf(s, "  cmp w0, 0\n");
@@ -2385,7 +2344,7 @@ void verificar_fn(FILE* s) {
 
     if(!eh_prototipo) {
         // chama a simulação real pra saber tamanho na pilha
-        int tam_vars_locais = processar_variaveis_tam(escopo_global);
+        int tam_vars_locais = processar_var_tam(escopo_global);
         int frame_tam = tam_vars_locais;
         // espaço pra registradores salvos (x19..x22)
         if(tipo_real != T_pVAZIO) frame_tam += 32;
@@ -3064,6 +3023,30 @@ TipoToken fator(FILE* s, int escopo) {
         gerar_convert(s, tipo_origem, tipo_destino);
         
         return tipo_destino;
+    }
+    if(L.tk.tipo == T_NAO) {
+        proximoToken(); // consome o !
+        TipoToken tipo = fator(s, escopo); // processa o operando
+        
+        if(tipo != T_pINT && tipo != T_pBOOL) {
+            // tenta converter para booleano se necessario
+            if(tipo == T_pFLU) {
+                fprintf(s, "  fcmp s0, 0.0\n");
+                fprintf(s, "  cset w0, ne\n"); // 1 se diferente de 0
+                tipo = T_pBOOL;
+            } else if(tipo == T_pDOBRO) {
+                fprintf(s, "  fcmp d0, 0.0\n");
+                fprintf(s, "  cset w0, ne\n");
+                tipo = T_pBOOL;
+            } else {
+                fatal("[fator] operando do operador ! deve ser inteiro, booleano ou conversível para booleano");
+            }
+        }
+        // aplica o NÃO logico
+        fprintf(s, "  cmp w0, 0\n");
+        fprintf(s, "  cset w0, eq\n"); // 1 se igual a 0(não)
+        
+        return T_pBOOL;
     }
     if(L.tk.tipo == T_ARROBA) {
         // operador de endereço @

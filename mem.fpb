@@ -2,13 +2,13 @@
 #global inicio();
 
 vazio inicio() {
-    int x = 0;
-    enq(x < 10) {
-        escrever(x, "\n");
-        se(x == 5) {
-            escrever("parando\n");
-            pare;
-        }
-        x++;
+    bool x = falso;
+    bool y = falso;
+    bool z = falso;
+    enq(!x && !y && !z) {
+        escrever("Teste, X = ", x, "\n");
+        x = verdade;
+        y = verdade;
+        z = verdade;
     }
 }

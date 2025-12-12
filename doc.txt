@@ -66,6 +66,52 @@ longo[] longos = { 1L, 1L, 1L };
 byte[] bytes = { 0xFF, 0xFF, 0xFF };
 [código]
 
+## CONDICIONAIS ##
+
+condicionais são abrangentes, você pode fazer:
+
+[código]
+se(!booleano) escrever("resultado");
+[código]
+
+caso o booleano seja falso, irá executar a chamada.
+
+ou
+
+[código]
+se(booleano) escrever("resultado");
+[código]
+
+caso seja verdade, vai executar a chamada.
+
+você também pode usar condições aninhadas:
+
+[código]
+se(booleano && !booleano2 && booleano3) escrever("resultado");
+[código]
+
+só vai executar se todas as condições forem atendidas.
+
+[código]
+se(booleano || !booleano2 || booleano3) escrever("resultado");
+[código]
+
+vai executar se qualquer condição for atendida.
+
+e também:
+
+se(condicao) escrever("foi de primeira");
+senao se(outra_condicao) escrever("foi de segunda");
+senao escrever("não foi");
+
+ah é, você pode usar com chaves também:
+
+se(condicao) {
+    escrever("foi");
+} senao {
+    escrever("não foi");
+}
+
 ## ARRAYS ##
 
 você pode utilizar arrays de várias maneiras, e uma peculiaridade especial da FPB são seus arrays de texto mutáveis, diferente de outras linguagens onde um array de caracteres é um ponteiro imutável, na FPB os arrays de caracteres são totalmente temporários:

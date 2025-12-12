@@ -788,6 +788,7 @@ testeComparacoes:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, gt
+.B0:
   cmp w0, 0
   beq .B1
   ldr x0, = .tex_41
@@ -800,6 +801,7 @@ testeComparacoes:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, ge
+.B3:
   cmp w0, 0
   beq .B4
   ldr x0, = .tex_42
@@ -818,6 +820,7 @@ testeComparacoes:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, ge
+  str w0, [sp, -16]!
   cmp w0, 0
   beq .B7
   ldr w0, [x29, -32]
@@ -826,52 +829,50 @@ testeComparacoes:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, gt
-  cmp w0, 0
-  beq .B7
-  mov w0, 1
-  b .B8
+  ldr w1, [sp], 16
+  and w0, w1, w0
+  b .B6
 .B7:
   mov w0, 0
-.B8:
+.B6:
   cmp w0, 0
-  beq .B9
+  beq .B8
   ldr x0, = .tex_44
   bl _escrever_tex
-  b .B10
-.B9:
+  b .B9
+.B8:
   ldr x0, = .tex_45
   bl _escrever_tex
-.B10:
+.B9:
   ldr w0, [x29, -48]
   str w0, [sp, -16]!
   ldr w0, [x29, -32]
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, eq
+  str w0, [sp, -16]!
   cmp w0, 1
-  beq .B13
+  beq .B10
   ldr w0, [x29, -32]
   str w0, [sp, -16]!
   mov w0, 3
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, gt
-  cmp w0, 1
-  beq .B13
-.B12:
-  mov w0, 0
-  b .B13
-  mov w0, 1
-.B13:
+  ldr w1, [sp], 16
+  orr w0, w1, w0
   cmp w0, 0
-  beq .B14
+  cset w0, ne
+.B10:
+  cmp w0, 0
+  beq .B12
   ldr x0, = .tex_46
   bl _escrever_tex
-  b .B15
-.B14:
+  b .B13
+.B12:
   ldr x0, = .tex_47
   bl _escrever_tex
-.B15:
+.B13:
   ldr x0, = .tex_48
   bl _escrever_tex
   ldr x0, = .tex_49
@@ -899,13 +900,14 @@ testeComparacoes:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, eq
+.B14:
   cmp w0, 0
-  beq .B17
+  beq .B15
   ldr x0, = .tex_51
   bl _escrever_tex
-  b .B18
-.B17:
-.B18:
+  b .B16
+.B15:
+.B16:
   ldr x0, [x29, -64]
   str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
   ldr x0, [x29, -80]
@@ -919,13 +921,14 @@ testeComparacoes:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, eq
+.B17:
   cmp w0, 0
-  beq .B20
+  beq .B18
   ldr x0, = .tex_52
   bl _escrever_tex
-  b .B21
-.B20:
-.B21:
+  b .B19
+.B18:
+.B19:
   ldr x0, [x29, -64]
   str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
   ldr x0, [x29, -64]
@@ -939,15 +942,16 @@ testeComparacoes:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, eq
+.B20:
   cmp w0, 0
-  beq .B23
+  beq .B21
   ldr x0, = .tex_53
   bl _escrever_tex
-  b .B24
-.B23:
+  b .B22
+.B21:
   ldr x0, = .tex_54
   bl _escrever_tex
-.B24:
+.B22:
   b 1f
 // epilogo
 1:
@@ -1045,17 +1049,18 @@ testeMemoria:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, ge
+.B23:
   cmp w0, 0
-  beq .B26
+  beq .B24
   ldr x0, = .tex_65
   bl _escrever_tex
   ldr w0, [x29, -96]
   bl _escrever_int
-  b .B27
-.B26:
+  b .B25
+.B24:
   ldr x0, = .tex_66
   bl _escrever_tex
-.B27:
+.B25:
   ldr x0, = .tex_67
   bl _escrever_tex
   ldr x0, = .tex_68
@@ -1148,7 +1153,7 @@ testeMemoria:
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 304]
-.B29:
+.B27:
   ldr w0, [x29, 304]
   str w0, [sp, -16]!
   mov w0, 4
@@ -1156,7 +1161,7 @@ testeMemoria:
   cmp w1, w0
   cset w0, lt
   cmp w0, 0
-  beq .B30
+  beq .B28
   ldr x0, = .tex_75
   bl _escrever_tex
   ldr w0, [x29, 304]
@@ -1179,8 +1184,8 @@ testeMemoria:
   ldr w0, [x29, 304]
   add w0, w0, 1
   str w0, [x29, 304]
-  b .B29
-.B30:
+  b .B27
+.B28:
   ldr x0, = const_5
   ldr s0, [x0]
   str s0, [x29, -176]
@@ -1197,7 +1202,7 @@ testeMemoria:
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 288]
-.B32:
+.B30:
   ldr w0, [x29, 288]
   str w0, [sp, -16]!
   mov w0, 4
@@ -1205,7 +1210,7 @@ testeMemoria:
   cmp w1, w0
   cset w0, lt
   cmp w0, 0
-  beq .B33
+  beq .B31
   ldr x0, = .tex_75
   bl _escrever_tex
   ldr w0, [x29, 288]
@@ -1228,8 +1233,8 @@ testeMemoria:
   ldr w0, [x29, 288]
   add w0, w0, 1
   str w0, [x29, 288]
-  b .B32
-.B33:
+  b .B30
+.B31:
   b 1f
 // epilogo
 1:
@@ -1247,15 +1252,16 @@ testeLoops:
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -32]
-.B35:
+.B33:
   ldr w0, [x29, -32]
   str w0, [sp, -16]!
   mov w0, 10
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, lt
+.B35:
   cmp w0, 0
-  beq .B36
+  beq .B34
   ldr x0, = .tex_80
   bl _escrever_tex
   ldr w0, [x29, -32]
@@ -1263,21 +1269,22 @@ testeLoops:
   ldr w0, [x29, -32]
   add w0, w0, 1
   str w0, [x29, -32]
-  b .B35
-.B36:
+  b .B33
+.B34:
   mov w0, 0
   str w0, [x29, -48]
   ldr x0, = .tex_81
   bl _escrever_tex
-.B39:
+.B37:
   ldr w0, [x29, -48]
   str w0, [sp, -16]!
   mov w0, 10
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, lt
+.B39:
   cmp w0, 0
-  beq .B40
+  beq .B38
   ldr w0, [x29, -48]
   bl _escrever_int
   ldr x0, = .tex_1
@@ -1288,24 +1295,25 @@ testeLoops:
   ldr w1, [sp], 16
   cmp w1, w0
   cset w0, eq
+.B40:
   cmp w0, 0
-  beq .B43
+  beq .B41
   ldr x0, = .tex_82
   bl _escrever_tex
-  b .B40
-  b .B44
-.B43:
-.B44:
+  b .B38
+  b .B42
+.B41:
+.B42:
   ldr w0, [x29, -48]
   add w0, w0, 1
   str w0, [x29, -48]
-  b .B39
-.B40:
+  b .B37
+.B38:
   ldr x0, = .tex_83
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, 160]
-.B46:
+.B44:
   ldr w0, [x29, 160]
   str w0, [sp, -16]!
   mov w0, 10
@@ -1313,7 +1321,7 @@ testeLoops:
   cmp w1, w0
   cset w0, lt
   cmp w0, 0
-  beq .B47
+  beq .B45
   ldr x0, = .tex_84
   bl _escrever_tex
   ldr w0, [x29, 160]
@@ -1323,8 +1331,8 @@ testeLoops:
   ldr w0, [x29, 160]
   add w0, w0, 1
   str w0, [x29, 160]
-  b .B46
-.B47:
+  b .B44
+.B45:
   b 1f
 // epilogo
 1:
@@ -1567,7 +1575,7 @@ const_13:
 .tex_80: .asciz "\nvalor de i: "
 .tex_81: .asciz "\n\nTeste de parada do loop (deve parar em 5)\n"
 .tex_82: .asciz "parando\n"
-.tex_83: .asciz "\n\nPor:\n"
+.tex_83: .asciz "\nLoop Por:\n"
 .tex_84: .asciz "indice: "
 .tex_85: .asciz "\n\nTeste de matrizes:\n\n"
 .tex_86: .asciz "matriz 2D int m2[0][1]: "

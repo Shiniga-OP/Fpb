@@ -210,6 +210,19 @@ por(int i = 0; i < 10; i++) {
 }
 [código]
 
+você também tem acesso a instruções em loops, como o "pare", que termina o loop instantaneamente:
+
+[código]
+por(int i = 0; i < 10; i++) {
+    escrever("i = ", i, "\n");
+    se(i == 5) {
+        pare;
+    }
+}
+[código]
+
+isso vai terminar o loop quando imprimir "i = 5" no terminal.
+
 ## GLOBAIS ##
 
 funções globais são definidas sem retorno:

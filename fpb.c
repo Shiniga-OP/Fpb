@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 12/12/2025.
+* [ATUAL]: 13/12/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,14 +18,14 @@
 #include "util/otimi1.h"
 #include "util/otimi2.h"
 
-#define MAX_TOK 8192 // maximo de tolens
-#define MAX_CODIGO 8192 // maximo de codhgk
+#define MAX_TOK 18192 // maximo de tolens
+#define MAX_CODIGO 18192 // maximo de codhgk
 #define MAX_FN 1552 // maximo de funções
 #define MAX_VAR 1552 // maximo de variaveis
 #define MAX_CONST 1552 // maxmio de constantes
 #define MAX_PARAMS 8 // maximo de parametros
 #define MAX_TEX 1552 // mqximo de textos
-#define MAX_DIMS 4  // máximo de dimensões para matrizes
+#define MAX_DIMS 5  // máximo de dimensões para matrizes
 #define MAX_MACROS 1556 // maximo de macros
 
 typedef enum {
@@ -1994,11 +1994,11 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         // conversão baseada no tipo
         if(tipo_exp == T_pBYTE) {
             // byte -> ponteiro: estende sem sinal paa 64 bits
-            fprintf(s, "  and w0, w0, 0xFF\n"); // Garante que é byte
+            fprintf(s, "  and w0, w0, 0xFF\n"); // garante que é byte
             fprintf(s, "  uxtw x0, w0\n"); // estende sem sinal pra 64 bits
         } else if(tipo_exp == T_pINT) {
             // int -> pnteiro: estende sem sinal pra 64 bits  
-            fprintf(s, "  uxtw x0, w0\n"); // Estende sem sinal para 64 bits
+            fprintf(s, "  uxtw x0, w0\n"); // estende sem sinal para 64 bits
         } else if(tipo_exp == T_pLONGO) {
             // longo -> ponteiro: ja é 64 bits, não precisa conversão
         } else {
@@ -3430,13 +3430,9 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                     var->valor = (int)L.tk.valor_l;
                     var->valor_f = (double)L.tk.valor_l;
                     proximoToken();
-                } else if(L.tk.tipo == T_FLU) {
+                } else if(L.tk.tipo == T_FLU || L.tk.tipo == T_DOBRO) {
                     var->valor_f = L.tk.valor_d;
                     var->valor = 0; // não usa pra flutuantes
-                    proximoToken();
-                } else if(L.tk.tipo == T_DOBRO) {
-                    var->valor_f = L.tk.valor_d;
-                    var->valor = 0;
                     proximoToken();
                 } else if(L.tk.tipo == T_LONGO) {
                     if(debug_o) printf("[declaracao_var]: atribuindo %s com longo, valor: %ld", var->nome, L.tk.valor_l);
@@ -3528,16 +3524,8 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 fprintf(s, "  str x0, [x29, %d]\n", var->pos);
                 proximoToken();
             } else {
-                Token token_valor = L.tk;
                 TipoToken tipo_exp = expressao(s, escopo);
                 
-                if(eh_final) {
-                    if(token_valor.tipo == T_INT) {
-                        var->valor = (int)token_valor.valor_l;
-                    } else if(token_valor.tipo == T_CAR && token_valor.lex[0] != 0) {
-                        var->valor = (int)token_valor.lex[0];
-                    }
-                }
                 if(eh_ponteiro) {
                     if(tipo_exp == T_pINT) {
                         fprintf(s, "  sxtw x0, w0\n");

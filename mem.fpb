@@ -2,13 +2,7 @@
 #global inicio();
 
 vazio inicio() {
-    bool x = falso;
-    bool y = falso;
-    bool z = falso;
-    enq(!x && !y && !z) {
-        escrever("Teste, X = ", x, "\n");
-        x = verdade;
-        y = verdade;
-        z = verdade;
-    }
+    escrever("=== medidor de tempo em Milissegundos ===\n");
+    // teste unico do conversor FPB
+    escrever("\n[FPB] Inicio: ", 123.45f);
 }

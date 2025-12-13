@@ -1,9 +1,8 @@
 #incluir "biblis/impressao.asm";
-#incluir "cvtint.fpb";
+#incluir "biblis/cvts.fpb"
 #global inicio();
 
 vazio inicio() {
-    int x = cvtint("123", 3);
-    x++;
-    escrever(x);
+    escrever(cvtint("123", 3) + 1, '\n');
+    escrever(cvtflu("12.50", 5) + 0.50f, '\n')
 }

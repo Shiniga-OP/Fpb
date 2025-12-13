@@ -192,7 +192,9 @@ void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo);
 void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo);
 void gerar_prelude(FILE* s);
 // processar:
-TipoToken processar_condicao(FILE* s, int escopo);
+void processar_args(FILE* s, Funcao* f);
+char* processar_caminho();
+int processar_var_tam(int escopo);
 // etc
 TipoToken expressao(FILE* s, int escopo);
 TipoToken termo(FILE* s, int escopo);
@@ -276,7 +278,7 @@ const char* token_str(TipoToken t) {
 }
 
 void fatal(const char* m) {
-    fprintf(stderr, "%s.fpb [ERRO] linha: %d coluna: %d, %s próximo de \"%s\"\n", arquivoAtual, L.tk.pos.linha + 1, L.tk.pos.coluna + 1, m, L.tk.lex);
+    fprintf(stderr, "%s [ERRO] linha: %d coluna: %d, %s próximo de \"%s\"\n", arquivoAtual, L.tk.pos.linha + 1, L.tk.pos.coluna + 1, m, L.tk.lex);
     exit(1);
 }
 
@@ -1293,85 +1295,6 @@ char* processar_caminho() {
     return caminho;
 }
 
-TipoToken processar_condicao(FILE* s, int escopo) {
-    int rotulo_fim = escopo_global++;
-    TipoToken tipo_final = T_pBOOL;
-    
-    // processa a primeira expressão
-    TipoToken tipo_atual = expressao(s, escopo);
-    
-    if(tipo_atual != T_pINT && tipo_atual != T_pBOOL) {
-        // converte pra booleano se necessario
-        if(tipo_atual == T_pFLU) {
-            fprintf(s, "  fcmp s0, 0.0\n");
-            fprintf(s, "  cset w0, ne\n");
-            tipo_atual = T_pBOOL;
-        } else if(tipo_atual == T_pDOBRO) {
-            fprintf(s, "  fcmp d0, 0.0\n");
-            fprintf(s, "  cset w0, ne\n");
-            tipo_atual = T_pBOOL;
-        } else {
-            fatal("[processar_condicao] condição deve ser inteiro ou booleano");
-        }
-    }
-    // processa operadores logicos encadeados
-    while(L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {
-        TipoToken op = L.tk.tipo;
-        proximoToken(); // consome && ou ||
-        
-        int rotulo_curto = escopo_global++;
-        
-        // salva o resultado da primeira parte
-        fprintf(s, "  str w0, [sp, -16]!\n");
-        
-        if(op == T_TAMBEM_TAMBEM) {
-            // se for falso, pula direto pra falso
-            fprintf(s, "  cmp w0, 0\n");
-            fprintf(s, "  beq .B%d\n", rotulo_curto);
-        } else { // T_OU_OU
-            // se for verdadeiro, pula direto pra verdadeiro
-            fprintf(s, "  cmp w0, 1\n");
-            fprintf(s, "  beq .B%d\n", rotulo_fim);
-        }
-        // processa a proxima expressão
-        TipoToken tipo_dir = expressao(s, escopo);
-        
-        if(tipo_dir != T_pINT && tipo_dir != T_pBOOL) {
-            // converte pra booleano se necessario
-            if(tipo_dir == T_pFLU) {
-                fprintf(s, "  fcmp s0, 0.0\n");
-                fprintf(s, "  cset w0, ne\n");
-                tipo_dir = T_pBOOL;
-            } else if(tipo_dir == T_pDOBRO) {
-                fprintf(s, "  fcmp d0, 0.0\n");
-                fprintf(s, "  cset w0, ne\n");
-                tipo_dir = T_pBOOL;
-            } else {
-                fatal("[processar_condicao] condição deve ser inteiro ou booleano");
-            }
-        }
-        // recupera o primeiro valor
-        fprintf(s, "  ldr w1, [sp], 16\n");
-        
-        if(op == T_TAMBEM_TAMBEM) {
-            // TAMBEM: ambas devem ser verdadeiras
-            fprintf(s, "  and w0, w1, w0\n");
-        } else { // T_OU_OU
-            // OU: pelo menos uma deve ser verdadeira
-            fprintf(s, "  orr w0, w1, w0\n");
-            fprintf(s, "  cmp w0, 0\n");
-            fprintf(s, "  cset w0, ne\n"); // converte pra 0/1
-        }
-        if(op == T_TAMBEM_TAMBEM) {
-            fprintf(s, "  b .B%d\n", rotulo_fim);
-            fprintf(s, ".B%d:\n", rotulo_curto);
-            fprintf(s, "  mov w0, 0\n");
-        }
-    }
-    fprintf(s, ".B%d:\n", rotulo_fim);
-    return T_pBOOL;
-}
-
 int processar_var_tam(int escopo) {
     Lexer salvo = L;
     int tam_total = 0;
@@ -1839,14 +1762,28 @@ void verificar_se(FILE* s, int escopo) {
     excessao(T_SE);
     excessao(T_PAREN_ESQ);
     
-    TipoToken tipo_cond = processar_condicao(s, escopo);
+    TipoToken tipo_cond = expressao(s, escopo);
     
+    // expressão ja deve retornar booleano pra comparações
+    // mas verifica se é compatível com booleano
     if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
-        fatal("[verificar_se] condição deve ser inteiro ou booleano");
+        // tenta converter se for flutuante
+        if(tipo_cond == T_pFLU) {
+            fprintf(s, "  fcmp s0, 0.0\n");
+            fprintf(s, "  cset w0, ne\n");
+            tipo_cond = T_pBOOL;
+        } else if(tipo_cond == T_pDOBRO) {
+            fprintf(s, "  fcmp d0, 0.0\n");
+            fprintf(s, "  cset w0, ne\n");
+            tipo_cond = T_pBOOL;
+        } else {
+            fatal("[verificar_se] condição deve ser inteiro ou booleano");
+        }
     }
     excessao(T_PAREN_DIR);
     
     int rotulo_falso = escopo_global++;
+    // agora w0 contem 0(falso) ou 1(verdade)
     fprintf(s, "  cmp w0, 0\n");
     fprintf(s, "  beq .B%d\n", rotulo_falso);
     
@@ -1987,7 +1924,7 @@ void verificar_enq(FILE* s, int escopo) {
 
     fprintf(s, ".B%d:\n", rotulo_inicio);
 
-    processar_condicao(s, novo_escopo);
+    expressao(s, novo_escopo);
     
     excessao(T_PAREN_DIR);
 
@@ -2114,7 +2051,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             long tam = ftell(arquivo_incluir);
             fseek(arquivo_incluir, 0, SEEK_SET);
             char* conteudo_fpb = malloc(tam + 1);
-            fread(conteudo_fpb, 1, tamanho, arquivo_incluir);
+            fread(conteudo_fpb, 1, tam, arquivo_incluir);
             conteudo_fpb[tam] = '\0';
             fclose(arquivo_incluir);
             // atualiza o lexer com o novo conteúdo
@@ -2521,7 +2458,35 @@ void gerar_texs(FILE* s) {
     fprintf(s, ".section .rodata\n");
     fprintf(s, ".align 2\n");
     for(int i = 0; i < tex_cnt; i++) {
-        fprintf(s, "%s: .asciz \"%s\"\n", texs[i].nome, texs[i].valor);
+        fprintf(s, "%s: .asciz \"", texs[i].nome);
+        
+        // processa cada caractere pra escapar caracteres especiais
+        const char* str = texs[i].valor;
+        for(int j = 0; str[j] != '\0'; j++) {
+            unsigned char c = str[j];
+            switch(c) {
+                case '\n': fprintf(s, "\\n"); break;
+                case '\t': fprintf(s, "\\t"); break;
+                case '\r': fprintf(s, "\\r"); break;
+                case '\0': fprintf(s, "\\0"); break;
+                case '\\': fprintf(s, "\\\\"); break;
+                case '\"': fprintf(s, "\\\""); break;
+                case '\a': fprintf(s, "\\a"); break;
+                case '\b': fprintf(s, "\\b"); break;
+                case '\v': fprintf(s, "\\v"); break;
+                case '\f': fprintf(s, "\\f"); break;
+                default:
+                    // caracteres imprimiveis normais
+                    if(c >= 32 && c <= 126) {
+                        fputc(c, s);
+                    } else {
+                        // caracteres não imprimiveis: usa escape octal
+                        fprintf(s, "\\%03o", c);
+                    }
+                break;
+            }
+        }
+        fprintf(s, "\"\n");
     }
     fprintf(s, ".section .text\n\n");
 }
@@ -3275,12 +3240,11 @@ TipoToken expressao(FILE* s, int escopo) {
         char id[32];
         strcpy(id, L.tk.lex);
         if(debug_o) printf("[expressao]: recebeu ID: %s\n", id);
-        // dalva a posição atual
+        // salva a posição atual
         size_t pos_salvo = L.pos;
         int linha_salvo = L.linha_atual;
         int coluna_salvo = L.coluna_atual;
         Token tk_salvo = L.tk;
-        
         // avança pra ver se tem "="
         proximoToken();
         if(L.tk.tipo == T_IGUAL) {
@@ -3301,25 +3265,112 @@ TipoToken expressao(FILE* s, int escopo) {
             L.tk = tk_salvo;
         }
     }
+    // processa primeiro nível: comparações e operadores aritmeticos
     TipoToken tipo = termo(s, escopo);
-    
+    // processa operadores de comparação
+    if(L.tk.tipo == T_IGUAL_IGUAL || L.tk.tipo == T_DIFERENTE || 
+        L.tk.tipo == T_MAIOR || L.tk.tipo == T_MENOR ||
+        L.tk.tipo == T_MAIOR_IGUAL || L.tk.tipo == T_MENOR_IGUAL) {
+        
+        TipoToken op = L.tk.tipo;
+        proximoToken();
+        
+        // salva primeiro operando
+        if(tipo == T_pFLU) {
+            fprintf(s, "  str s0, [sp, -16]!\n");
+        } else if(tipo == T_pDOBRO) {
+            fprintf(s, "  str d0, [sp, -16]!\n");
+        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+            fprintf(s, "  str x0, [sp, -16]!\n");
+        } else {
+            fprintf(s, "  str w0, [sp, -16]!\n");
+        }
+        TipoToken tipo_dir = termo(s, escopo);
+        
+        // recupera primeiro operando
+        if(tipo == T_pFLU) {
+            fprintf(s, "  ldr s1, [sp], 16\n");
+        } else if(tipo == T_pDOBRO) {
+            fprintf(s, "  ldr d1, [sp], 16\n");
+        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+            fprintf(s, "  ldr x1, [sp], 16\n");
+        } else {
+            fprintf(s, "  ldr w1, [sp], 16\n");
+        }
+        tipo = converter_tipos(s, tipo, tipo_dir);
+        gerar_comparacao(s, op, tipo);
+        tipo = T_pBOOL; // comparações sempre retornam booleano
+    }
+    // processa operadores logicos
+    while(L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {
+        TipoToken op = L.tk.tipo;
+        proximoToken();
+        
+        if(debug_o) printf("[expressao]: processando operador lógico %s\n", token_str(op));
+        
+        // salva primeiro operando(ja deve ser booleano da comparação)
+        fprintf(s, "  str w0, [sp, -16]!\n");
+        // processa segundo operando(que pode ser outra expressao completa)
+        TipoToken tipo_dir = expressao(s, escopo); // chama recursivamente
+        
+        // pra operadores logicos, precisa que ambos sejam booleanos
+        if(tipo_dir != T_pINT && tipo_dir != T_pBOOL) {
+            if(tipo_dir == T_pFLU) {
+                fprintf(s, "  fcmp s0, 0.0\n");
+                fprintf(s, "  cset w0, ne\n");
+                tipo_dir = T_pBOOL;
+            } else if(tipo_dir == T_pDOBRO) {
+                fprintf(s, "  fcmp d0, 0.0\n");
+                fprintf(s, "  cset w0, ne\n");
+                tipo_dir = T_pBOOL;
+            } else {
+                fatal("[expressao] operando do operador lógico deve ser inteiro ou booleano");
+            }
+        }
+        // recupera primeiro operando
+        fprintf(s, "  ldr w1, [sp], 16\n");
+        // primeiro operando tambem deve ser booleano
+        if(tipo != T_pINT && tipo != T_pBOOL) {
+            if(tipo == T_pFLU) {
+                // ja deveria ter sido convertido
+                fatal("[expressao] primeiro operando do operador lógico não é booleano");
+            }
+        }
+        // aplica operador logico
+        if(op == T_TAMBEM_TAMBEM) {
+            fprintf(s, "  cmp w1, 0\n");
+            fprintf(s, "  cset w1, ne\n");
+            fprintf(s, "  cmp w0, 0\n");
+            fprintf(s, "  cset w0, ne\n");
+            fprintf(s, "  and w0, w1, w0\n");
+        } else { // T_OU_OU
+            fprintf(s, "  cmp w1, 0\n");
+            fprintf(s, "  cset w1, ne\n");
+            fprintf(s, "  cmp w0, 0\n");
+            fprintf(s, "  cset w0, ne\n");
+            fprintf(s, "  orr w0, w1, w0\n");
+        }
+        
+        tipo = T_pBOOL;
+    }
+    // processa operadores aritmeticos restantes
     while(L.tk.tipo == T_MAIS || L.tk.tipo == T_MENOS ||
-    L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU ||
-    L.tk.tipo == T_MENOR_MENOR || L.tk.tipo == T_OU) {
+          L.tk.tipo == T_MENOR_MENOR || L.tk.tipo == T_OU) {
         if(debug_o) printf("[expressao]: achou operação: %s\n", token_str(L.tk.tipo));
         TipoToken op = L.tk.tipo;
         proximoToken();
-       // salva o primeiro resultado:
-       if(tipo == T_pFLU) {
-           fprintf(s, "  str s0, [sp, -16]!\n");
-       } else if(tipo == T_pDOBRO) {
-           fprintf(s, "  str d0, [sp, -16]!\n");
-       } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
-           fprintf(s, "  str x0, [sp, -16]!\n");
-       } else {
-           fprintf(s, "  str w0, [sp, -16]!\n");
-       }
-       TipoToken tipo_dir = termo(s, escopo);
+        // salva o primeiro resultado:
+        if(tipo == T_pFLU) {
+            fprintf(s, "  str s0, [sp, -16]!\n");
+        } else if(tipo == T_pDOBRO) {
+            fprintf(s, "  str d0, [sp, -16]!\n");
+        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+            fprintf(s, "  str x0, [sp, -16]!\n");
+        } else {
+            fprintf(s, "  str w0, [sp, -16]!\n");
+        }
+        TipoToken tipo_dir = termo(s, escopo);
+        
         // recupera o primeiro resultado:
         if(tipo == T_pFLU) {
             fprintf(s, "  ldr s1, [sp], 16\n");
@@ -3333,37 +3384,7 @@ TipoToken expressao(FILE* s, int escopo) {
         tipo = converter_tipos(s, tipo, tipo_dir);
         gerar_operacao(s, op, tipo);
     }
-    if(L.tk.tipo == T_IGUAL_IGUAL || L.tk.tipo == T_DIFERENTE || 
-        L.tk.tipo == T_MAIOR || L.tk.tipo == T_MENOR ||
-        L.tk.tipo == T_MAIOR_IGUAL || L.tk.tipo == T_MENOR_IGUAL) {
-        
-        TipoToken op = L.tk.tipo;
-        proximoToken();
-        
-        if(tipo == T_pFLU) {
-            fprintf(s, "  str s0, [sp, -16]!\n");
-        } else if(tipo == T_pDOBRO) {
-            fprintf(s, "  str d0, [sp, -16]!\n");
-        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
-            fprintf(s, "  str x0, [sp, -16]!\n");
-        } else {
-            fprintf(s, "  str w0, [sp, -16]!\n");
-        }
-        TipoToken tipo_dir = termo(s, escopo);
-        
-        if(tipo == T_pFLU) {
-            fprintf(s, "  ldr s1, [sp], 16\n");
-        } else if(tipo == T_pDOBRO) {
-            fprintf(s, "  ldr d1, [sp], 16\n");
-        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
-            fprintf(s, "  ldr x1, [sp], 16\n");
-        } else {
-            fprintf(s, "  ldr w1, [sp], 16\n");
-        }
-        tipo = converter_tipos(s, tipo, tipo_dir);
-        gerar_comparacao(s, op, tipo);
-        tipo = T_pBOOL;
-    }
+    
     return tipo;
 }
 

@@ -1,0 +1,85 @@
+int cvtint(car[] v, int tam);
+flu cvtflu(car[] v, int tam);
+
+int cvtint(car[] v, int tam) {
+    int n = tam;
+    se(n == 0) retorne 0;
+    int i = 0;
+    bool neg = falso;
+    car p = v[0];
+    
+    se(p == '-') {
+        neg = verdade;
+        i = 1;
+    } senao se(p == '+')  i = 1;
+    
+    int dr = n - i;
+    se(dr == 0) retorne 0;
+    // 1-4 digitos
+    se(dr <= 4) {
+        int r;
+        se(dr == 1) r = v[i] - '0';
+        senao se(dr == 2) {
+            r = (v[i] - '0') * 10 + (v[i + 1] - '0');
+        } senao se(dr == 3) {
+            r = (v[i] - '0') * 100 +
+            (v[i + 1] - '0') * 10 + 
+            (v[i + 2] - '0');
+        } senao { // 4
+            r = (v[i] - '0') * 1000 +
+            (v[i + 1] - '0') * 100 +
+            (v[i + 2] - '0') * 10 +
+            (v[i + 3] - '0');
+        }
+        int res = 0;
+        se(neg) res = -r;
+        senao res = r;
+        retorne res;
+    }
+    // 5+ digitos
+    int r = 0;
+    enq(i < n) {
+        r = r * 10 + (v[i++] - '0');
+    }
+    int res = 0;
+    se(neg) res = -r;
+    senao res = r;
+    retorne res;
+}
+
+flu cvtflu(car[] v, int tam) {
+    se(tam == 0) retorne 0.0f;
+    
+    int i = 0;
+    bool neg = falso;
+    
+    // verifica sinal
+    se(v[0] == '-') {
+        neg = verdade;
+        i = 1;
+    } senao se(v[0] == '+') {
+        i = 1;
+    }
+    // parte inteira
+    flu resultado = 0.0f;
+    enq(i < tam && v[i] != '.' && v[i] != 'e' && v[i] != 'E') {
+        se(v[i] >= '0' && v[i] <= '9') {
+            resultado = resultado * 10.0f + (flu)(v[i] - '0');
+        }
+        i++;
+    }
+    // parte decimal
+    se(i < tam && v[i] == '.') {
+        i++;
+        flu frac = 0.1f;
+        enq(i < tam && v[i] >= '0' && v[i] <= '9') {
+            resultado = resultado + (flu)(v[i] - '0') * frac;
+            frac = frac * 0.1f;
+            i++;
+        }
+    }
+    // aplica sinal
+    se(neg) resultado = -resultado;
+    
+    retorne resultado;
+}

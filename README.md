@@ -19,6 +19,7 @@ suportados
 #incluir "biblis/texs.asm";
 #incluir "biblis/mem.asm";
 #incluir "biblis/sistema.asm";
+#incluir "biblis/cvts.fpb"; // pode usar .fpb também
 
 // macro:
 #def TAM 14;
@@ -41,6 +42,7 @@ vazio testeMemoria();
 vazio testeLoops();
 vazio testeMatrizes();
 vazio testeEspaco();
+vazio testeConversao();
 
 int textam(car* texto);
 int texcar(car* texto, car alvo);
@@ -52,8 +54,8 @@ vazio memcp(car[] array, car* p, int tam);
 longo obter_tempo_milis();
 
 int somar(int a, int b) {
-   escrever("valor a: ", a, "\n");
-   escrever("valor b: ", b, "\n");
+   escrever("valor a: ", a, '\n');
+   escrever("valor b: ", b, '\n');
    retorne a + b;
 }
 
@@ -93,16 +95,16 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     escrever("\nnovo inteiro: ", numero);
     escrever("\nnovo caractere: ", letra);
     escrever("\nnovo booleano: ", marca);
-    escrever("\nnovo longo: ", numLongo, "\n");
+    escrever("\nnovo longo: ", numLongo, '\n');
     escrever("\nTeste de positivo e negativo:\n\n");
     int x = 1;
-    escrever("inteiro positivo: ", x, "\n");
+    escrever("inteiro positivo: ", x, '\n');
     x = -1;
-    escrever("inteiro negativo: ", x, "\n");
+    escrever("inteiro negativo: ", x, '\n');
     flu y = 1.1;
-    escrever("flutuante positivo: ", y, "\n");
+    escrever("flutuante positivo: ", y, '\n');
     y = -1.1;
-    escrever("flutuante negativo: ", y, "\n");
+    escrever("flutuante negativo: ", y, '\n');
     escrever("\nTeste de conversão:\n\n");
     escrever("(car)65 = ", (car)65);
     // teste operações:
@@ -112,27 +114,28 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     testeMemoria();
     testeMatrizes();
     testeEspaco();
+    testeConversao();
 }
 
 vazio testeOperacoes() {
     escrever("\n\nTeste de operações matematicas:\n\n");
     // testando ordem de precedencia:
-    escrever("operação 5 + 5 * 5, esperado: 30, veio: ", 5 + 5 * 5, "\n");
-    escrever("operação (5 + 5) * 5, esperado: 50, veio: ", (5 + 5) * 5, "\n");
+    escrever("operação 5 + 5 * 5, esperado: 30, veio: ", 5 + 5 * 5, '\n');
+    escrever("operação (5 + 5) * 5, esperado: 50, veio: ", (5 + 5) * 5, '\n');
 
     escrever(5 + 5, "\n"); // expressão direta
-    escrever(somar(5, 5), "\n"); // retorno passado direto
+    escrever(somar(5, 5), '\n'); // retorno passado direto
     
-    escrever("10 % 3 = ?, esperado: 1, recebido: ", 10 % 3, "\n");
+    escrever("10 % 3 = ?, esperado: 1, recebido: ", 10 % 3, '\n');
     escrever("\n\nTeste de operações entre tipos:\n\n");
     int y = 3;
     flu x = 0.5f; // pode ter sufixo também
-    escrever("x: ", x, " * y: ", y, ", resultado: ", x * y, "\n");
+    escrever("x: ", x, " * y: ", y, ", resultado: ", x * y, '\n');
     escrever("10 << 2, resultado: ", 10 << 2, "\n");
     escrever("10 >> 2, resultado: ", 10 >> 2, "\n");
     escrever("124 & 15, resultado: ", 124 & 15, "\n");
     escrever("124 & 0xF, resultado: ", 124 & 0xF, "\n");
-    escrever("1 | 2, resultado: ", 1 | 2, "\n");
+    escrever("1 | 2, resultado: ", 1 | 2, '\n');
 }
 
 vazio testeComparacoes() {
@@ -158,7 +161,7 @@ vazio testeComparacoes() {
     escrever("\nComparação com textos:\n\n");
     car* t1 = "texto 1";
     car* t2 = "texto 2";
-    escrever(t1, "\n", t2, "\n");
+    escrever(t1, '\n', t2, '\n');
     se(texcmp(t1, t2) == 1) {
         escrever("texto 1 é igual a texto 2\n");
     }
@@ -185,7 +188,7 @@ vazio testeMemoria() {
     int* p1 = @x1;
     escrever("p1 = p1 + 5; x1 = ?\n");
     p1 = p1 + 5;
-    escrever("x1 = ", x1, "\n");
+    escrever("x1 = ", x1, '\n');
     
     car* ponteiro = "exemplo de ponteiro";
     
@@ -212,17 +215,17 @@ vazio testeMemoria() {
     
     escrever("\nTeste de acesso a itens array:\n");
     car ca = array2[0];
-    escrever("item do indice 0 do array: ", ca, "\n");
+    escrever("item do indice 0 do array: ", ca, '\n');
     
     int[] num = { 0, 1, 2, 5 };
     escrever("\nArray de inteiros: \n\n");
     por(int j = 0; j < 4; j++) {
-        escrever("no indice: ", j, " valor: ", num[j], "\n");
+        escrever("no indice: ", j, " valor: ", num[j], '\n');
     }
     flu[] flutuante = { 0.2, 1.5, 5.1, 5.1 };
     escrever("\nArray de flutuantes: \n\n");
     por(int j = 0; j < 4; j++) {
-        escrever("no indice: ", j, " valor: ", flutuante[j], "\n");
+        escrever("no indice: ", j, " valor: ", flutuante[j], '\n');
     }
 }
 
@@ -237,7 +240,7 @@ vazio testeLoops() {
     int x = 0;
     escrever("\n\nTeste de parada do loop (deve parar em 5)\n");
     enq(x < 10) {
-        escrever(x, "\n");
+        escrever(x, '\n');
         se(x == 5) {
             escrever("parando\n");
             pare;
@@ -246,16 +249,16 @@ vazio testeLoops() {
     }
     escrever("\nLoop Por:\n");
     por(int i = 0; i < 10; i++) {
-        escrever("indice: ", i, "\n");
+        escrever("indice: ", i, '\n');
     }
 }
 
 vazio testeMatrizes() {
     escrever("\n\nTeste de matrizes:\n\n");
     int[][] m2 = { {0, 1, 4}, {4, 1, 0} };
-    escrever("matriz 2D int m2[0][1]: ", m2[0][1], "\n");
+    escrever("matriz 2D int m2[0][1]: ", m2[0][1], '\n');
     flu[][] m2f = { {3f, 5f, 7f}, {2f, 9f, 10f} };
-    escrever("matriz 2D flu m2f[0][1]: ", m2f[0][1], "\n");
+    escrever("matriz 2D flu m2f[0][1]: ", m2f[0][1], '\n');
 }
 
 vazio testeEspaco() {
@@ -269,7 +272,13 @@ vazio testeEspaco() {
     p2.idade = 1992;
     
     escrever("Pessoa 1:\nNome: ", p.nome, "\nIdade: ", p.idade);
-    escrever("\nPessoa 2:\nNome: ", p2.nome, "\nIdade: ", p2.idade, "\n");
+    escrever("\nPessoa 2:\nNome: ", p2.nome, "\nIdade: ", p2.idade, '\n');
+}
+
+vazio testeConversao() {
+    escrever("\nTeste de conversão de texto:\n");
+    escrever("123 + 1 = ", cvtint("123", 3) + 1, '\n');
+    escrever("1.50 + 0.50 = ", cvtflu("1.50", 4) + 0.50f, '\n');
 }
 ```
 ## info extra:

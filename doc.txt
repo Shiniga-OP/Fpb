@@ -301,6 +301,8 @@ você pode usar #def para definir macros númericos de inteiro ou longo.
 
 importe bibliotecas padrão da FPB com: "#include caminho;".
 
+você pode importar bibliotecas FPB também, e usar seus códigos.
+
 que não dependem de chamadas do sistema:
 
 "biblis/texs.asm": contém:

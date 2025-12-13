@@ -1,7 +1,9 @@
 #incluir "biblis/impressao.asm";
+#incluir "cvtint.fpb";
 #global inicio();
 
 vazio inicio() {
-    car[] arr = "olá\n";
-    escrever(arr);
+    int x = cvtint("123", 3);
+    x++;
+    escrever(x);
 }

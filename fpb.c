@@ -2073,40 +2073,99 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         proximoToken();
         
         if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
+        // verifica se é um arquivo .fpb ou .asm
+        char* extensao = strrchr(caminho, '.');
+        if(extensao == NULL) fatal("[verificar_stmt] arquivo sem extensão");
         
         FILE* arquivo_incluir = NULL;
+        
         // tenta primeiro com o caminho relativo ao FPB_DIR
         char* base_dir = processar_caminho();
         if(strlen(base_dir) > 0) {
             char caminho_completo[512];
             snprintf(caminho_completo, sizeof(caminho_completo), 
-                    "%s/%s", base_dir, caminho);
+            "%s/%s", base_dir, caminho);
             arquivo_incluir = fopen(caminho_completo, "r");
         }
-        // se não encontrou, tenta no diretorio atual
+        // se não encontrou, tenta no diretório atual
         if(!arquivo_incluir) {
             arquivo_incluir = fopen(caminho, "r");
         }
         if(!arquivo_incluir) {
             char mensagem_erro[300];
             snprintf(mensagem_erro, sizeof(mensagem_erro), 
-                    "[verificar_stmt] não foi possível abrir: %s (FPB_DIR=%s)", 
-                    caminho, processar_caminho());
+            "[verificar_stmt] não foi possível abrir: %s (FPB_DIR=%s)", 
+            caminho, processar_caminho());
             fatal(mensagem_erro);
         }
-        fprintf(s, "\n// inicio de %s\n", caminho);
-        char linha[512];
-        while(fgets(linha, sizeof(linha), arquivo_incluir)) {
-            if(strstr(linha, ".section .data") != NULL) {
-                fputs(linha, s);
-                fputs("  .align 2\n", s);
-            } else if(strstr(linha, ": .asciz") != NULL) {
-                fputs("  .align 2\n", s);
-                fputs(linha, s);
-            } else fputs(linha, s);
+        if(strcmp(extensao, ".fpb") == 0 || strcmp(extensao, ".FBP") == 0) {
+            // processa arquivo .fpb (compila inline)
+            fprintf(s, "\n// inicio de %s\n", caminho);
+            // salva estado atual do lexer
+            Lexer lexer_salvo = L;
+            char* fonte_salvo = (char*)L.fonte;
+            size_t pos_salvo = L.pos;
+            int linha_salvo = L.linha_atual;
+            int coluna_salvo = L.coluna_atual;
+            Token tk_salvo = L.tk;
+            char* arquivoAtual_salvo = arquivoAtual;
+            // le o conteudo do arquivo .fpb
+            fseek(arquivo_incluir, 0, SEEK_END);
+            long tam = ftell(arquivo_incluir);
+            fseek(arquivo_incluir, 0, SEEK_SET);
+            char* conteudo_fpb = malloc(tam + 1);
+            fread(conteudo_fpb, 1, tamanho, arquivo_incluir);
+            conteudo_fpb[tam] = '\0';
+            fclose(arquivo_incluir);
+            // atualiza o lexer com o novo conteúdo
+            L.fonte = conteudo_fpb;
+            L.pos = 0;
+            L.linha_atual = 1;
+            L.coluna_atual = 1;
+            arquivoAtual = caminho;
+            // processa todo o arquivo .fpb
+            proximoToken();
+            while(L.tk.tipo != T_FIM) {
+                if(L.tk.tipo == T_INCLUIR) {
+                    // recursivamente processa outros incluir
+                    int pos = 0;
+                    verificar_stmt(s, &pos, 0);
+                } else if(L.tk.tipo == T_DEF) verificar_def();
+                else if(L.tk.tipo == T_ESPACO) verificar_espaco(s);
+                else if(L.tk.tipo == T_GLOBAL) verificar_global(s);
+                else verificar_fn(s);
+            }
+            fprintf(s, "\n// fim de %s\n\n", caminho);
+            // restaura estado original do lexer
+            free(conteudo_fpb);
+            L = lexer_salvo;
+            L.fonte = fonte_salvo;
+            L.pos = pos_salvo;
+            L.linha_atual = linha_salvo;
+            L.coluna_atual = coluna_salvo;
+            L.tk = tk_salvo;
+            arquivoAtual = arquivoAtual_salvo;
+        } else if(strcmp(extensao, ".asm") == 0 || strcmp(extensao, ".s") == 0) {
+            // copia arquivo .asm diretamente
+            fprintf(s, "\n// inicio de %s\n", caminho);
+            char linha[512];
+            while(fgets(linha, sizeof(linha), arquivo_incluir)) {
+                if(strstr(linha, ".section .data") != NULL) {
+                    fputs(linha, s);
+                    fputs("  .align 2\n", s);
+                } else if(strstr(linha, ": .asciz") != NULL) {
+                    fputs("  .align 2\n", s);
+                    fputs(linha, s);
+                } else {
+                    fputs(linha, s);
+                }
+            }
+            fprintf(s, "\n// fim de %s\n\n", caminho);
+            fclose(arquivo_incluir);
+        } else {
+            fclose(arquivo_incluir);
+            fatal("[verificar_stmt] extensão de arquivo não suportada (use .fpb ou .asm)");
         }
-        fprintf(s, "\n// fim de %s\n\n", caminho);
-        fclose(arquivo_incluir);
         return;
     }
     if(L.tk.tipo == T_GLOBAL) {

@@ -6,7 +6,7 @@ suportados
 #incluir "biblis/impressao.asm";
 #incluir "biblis/texs.asm";
 #incluir "biblis/mem.asm";
-#incluir "biblis/sistema.asm";
+#incluir "biblis/sistema.asm"; // pode usar .fpb também
 
 // macro:
 #def TAM 14;

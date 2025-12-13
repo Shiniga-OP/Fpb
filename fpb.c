@@ -542,7 +542,23 @@ void proximoToken() {
             if(c == '\\') {
                 char n = L.fonte[L.pos + 1];
                 if(!n) fatal("tex mal formado");
-                if(i < MAX_TOK-2) { L.tk.lex[i++] = '\\'; L.tk.lex[i++] = n; }
+                
+                char escape_car;
+                switch(n) {
+                    case 'n': escape_car = '\n'; break;
+                    case 't': escape_car = '\t'; break;
+                    case 'r': escape_car = '\r'; break;
+                    case '0': escape_car = '\0'; break;
+                    case '\\': escape_car = '\\'; break;
+                    case '\'': escape_car = '\''; break;
+                    case '\"': escape_car = '\"'; break;
+                    case 'a': escape_car = '\a'; break;
+                    case 'b': escape_car = '\b'; break;
+                    case 'v': escape_car = '\v'; break;
+                    case 'f': escape_car = '\f'; break;
+                    default: escape_car = n;break;
+                }
+                if(i < MAX_TOK - 1) L.tk.lex[i++] = escape_car;
                 L.pos += 2; L.coluna_atual += 2;
                 c = L.fonte[L.pos];
                 continue;
@@ -562,20 +578,47 @@ void proximoToken() {
     if(c == '\'') {
         L.pos++; L.coluna_atual++;
         if(!L.fonte[L.pos]) fatal("caractere mal formado");
+        
+        char valor_car;
+        
+        // verifica se é uma sequencia de escape
         if(L.fonte[L.pos] == '\\') {
-            char n = L.fonte[L.pos + 1];
-            if(!n || L.fonte[L.pos + 2] != '\'') fatal("caractere mal formado");
-            if(MAX_TOK > 3) sprintf(L.tk.lex, "\\%c", n);
-            L.pos += 3;
-            L.coluna_atual += 3;
+            L.pos++; L.coluna_atual++;
+            
+            if(!L.fonte[L.pos]) fatal("caractere mal formado");
+            
+            // lrocessa sequências de escape comuns
+            switch(L.fonte[L.pos]) {
+                case 'n': valor_car = '\n'; break; // quebra de linha
+                case 't': valor_car = '\t'; break; // tab horizontal
+                case 'r': valor_car = '\r'; break;
+                case '0': valor_car = '\0'; break; // fim de texto
+                case '\\': valor_car = '\\'; break;
+                case '\'': valor_car = '\''; break; // aspas simples escapada
+                case '\"': valor_car = '\"'; break; // aspas normal escapada
+                case 'a': valor_car = '\a'; break;  // alerta
+                case 'b': valor_car = '\b'; break;  // apaga
+                case 'v': valor_car = '\v'; break;  // tab vertical
+                case 'f': valor_car = '\f'; break;
+                default:
+                // se não for uma sequencia de escape conhecida, mantem o caractere literal
+                valor_car = L.fonte[L.pos];
+                break;
+            }
+            L.pos++; L.coluna_atual++;
         } else {
-            char v = L.fonte[L.pos];
-            if(L.fonte[L.pos + 1] != '\'') fatal("caractere mal formado");
-            if(MAX_TOK > 2) sprintf(L.tk.lex, "%c", v);
-            L.pos += 2;
-            L.coluna_atual += 2;
+            // caractere normal
+            valor_car = L.fonte[L.pos];
+            L.pos++; L.coluna_atual++;
         }
+        // verifica se fecha com aspas simples
+        if(L.fonte[L.pos] != '\'') fatal("caractere mal formado");
+        L.pos++; L.coluna_atual++;
+        // armazena o valor
         L.tk.tipo = T_CAR;
+        L.tk.lex[0] = valor_car;
+        L.tk.lex[1] = '\0';
+        L.tk.valor_l = (long)valor_car;
         return;
     }
     // caracteres simples:
@@ -1122,7 +1165,7 @@ TipoToken tratar_flutuante(FILE* s) {
 }
 
 TipoToken tratar_caractere(FILE* s) {
-    char val = L.tk.lex[0];
+    char val = (char)L.tk.valor_l;
     proximoToken();
     fprintf(s, "  mov w0, %d\n", val);
     return T_pCAR;
@@ -3420,15 +3463,15 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 if(L.tk.tipo == T_INT) {
                     if(debug_o) printf("[declaracao_var]: atribuindo %s como int, valor: %ld", var->nome, L.tk.valor_l);
                     var->valor = (int)L.tk.valor_l;
-                    var->valor_f = (double)L.tk.valor_l;
+                    var->valor_f = 0;
                     proximoToken();
                 } else if(L.tk.tipo == T_CAR && L.tk.lex[0] != 0) {
-                    var->valor = (int)L.tk.lex[0];
-                    var->valor_f = (double)L.tk.lex[0];
+                    var->valor = (char)L.tk.valor_l;
+                    var->valor_f = 0;
                     proximoToken();
                 } else if(L.tk.tipo == T_BYTE) {
                     var->valor = (int)L.tk.valor_l;
-                    var->valor_f = (double)L.tk.valor_l;
+                    var->valor_f = 0;
                     proximoToken();
                 } else if(L.tk.tipo == T_FLU || L.tk.tipo == T_DOBRO) {
                     var->valor_f = L.tk.valor_d;
@@ -3437,7 +3480,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 } else if(L.tk.tipo == T_LONGO) {
                     if(debug_o) printf("[declaracao_var]: atribuindo %s com longo, valor: %ld", var->nome, L.tk.valor_l);
                     var->valor = L.tk.valor_l;
-                    var->valor_f = L.tk.valor_d;
+                    var->valor_f = 0;
                     proximoToken();
                 } else {
                     fatal("[declaracao_var] inicialização global deve ser constante");
@@ -3472,8 +3515,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                     
                     if(!tipos_compativeis(campo->tipo_base, tipo_valor)) {
                         char msg[100];
-                        sprintf(msg, "[declaracao_var] tipo incompatível na inicialização do espaço (campo %s)", 
-                                campo->nome);
+                        sprintf(msg, "[declaracao_var] tipo incompatível na inicialização do espaço (campo %s)", campo->nome);
                         fatal(msg);
                     }
                     // calcula posição do campo

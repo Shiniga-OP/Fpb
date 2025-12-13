@@ -2,7 +2,6 @@
 #global inicio();
 
 vazio inicio() {
-    escrever("=== medidor de tempo em Milissegundos ===\n");
-    // teste unico do conversor FPB
-    escrever("\n[FPB] Inicio: ", 123.45f);
+    car[] arr = "olá\n";
+    escrever(arr);
 }

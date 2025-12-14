@@ -296,10 +296,10 @@ int* p;
 ```
 
 funções globais NÃO SÃO APAGADAS, mesmo se não forem usadas no mesmo código com a otimização nivel 1.
-## documentação (beta)
+## documentação:
 você pode encontrar mais explicações em doc.txt
 
-## como compilar
+## como compilar:
 para compilar, você deve usar:
 ```Bash
 fpb ola
@@ -308,7 +308,7 @@ fpb ola -s /caminho/arquivo
 ```
 não precisa da extensão, o compilador gera o binário com o nome específico automaticamente, mas agora pode passar a extensão se quiser.
 
-# configuração extra
+# configuração extra:
 caso você queira o código assembly intermediário, utilize:
 ```Bash
 fpb ola -asm

@@ -3,7 +3,7 @@
 * [IMPLEMENTAÇÃO]: @Shiniga-OP.
 * [BASE]: Assembly.
 * [SISTEMA OPERACIONAL]: ANDROID.
-* [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
+* [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
 * [ATUAL]: 14/12/2025.
@@ -25,7 +25,7 @@
 #define MAX_CONST 1552 // maxmio de constantes
 #define MAX_PARAMS 8 // maximo de parametros
 #define MAX_TEX 1552 // mqximo de textos
-#define MAX_DIMS 5  // máximo de dimensões para matrizes
+#define MAX_DIMS 6  // máximo de dimensões para matrizes
 #define MAX_MACROS 1556 // maximo de macros
 
 typedef enum {
@@ -139,9 +139,9 @@ typedef struct {
 } Tex;
 
 typedef struct {
-    bool x[16];
-    bool s[16];
-    bool d[16];
+    bool x[19];
+    bool s[19];
+    bool d[19];
 } Regs;
 
 static Lexer L;
@@ -160,6 +160,8 @@ static Espaco espacos[MAX_FN];
 static int espaco_cnt = 0;
 static int rotulos_pare[MAX_FN];  // Pilha de rótulos para 'pare'
 static int rotulo_pare_topo = -1; // Topo da pilha
+static bool em_loop = false;
+static int nivel_loop = 0;
 static char* arquivoAtual;
 static Regs regs = {0};
 static bool debug_o = false;
@@ -306,14 +308,7 @@ int alocar_reg(char tipo) {
     // pra registradores de inteiros(x/w)
     if(tipo == 'x' || tipo == 'w') {
         // usa x8-x15 pra temporarios(não preservados pelo chamador)
-        for(int i = 8; i <= 15; i++) {
-            if(!regs.x[i]) {
-                regs.x[i] = true;
-                return i;
-            }
-        }
-        // se não houver registradores temporarios, tenta x19-x22(salvos)
-        for(int i = 19; i <= 22; i++) {
+        for(int i = 8; i <= 19; i++) {
             if(!regs.x[i]) {
                 regs.x[i] = true;
                 return i;
@@ -323,7 +318,7 @@ int alocar_reg(char tipo) {
     // pra registradores de ponto flutuante(s)
     else if(tipo == 's') {
         // s0-s7 são usados pra parametros, então usamos s8-s15
-        for(int i = 8; i <= 15; i++) {
+        for(int i = 8; i <= 19; i++) {
             if(!regs.s[i]) {
                 regs.s[i] = true;
                 return i;
@@ -333,31 +328,31 @@ int alocar_reg(char tipo) {
     // pra registradores de ponto flutuante dobro(d)
     else if(tipo == 'd') {
         // d0-d7 são usados pra parametros, então usamos d8-d15
-        for(int i = 8; i <= 15; i++) {
+        for(int i = 8; i <= 19; i++) {
             if(!regs.d[i]) {
                 regs.d[i] = true;
                 return i;
             }
         }
     }
-    return -1; // significa SP (pilha)
+    return -1; // significa pilha
 }
 
 void liberar_reg(char tipo, int reg) {
     if(tipo == 'x' || tipo == 'w') {
-        if(reg >= 8 && reg <= 15) {
+        if(reg >= 8 && reg <= 19) {
             regs.x[reg] = false;
         } else if(reg >= 19 && reg <= 22) {
             regs.x[reg] = false;
         }
     }
     else if(tipo == 's') {
-        if(reg >= 8 && reg <= 15) {
+        if(reg >= 8 && reg <= 19) {
             regs.s[reg] = false;
         }
     }
     else if(tipo == 'd') {
-        if(reg >= 8 && reg <= 15) {
+        if(reg >= 8 && reg <= 19) {
             regs.d[reg] = false;
         }
     }
@@ -1753,38 +1748,64 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
     }
     Variavel* var = buscar_var(id, escopo);
     if(!var) fatal("[verificar_atribuicao] variável não declarada");
-    if(var->eh_final) fatal("[verificar_atribuicao] não é possível alterar uma variável final.");
+    if(var->eh_final) fatal("[verificar_atribuicao] não é possível alterar uma variável final");
     if(var->eh_array) fatal("[verificar_atribuicao] não é possível armazenar valor direto em array");
     
     excessao(T_IGUAL);
     
     TipoToken tipo_exp = expressao(s, escopo);
     
-    if(var->eh_ponteiro) {
-        // se a expressão da direita tambem é ponteiro = atribuição de ponteiro
-        if(tipo_exp == T_PONTEIRO) {
-            // atribuição de ponteiro: p = outro_ponteiro
+    // determina o tipo do registrador baseado no tipo da variavel
+    char reg_tipo;
+    int reg_num;
+    
+    if(var->tipo_base == T_pFLU) reg_tipo = 's';
+    else if(var->tipo_base == T_pDOBRO) reg_tipo = 'd';
+    else if(var->tipo_base == T_pLONGO || var->tipo_base == T_PONTEIRO) reg_tipo = 'x';
+    else reg_tipo = 'w';
+    
+    // tenta alocar um registrador temporario
+    reg_num = alocar_reg(reg_tipo);
+    
+    if(reg_num >= 0) {
+        // tem registrador disponivel
+        if(debug_o) printf("[verificar_atribuicao]: usando registrador %c%d pra valor temporário\n", reg_tipo, reg_num);
+        
+        // move o resultado da expressão pra o registrador temporario
+        if(reg_tipo == 's') {
+            fprintf(s, "  fmov s%d, s0\n", reg_num);
+        } else if(reg_tipo == 'd') {
+            fprintf(s, "  fmov d%d, d0\n", reg_num);
+        } else if(reg_tipo == 'x') {
+            fprintf(s, "  mov x%d, x0\n", reg_num);
+        } else {
+            fprintf(s, "  mov w%d, w0\n", reg_num);
+        }
+        // armazena o valor
+        if(var->eh_ponteiro) {
             fprintf(s, "  str x0, [x29, %d]\n", var->pos);
         } else {
-            // atribuição deferenciada: p = valor(armazena no apontado)
-            fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
-            
-            if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL) {
-                fprintf(s, "  strb w0, [x1]\n");
-            } else if(var->tipo_base == T_pINT) {
-                fprintf(s, "  str w0, [x1]\n");
-            } else if(var->tipo_base == T_pFLU) {
-                fprintf(s, "  str s0, [x1]\n");
-            } else if(var->tipo_base == T_pDOBRO) {
-                fprintf(s, "  str d0, [x1]\n");
-            } else if(var->tipo_base == T_pLONGO) {
-                fprintf(s, "  str x0, [x1]\n");
+            // restaura do registrador temporario antes de armazenar
+            if(reg_tipo == 's') {
+                fprintf(s, "  fmov s0, s%d\n", reg_num);
+            } else if(reg_tipo == 'd') {
+                fprintf(s, "  fmov d0, d%d\n", reg_num);
+            } else if(reg_tipo == 'x') {
+                fprintf(s, "  mov x0, x%d\n", reg_num);
+            } else {
+                fprintf(s, "  mov w0, w%d\n", reg_num);
             }
+            armazenar_valor(s, var);
         }
+        // libera o registrador
+        liberar_reg(reg_tipo, reg_num);
     } else {
-        // variavel normal
-        if(debug_o) printf("[verificar_atribuicao]: variavel normal, escopo: %d\n", var->escopo);
-        armazenar_valor(s, var);
+        // sem registradores disponiveis, usa pilha
+        if(var->eh_ponteiro) {
+            fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+        } else {
+            armazenar_valor(s, var);
+        }
     }
 }
 
@@ -1837,21 +1858,92 @@ void verificar_se(FILE* s, int escopo) {
     
     TipoToken tipo_cond = expressao(s, escopo);
     
-    // expressão ja deve retornar booleano pra comparações
-    // mas verifica se é compatível com booleano
-    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
-        // tenta converter se for flutuante
-        if(tipo_cond == T_pFLU) {
-            fprintf(s, "  fcmp s0, 0.0\n");
-            fprintf(s, "  cset w0, ne\n");
-            tipo_cond = T_pBOOL;
-        } else if(tipo_cond == T_pDOBRO) {
-            fprintf(s, "  fcmp d0, 0.0\n");
-            fprintf(s, "  cset w0, ne\n");
-            tipo_cond = T_pBOOL;
+    // salva o resultado da condição em um registrador temporario se possivel
+    char reg_tipo;
+    int reg_temp = -1;
+    
+    if(tipo_cond == T_pFLU) {
+        reg_tipo = 's';
+        reg_temp = alocar_reg(reg_tipo);
+        if(reg_temp >= 0) {
+            if(debug_o) printf("[verificar_se]: usando registrador s%d\n", reg_temp);
+            fprintf(s, "  fmov s%d, s0\n", reg_temp);
         } else {
-            fatal("[verificar_se] condição deve ser inteiro ou booleano");
+            fprintf(s, "  str s0, [sp, -16]!\n");
         }
+    } else if(tipo_cond == T_pDOBRO) {
+        reg_tipo = 'd';
+        reg_temp = alocar_reg(reg_tipo);
+        if(reg_temp >= 0) {
+            if(debug_o) printf("[verificar_se]: usando registrador d%d\n", reg_temp);
+            fprintf(s, "  fmov d%d, d0\n", reg_temp);
+        } else {
+            fprintf(s, "  str d0, [sp, -16]!\n");
+        }
+    } else if(tipo_cond == T_pLONGO || tipo_cond == T_PONTEIRO) {
+        reg_tipo = 'x';
+        reg_temp = alocar_reg(reg_tipo);
+        if(reg_temp >= 0) {
+            if(debug_o) printf("[verificar_se]: usando registrador x%d\n", reg_temp);
+            fprintf(s, "  mov x%d, x0\n", reg_temp);
+        } else {
+            fprintf(s, "  str x0, [sp, -16]!\n");
+        }
+    } else {
+        reg_tipo = 'w';
+        reg_temp = alocar_reg(reg_tipo);
+        if(reg_temp >= 0) {
+            if(debug_o) printf("[verificar_se]: usando registrador w%d\n", reg_temp);
+            fprintf(s, "  mov w%d, w0\n", reg_temp);
+        } else {
+            fprintf(s, "  str w0, [sp, -16]!\n");
+        }
+    }
+    // verifica se a expressão precisa ser convertida pra booleano
+    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
+        // carrega o valor salvo
+        if(reg_temp >= 0) {
+            if(tipo_cond == T_pFLU) {
+                fprintf(s, "  fmov s0, s%d\n", reg_temp);
+                fprintf(s, "  fcmp s0, 0.0\n");
+            } else if(tipo_cond == T_pDOBRO) {
+                fprintf(s, "  fmov d0, d%d\n", reg_temp);
+                fprintf(s, "  fcmp d0, 0.0\n");
+            } else if(tipo_cond == T_pLONGO) {
+                fprintf(s, "  mov x0, x%d\n", reg_temp);
+                fprintf(s, "  cmp x0, 0\n");
+            } else {
+                fprintf(s, "  mov w0, w%d\n", reg_temp);
+                fprintf(s, "  cmp w0, 0\n");
+            }
+        } else {
+            if(tipo_cond == T_pFLU) {
+                fprintf(s, "  ldr s0, [sp], 16\n");
+                fprintf(s, "  fcmp s0, 0.0\n");
+            } else if(tipo_cond == T_pDOBRO) {
+                fprintf(s, "  ldr d0, [sp], 16\n");
+                fprintf(s, "  fcmp d0, 0.0\n");
+            } else if(tipo_cond == T_pLONGO) {
+                fprintf(s, "  ldr x0, [sp], 16\n");
+                fprintf(s, "  cmp x0, 0\n");
+            } else {
+                fprintf(s, "  ldr w0, [sp], 16\n");
+                fprintf(s, "  cmp w0, 0\n");
+            }
+        }
+        fprintf(s, "  cset w0, ne\n");
+        tipo_cond = T_pBOOL;
+    } else {
+        // ja é inteiro ou booleano, apenas carrega
+        if(reg_temp >= 0) {
+            fprintf(s, "  mov w0, w%d\n", reg_temp);
+        } else {
+            fprintf(s, "  ldr w0, [sp], 16\n");
+        }
+    }
+    // libera registrador temporário se foi alocado
+    if(reg_temp >= 0) {
+        liberar_reg(reg_tipo, reg_temp);
     }
     excessao(T_PAREN_DIR);
     
@@ -1885,6 +1977,8 @@ void verificar_se(FILE* s, int escopo) {
 }
 
 void verificar_por(FILE* s, int escopo) {
+    em_loop = true;
+    nivel_loop++;
     excessao(T_POR);
     excessao(T_PAREN_ESQ);
     
@@ -1912,22 +2006,96 @@ void verificar_por(FILE* s, int escopo) {
     empilhar_pare(rotulo_fim);
     
     fprintf(s, ".B%d:\n", rotulo_inicio);
+    
     // processa condição
     if(L.tk.tipo != T_PONTO_VIRGULA) {
         TipoToken tipo_cond = expressao(s, novo_escopo);
         
-        if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
-            // tenta converter pra booleano
-            if(tipo_cond == T_pFLU) {
-                fprintf(s, "  fcmp s0, 0.0\n");
-                fprintf(s, "  cset w0, ne\n");
-            } else if(tipo_cond == T_pDOBRO) {
-                fprintf(s, "  fcmp d0, 0.0\n");
-                fprintf(s, "  cset w0, ne\n");
+        // Salva o resultado da condição em um registrador temporário
+        char reg_tipo;
+        int reg_temp = -1;
+        
+        if(tipo_cond == T_pFLU) {
+            reg_tipo = 's';
+            reg_temp = alocar_reg(reg_tipo);
+            if(reg_temp >= 0) {
+                if(debug_o) printf("[verificar_por]: usando registrador s%d\n", reg_temp);
+                fprintf(s, "  fmov s%d, s0\n", reg_temp);
             } else {
-                fatal("[verificar_por] condição do loop deve ser inteiro ou booleano");
+                fprintf(s, "  str s0, [sp, -16]!\n");
+            }
+        } else if(tipo_cond == T_pDOBRO) {
+            reg_tipo = 'd';
+            reg_temp = alocar_reg(reg_tipo);
+            if(reg_temp >= 0) {
+                if(debug_o) printf("[verificar_por]: usando registrador d%d\n", reg_temp);
+                fprintf(s, "  fmov d%d, d0\n", reg_temp);
+            } else {
+                fprintf(s, "  str d0, [sp, -16]!\n");
+            }
+        } else if(tipo_cond == T_pLONGO || tipo_cond == T_PONTEIRO) {
+            reg_tipo = 'x';
+            reg_temp = alocar_reg(reg_tipo);
+            if(reg_temp >= 0) {
+                if(debug_o) printf("[verificar_por]: usando registrador x%d\n", reg_temp);
+                fprintf(s, "  mov x%d, x0\n", reg_temp);
+            } else {
+                fprintf(s, "  str x0, [sp, -16]!\n");
+            }
+        } else {
+            reg_tipo = 'w';
+            reg_temp = alocar_reg(reg_tipo);
+            if(reg_temp >= 0) {
+                if(debug_o) printf("[verificar_por]: usando registrador w%d\n", reg_temp);
+                fprintf(s, "  mov w%d, w0\n", reg_temp);
+            } else {
+                fprintf(s, "  str w0, [sp, -16]!\n");
             }
         }
+        // verifica se precisa converter pra booleano
+        if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
+            // carrega o valor salvo
+            if(reg_temp >= 0) {
+                if(tipo_cond == T_pFLU) {
+                    fprintf(s, "  fmov s0, s%d\n", reg_temp);
+                    fprintf(s, "  fcmp s0, 0.0\n");
+                } else if(tipo_cond == T_pDOBRO) {
+                    fprintf(s, "  fmov d0, d%d\n", reg_temp);
+                    fprintf(s, "  fcmp d0, 0.0\n");
+                } else if(tipo_cond == T_pLONGO) {
+                    fprintf(s, "  mov x0, x%d\n", reg_temp);
+                    fprintf(s, "  cmp x0, 0\n");
+                } else {
+                    fprintf(s, "  mov w0, w%d\n", reg_temp);
+                    fprintf(s, "  cmp w0, 0\n");
+                }
+            } else {
+                if(tipo_cond == T_pFLU) {
+                    fprintf(s, "  ldr s0, [sp], 16\n");
+                    fprintf(s, "  fcmp s0, 0.0\n");
+                } else if(tipo_cond == T_pDOBRO) {
+                    fprintf(s, "  ldr d0, [sp], 16\n");
+                    fprintf(s, "  fcmp d0, 0.0\n");
+                } else if(tipo_cond == T_pLONGO) {
+                    fprintf(s, "  ldr x0, [sp], 16\n");
+                    fprintf(s, "  cmp x0, 0\n");
+                } else {
+                    fprintf(s, "  ldr w0, [sp], 16\n");
+                    fprintf(s, "  cmp w0, 0\n");
+                }
+            }
+            fprintf(s, "  cset w0, ne\n");
+        } else {
+            // ja é inteiro ou booleano, apenas carrega
+            if(reg_temp >= 0) {
+                fprintf(s, "  mov w0, w%d\n", reg_temp);
+            } else {
+                fprintf(s, "  ldr w0, [sp], 16\n");
+            }
+        }
+        // libera registrador temporario se foi alocado
+        if(reg_temp >= 0) liberar_reg(reg_tipo, reg_temp);
+        
         fprintf(s, "  cmp w0, 0\n");
         fprintf(s, "  beq .B%d\n", rotulo_fim);
     }
@@ -1982,9 +2150,13 @@ void verificar_por(FILE* s, int escopo) {
     fprintf(s, ".B%d:\n", rotulo_fim);
     // desempilha o rotulo de "pare" apos o loop
     desempilhar_pare();
+    em_loop = false;
+    nivel_loop--;
 }
 
 void verificar_enq(FILE* s, int escopo) {
+    em_loop = true;
+    nivel_loop++;
     excessao(T_ENQ);
     excessao(T_PAREN_ESQ);
 
@@ -1997,7 +2169,93 @@ void verificar_enq(FILE* s, int escopo) {
 
     fprintf(s, ".B%d:\n", rotulo_inicio);
 
-    expressao(s, novo_escopo);
+    // avalia a condição usando a mesma abordagem
+    TipoToken tipo_cond = expressao(s, novo_escopo);
+    
+    // salva o resultado da condição em um registrador temporario
+    char reg_tipo;
+    int reg_temp = -1;
+    
+    if(tipo_cond == T_pFLU) {
+        reg_tipo = 's';
+        reg_temp = alocar_reg(reg_tipo);
+        if(reg_temp >= 0) {
+            if(debug_o) printf("[verificar_enq]: usando registrador s%d\n", reg_temp);
+            fprintf(s, "  fmov s%d, s0\n", reg_temp);
+        } else {
+            fprintf(s, "  str s0, [sp, -16]!\n");
+        }
+    } else if(tipo_cond == T_pDOBRO) {
+        reg_tipo = 'd';
+        reg_temp = alocar_reg(reg_tipo);
+        if(reg_temp >= 0) {
+            if(debug_o) printf("[verificar_enq]: usando registrador d%d\n", reg_temp);
+            fprintf(s, "  fmov d%d, d0\n", reg_temp);
+        } else {
+            fprintf(s, "  str d0, [sp, -16]!\n");
+        }
+    } else if(tipo_cond == T_pLONGO || tipo_cond == T_PONTEIRO) {
+        reg_tipo = 'x';
+        reg_temp = alocar_reg(reg_tipo);
+        if(reg_temp >= 0) {
+            if(debug_o) printf("[verificar_enq]: usando registrador x%d\n", reg_temp);
+            fprintf(s, "  mov x%d, x0\n", reg_temp);
+        } else {
+            fprintf(s, "  str x0, [sp, -16]!\n");
+        }
+    } else {
+        reg_tipo = 'w';
+        reg_temp = alocar_reg(reg_tipo);
+        if(reg_temp >= 0) {
+            if(debug_o) printf("[verificar_enq]: usando registrador w%d\n", reg_temp);
+            fprintf(s, "  mov w%d, w0\n", reg_temp);
+        } else {
+            fprintf(s, "  str w0, [sp, -16]!\n");
+        }
+    }
+    // verifica se precisa converter pra booleano
+    if(tipo_cond != T_pINT && tipo_cond != T_pBOOL) {
+        // carrega o valor salvo
+        if(reg_temp >= 0) {
+            if(tipo_cond == T_pFLU) {
+                fprintf(s, "  fmov s0, s%d\n", reg_temp);
+                fprintf(s, "  fcmp s0, 0.0\n");
+            } else if(tipo_cond == T_pDOBRO) {
+                fprintf(s, "  fmov d0, d%d\n", reg_temp);
+                fprintf(s, "  fcmp d0, 0.0\n");
+            } else if(tipo_cond == T_pLONGO) {
+                fprintf(s, "  mov x0, x%d\n", reg_temp);
+                fprintf(s, "  cmp x0, 0\n");
+            } else {
+                fprintf(s, "  mov w0, w%d\n", reg_temp);
+                fprintf(s, "  cmp w0, 0\n");
+            }
+        } else {
+            if(tipo_cond == T_pFLU) {
+                fprintf(s, "  ldr s0, [sp], 16\n");
+                fprintf(s, "  fcmp s0, 0.0\n");
+            } else if(tipo_cond == T_pDOBRO) {
+                fprintf(s, "  ldr d0, [sp], 16\n");
+                fprintf(s, "  fcmp d0, 0.0\n");
+            } else if(tipo_cond == T_pLONGO) {
+                fprintf(s, "  ldr x0, [sp], 16\n");
+                fprintf(s, "  cmp x0, 0\n");
+            } else {
+                fprintf(s, "  ldr w0, [sp], 16\n");
+                fprintf(s, "  cmp w0, 0\n");
+            }
+        }
+        fprintf(s, "  cset w0, ne\n");
+    } else {
+        // ja é inteiro ou booleano, apenas carrega
+        if(reg_temp >= 0) {
+            fprintf(s, "  mov w0, w%d\n", reg_temp);
+        } else {
+            fprintf(s, "  ldr w0, [sp], 16\n");
+        }
+    }
+    // libera registrador temporario se foi alocado
+    if(reg_temp >= 0) liberar_reg(reg_tipo, reg_temp);
     
     excessao(T_PAREN_DIR);
 
@@ -2018,6 +2276,8 @@ void verificar_enq(FILE* s, int escopo) {
     fprintf(s, ".B%d:\n", rotulo_fim);
     // desempilha o rotulo de "pare"
     desempilhar_pare();
+    em_loop = false;
+    nivel_loop--;
 }
 
 void verificar_stmt(FILE* s, int* pos, int escopo) {
@@ -2734,6 +2994,10 @@ void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo) {
 }
 
 TipoToken converter_tipos(FILE* s, TipoToken tipo_anterior, TipoToken tipo_atual) {
+    if(debug_o) {
+        printf("[converter_tipos]: conversão de %s e %s\n", 
+        token_str(tipo_anterior), token_str(tipo_atual));
+    }
     if(tipo_anterior == tipo_atual) return tipo_anterior;
     if(tipo_anterior == T_PONTEIRO && (tipo_atual == T_pINT || tipo_atual == T_pLONGO)) {
         return T_PONTEIRO;
@@ -3277,64 +3541,88 @@ TipoToken fator(FILE* s, int escopo) {
 
 TipoToken termo(FILE* s, int escopo) {
     TipoToken tipo_esq = fator(s, escopo);
+    
     while(L.tk.tipo == T_VEZES || L.tk.tipo == T_DIV ||
-    L.tk.tipo == T_PORCEN || L.tk.tipo == T_MENOR_MENOR ||
-    L.tk.tipo == T_MAIOR_MAIOR || L.tk.tipo == T_TAMBEM) {
+          L.tk.tipo == T_PORCEN || L.tk.tipo == T_MENOR_MENOR ||
+          L.tk.tipo == T_MAIOR_MAIOR || L.tk.tipo == T_TAMBEM) {
+        
         TipoToken op = L.tk.tipo;
         
-        int tam = tam_tipo(tipo_esq) > 8 ? 16 : 8;
         char reg_tipo;
-
+        
         if(tipo_esq == T_pFLU) {
             reg_tipo = 's';
-            tam = 4;
         } else if(tipo_esq == T_pDOBRO) {
             reg_tipo = 'd';
-            tam = 8;
         } else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) {
             reg_tipo = 'x';
-            tam = 8;
         } else {
             reg_tipo = 'w';
-            tam = 4;
         }
-        int reg_temp_esq = alocar_reg(reg_tipo); // tenta alocar reg(w8)
-
-        if(reg_temp_esq >= 8) { // registrador alocado
-            if(debug_o) printf("[termo]: guardando em reg %c%d, pulando pilha\n", reg_tipo, reg_temp_esq);
-            // move o operando esquerdo(w0/x0/s0/d0) pro registrador alocado(w8)
-            if(reg_tipo == 's') fprintf(s, "  fmov s%d, s0\n", reg_temp_esq);
-            else if(reg_tipo == 'd') fprintf(s, "  fmov d%d, d0\n", reg_temp_esq);
-            else if(reg_tipo == 'x') fprintf(s, "  mov x%d, x0\n", reg_temp_esq);
-            else fprintf(s, "  mov w%d, w0\n", reg_temp_esq);
-        } else { // falhou na alocação, usa pilha
-            if(debug_o) printf("[termo]: pilha usada pra operando esquerdo\n");
-            // empilha o operando esquerdo
-            if(tipo_esq == T_pFLU) fprintf(s, "  str s0, [sp, -%d]!\n", tam);
-            else if(tipo_esq == T_pDOBRO) fprintf(s, "  str d0, [sp, -%d]!\n", tam);
-            else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) fprintf(s, "  str x0, [sp, -%d]!\n", tam);
-            else fprintf(s, "  str w0, [sp, -%d]!\n", tam);
-            reg_temp_esq = -1; // marca o uso da pilha
+        int reg_temp_esq = alocar_reg(reg_tipo);
+        
+        if(reg_temp_esq >= 0) {
+            // registrador
+            if(debug_o) printf("[termo]: usando registrador %c%d para operando\n", reg_tipo, reg_temp_esq);
+            
+            // salva no registrador
+            if(reg_tipo == 's') {
+                fprintf(s, "  fmov s%d, s0  // salva em reg\n", reg_temp_esq);
+            } else if(reg_tipo == 'd') {
+                fprintf(s, "  fmov d%d, d0  // salva em reg\n", reg_temp_esq);
+            } else if(reg_tipo == 'x') {
+                fprintf(s, "  mov x%d, x0  // salva em reg\n", reg_temp_esq);
+            } else {
+                fprintf(s, "  mov w%d, w0  // salva em reg\n", reg_temp_esq);
+            }
+        } else {
+            // pilha
+            if(debug_o) printf("[termo]: pilha usada para operando\n");
+            
+            int tam = (reg_tipo == 's') ? 4 : 
+                     (reg_tipo == 'd') ? 8 : 
+                     (reg_tipo == 'x') ? 8 : 4;
+            
+            if(tipo_esq == T_pFLU) {
+                fprintf(s, "  str s0, [sp, -%d]!\n", tam);
+            } else if(tipo_esq == T_pDOBRO) {
+                fprintf(s, "  str d0, [sp, -%d]!\n", tam);
+            } else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) {
+                fprintf(s, "  str x0, [sp, -%d]!\n", tam);
+            } else {
+                fprintf(s, "  str w0, [sp, -%d]!\n", tam);
+            }
         }
         proximoToken();
         TipoToken tipo_dir = fator(s, escopo);
-        TipoToken tipo_resultado = tipo_dir; 
-
-        // carrega o operando esquerdo pra w1/x1/s1/d1
-        if(reg_temp_esq >= 8) { // registrador usado
-            if(debug_o) printf("[termo]: movendo de registrador %c%d pra %c1\n", reg_tipo, reg_temp_esq, reg_tipo);
-            if(reg_tipo == 's') fprintf(s, "  fmov s1, s%d\n", reg_temp_esq);
-            else if(reg_tipo == 'd') fprintf(s, "  fmov d1, d%d\n", reg_temp_esq);
-            else if(reg_tipo == 'x') fprintf(s, "  mov x1, x%d\n", reg_temp_esq);
-            else fprintf(s, "  mov w1, w%d\n", reg_temp_esq);
+        TipoToken tipo_resultado = converter_tipos(s, tipo_esq, tipo_dir);
+        
+        // recupera primeiro operando
+        if(reg_temp_esq >= 0) {
+            if(reg_tipo == 's') {
+                fprintf(s, "  fmov s1, s%d  // restaura do reg\n", reg_temp_esq);
+            } else if(reg_tipo == 'd') {
+                fprintf(s, "  fmov d1, d%d  // restaura do reg\n", reg_temp_esq);
+            } else if(reg_tipo == 'x') {
+                fprintf(s, "  mov x1, x%d  // restaura do reg\n", reg_temp_esq);
+            } else {
+                fprintf(s, "  mov w1, w%d  // restaura do reg\n", reg_temp_esq);
+            }
+            liberar_reg(reg_tipo, reg_temp_esq);
+        } else {
+            int tam = (reg_tipo == 's') ? 4 : 
+                     (reg_tipo == 'd') ? 8 : 
+                     (reg_tipo == 'x') ? 8 : 4;
             
-            liberar_reg(reg_tipo, reg_temp_esq); // libera o temporario
-        } else { // pilha foi usada
-            if(debug_o) printf("[termo]: desempilhando para w1/x1/s1\n");
-            if(tipo_esq == T_pFLU) fprintf(s, "  ldr s1, [sp], %d\n", tam);
-            else if(tipo_esq == T_pDOBRO) fprintf(s, "  ldr d1, [sp], %d\n", tam);
-            else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) fprintf(s, "  ldr x1, [sp], %d\n", tam);
-            else fprintf(s, "  ldr w1, [sp], %d\n", tam);
+            if(tipo_esq == T_pFLU) {
+                fprintf(s, "  ldr s1, [sp], %d\n", tam);
+            } else if(tipo_esq == T_pDOBRO) {
+                fprintf(s, "  ldr d1, [sp], %d\n", tam);
+            } else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) {
+                fprintf(s, "  ldr x1, [sp], %d\n", tam);
+            } else {
+                fprintf(s, "  ldr w1, [sp], %d\n", tam);
+            }
         }
         gerar_operacao(s, op, tipo_resultado);
         tipo_esq = tipo_resultado;
@@ -3374,6 +3662,7 @@ TipoToken expressao(FILE* s, int escopo) {
     }
     // processa primeiro nível: comparações e operadores aritmeticos
     TipoToken tipo = termo(s, escopo);
+    
     // processa operadores de comparação
     if(L.tk.tipo == T_IGUAL_IGUAL || L.tk.tipo == T_DIFERENTE || 
         L.tk.tipo == T_MAIOR || L.tk.tipo == T_MENOR ||
@@ -3382,31 +3671,82 @@ TipoToken expressao(FILE* s, int escopo) {
         TipoToken op = L.tk.tipo;
         proximoToken();
         
-        // salva primeiro operando
+        // salva o primeiro operando
+        char reg_tipo_esq;
+        int reg_temp_esq = -1;
+        
         if(tipo == T_pFLU) {
-            fprintf(s, "  str s0, [sp, -16]!\n");
+            reg_tipo_esq = 's';
+            reg_temp_esq = alocar_reg('s');
+            
+            if(reg_temp_esq >= 0) {
+                if(debug_o) printf("[expressao]: usando registrador %c%d\n", reg_tipo_esq, reg_temp_esq);
+                fprintf(s, "  fmov s%d, s0\n", reg_temp_esq);
+            } else {
+                fprintf(s, "  str s0, [sp, -16]!\n");
+            }
         } else if(tipo == T_pDOBRO) {
-            fprintf(s, "  str d0, [sp, -16]!\n");
+            reg_tipo_esq = 'd';
+            reg_temp_esq = alocar_reg('d');
+            
+            if(reg_temp_esq >= 0) {
+                if(debug_o) printf("[expressao]: usando registrador %c%d\n", reg_tipo_esq, reg_temp_esq);
+                fprintf(s, "  fmov d%d, d0\n", reg_temp_esq);
+            } else {
+                fprintf(s, "  str d0, [sp, -16]!\n");
+            }
         } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
-            fprintf(s, "  str x0, [sp, -16]!\n");
+            reg_tipo_esq = 'x';
+            reg_temp_esq = alocar_reg('x');
+            
+            if(reg_temp_esq >= 0) {
+                if(debug_o) printf("[expressao]: usando registrador %c%d\n", reg_tipo_esq, reg_temp_esq);
+                fprintf(s, "  mov x%d, x0\n", reg_temp_esq);
+            } else {
+                fprintf(s, "  str x0, [sp, -16]!\n");
+            }
         } else {
-            fprintf(s, "  str w0, [sp, -16]!\n");
+            reg_tipo_esq = 'w';
+            reg_temp_esq = alocar_reg('x'); // w é tratado como x
+            if(reg_temp_esq >= 0) {
+                if(debug_o) printf("[expressao]: usando registrador %c%d\n", reg_tipo_esq, reg_temp_esq);
+                fprintf(s, "  mov w%d, w0\n", reg_temp_esq);
+            } else {
+                fprintf(s, "  str w0, [sp, -16]!\n");
+            }
         }
         TipoToken tipo_dir = termo(s, escopo);
         
-        // recupera primeiro operando
-        if(tipo == T_pFLU) {
-            fprintf(s, "  ldr s1, [sp], 16\n");
-        } else if(tipo == T_pDOBRO) {
-            fprintf(s, "  ldr d1, [sp], 16\n");
-        } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
-            fprintf(s, "  ldr x1, [sp], 16\n");
+        // recupera o primeiro operando
+        if(reg_temp_esq >= 0) {
+            if(tipo == T_pFLU) {
+                fprintf(s, "  fmov s1, s%d\n", reg_temp_esq);
+                if(reg_temp_esq >= 8) liberar_reg('s', reg_temp_esq);
+            } else if(tipo == T_pDOBRO) {
+                fprintf(s, "  fmov d1, d%d\n", reg_temp_esq);
+                if(reg_temp_esq >= 8) liberar_reg('d', reg_temp_esq);
+            } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+                fprintf(s, "  mov x1, x%d\n", reg_temp_esq);
+                if(reg_temp_esq >= 8) liberar_reg('x', reg_temp_esq);
+            } else {
+                fprintf(s, "  mov w1, w%d\n", reg_temp_esq);
+                if(reg_temp_esq >= 8) liberar_reg('x', reg_temp_esq);
+            }
         } else {
-            fprintf(s, "  ldr w1, [sp], 16\n");
+            // usa pilha
+            if(tipo == T_pFLU) {
+                fprintf(s, "  ldr s1, [sp], 16\n");
+            } else if(tipo == T_pDOBRO) {
+                fprintf(s, "  ldr d1, [sp], 16\n");
+            } else if(tipo == T_PONTEIRO || tipo == T_pLONGO) {
+                fprintf(s, "  ldr x1, [sp], 16\n");
+            } else {
+                fprintf(s, "  ldr w1, [sp], 16\n");
+            }
         }
         tipo = converter_tipos(s, tipo, tipo_dir);
         gerar_comparacao(s, op, tipo);
-        tipo = T_pBOOL; // comparações sempre retornam booleano
+        tipo = T_pBOOL;
     }
     // processa operadores logicos
     while(L.tk.tipo == T_TAMBEM_TAMBEM || L.tk.tipo == T_OU_OU) {

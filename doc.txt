@@ -13,6 +13,11 @@ vazio inicio() {
 }
 [código]
 
+e compile com "fpb ola.fpb" ou "fpb ola.fpb -s ola" caso queira definir o nome final.
+digite "fpb -ajuda" para visualizar todos os comandos.
+
+agora a explicação de cada parte:
+
 "#incluir" é da categoria de diretivas (#), ela serve para colar códigos Assembly no seu código intermediário. Assim você poderá utilizar funções definidas no Assembly.
 
 "#global" é da categoria "#", e serve para expôr uma função para outros códigos que desejem chamar funções do seu código externamente. Utilizamos essa função para que o sistema operacional possa executar nosso código começando por "inicio()".
@@ -318,3 +323,61 @@ int textam(car* p);
 
 // retorna 1 se o texto tem o caractere e 0 senão
 int texcar(car* p, car c);
+
+"biblis/cvts.fpb": contém:
+
+// converte o texto em número inteiro e retorna o valor
+int cvtint(car[] v, int tam);
+
+// converte o texto em número flutuante e retorna o valor
+flu cvtflu(car[] v, int tam);
+
+que dependem de chamadas do sistema:
+
+"biblis/impressao.asm": contém:
+
+todas as funções de impressão padrão para "escrever(...);" funcionar.
+
+porém pode ser facilmente substituida por outra biblioteca que tenha os mesmos nomes e parâmetros, ou linkada a uma que tenha, assim não precisando importar.
+
+"biblis/sistema.asm": contém:
+
+// retorna o tempo em milissegundos
+longo obter_tempo_milis();
+
+"biblis/mem.asm": contém:
+
+// copia os bytes do ponteiro para o array
+vazio memcp(car[] arr, car* p, int tam);
+
+// retorna memória RAM do heap nativo
+int* memalocar(int bytes);
+
+// libera memória RAM do heap nativo
+vazio memliberar(int* p);
+
+## ESPAÇOS ##
+
+espaços são estruturas de dados leves, com a diretiva #espaco, você pode definir um espaço para guardar variaveis e organizá-las por categorias.
+
+[código]
+#espaco Pessoa {
+    car nome;
+    int idade;
+    byte endereco;
+}
+[código]
+
+para acessar ou configurar um novo espaço apartir do padrão, você pode fazer:
+
+[código]
+Pessoa p1;
+p1.nome = 'A';
+p1.idade = 32;
+p1.endereco = 0x000000;
+
+Pessoa p2;
+p2.nome = 'B';
+p2.idade = 34;
+p2.endereco = 0x000100; 
+[código]

@@ -430,9 +430,7 @@ cvtint:
   mov w0, 0
   strb w0, [x29, -112]
   mov w0, 0
-  str w0, [sp, -16]!
-  mov w0, 0
-  ldr w1, [sp], 16
+  mov w1, w0 // otimizado(literal)
   mov w2, 1
   mul w1, w1, w2
   add w0, w0, w1
@@ -542,9 +540,9 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 10
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
@@ -592,9 +590,9 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 100
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
@@ -615,9 +613,9 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 10
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
@@ -659,9 +657,9 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 1000
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
@@ -682,9 +680,9 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 100
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
@@ -707,9 +705,9 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 10
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
@@ -768,9 +766,9 @@ cvtint:
   cmp w0, 0
   beq .B20
   ldr w0, [x29, -160]
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 10
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
@@ -847,9 +845,7 @@ cvtflu:
   mov w0, 0
   strb w0, [x29, -96]
   mov w0, 0
-  str w0, [sp, -16]!
-  mov w0, 0
-  ldr w1, [sp], 16
+  mov w1, w0 // otimizado(literal)
   mov w2, 1
   mul w1, w1, w2
   add w0, w0, w1
@@ -870,9 +866,7 @@ cvtflu:
   b .B26
 .B25:
   mov w0, 0
-  str w0, [sp, -16]!
-  mov w0, 0
-  ldr w1, [sp], 16
+  mov w1, w0 // otimizado(literal)
   mov w2, 1
   mul w1, w1, w2
   add w0, w0, w1
@@ -1010,10 +1004,10 @@ cvtflu:
   cmp w0, 0
   beq .B32
   ldr s0, [x29, -112]
-  str s0, [sp, -16]!
+  fmov s8, s0
   ldr x0, = const_1
   ldr s0, [x0]
-  ldr s1, [sp], 16
+  fmov s1, s8
   fmul s0, s1, s0
   str s0, [sp, -16]!
   ldr w0, [x29, -80]
@@ -1150,18 +1144,18 @@ cvtflu:
   sub w0, w1, w0
   sxtb w0, w0
   scvtf s0, w0
-  str s0, [sp, -16]!
+  fmov s8, s0
   ldr s0, [x29, 224]
-  ldr s1, [sp], 16
+  fmov s1, s8
   fmul s0, s1, s0
   ldr s1, [sp], 16
   fadd s0, s1, s0
   str s0, [x29, -112]
   ldr s0, [x29, 224]
-  str s0, [sp, -16]!
+  fmov s8, s0
   ldr x0, = const_2
   ldr s0, [x0]
-  ldr s1, [sp], 16
+  fmov s1, s8
   fmul s0, s1, s0
   str s0, [x29, 224]
   ldr w0, [x29, -80]
@@ -1459,9 +1453,9 @@ testeOperacoes:
   mov w0, 5
   str w0, [sp, -16]!
   mov w0, 5
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 5
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
@@ -1471,21 +1465,17 @@ testeOperacoes:
   ldr x0, = .tex_29
   bl _escrever_tex
   mov w0, 5
-  str w0, [sp, -16]!
-  mov w0, 5
-  ldr w1, [sp], 16
+  mov w1, w0 // otimizado(literal)
   add w0, w1, w0
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 5
-  ldr w1, [sp], 16
+  mov w1, w8
   mul w0, w1, w0
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
   mov w0, 5
-  str w0, [sp, -16]!
-  mov w0, 5
-  ldr w1, [sp], 16
+  mov w1, w0 // otimizado(literal)
   add w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_13
@@ -1506,9 +1496,9 @@ testeOperacoes:
   ldr x0, = .tex_30
   bl _escrever_tex
   mov w0, 10
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 3
-  ldr w1, [sp], 16
+  mov w1, w8
   sdiv w2, w1, w0
   msub w0, w2, w0, w1
   bl _escrever_int
@@ -1532,44 +1522,43 @@ testeOperacoes:
   ldr x0, = .tex_34
   bl _escrever_tex
   ldr s0, [x29, -48]
-  str s0, [sp, -16]!
+  fmov s8, s0
   ldr w0, [x29, -32]
-  ldr s1, [sp], 16
-  scvtf s0, w0
-  fmul s0, s1, s0
-  bl _escrever_flu
+  fmov s1, s8
+  mul w0, w1, w0
+  bl _escrever_int
   mov w0, 10
   bl _escrever_car
   ldr x0, = .tex_35
   bl _escrever_tex
   mov w0, 10
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 2
-  ldr w1, [sp], 16
+  mov w1, w8
   lsl w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_comb_3
   bl _escrever_tex
   mov w0, 10
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 2
-  ldr w1, [sp], 16
+  mov w1, w8
   lsr w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_comb_4
   bl _escrever_tex
   mov w0, 124
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 15
-  ldr w1, [sp], 16
+  mov w1, w8
   and w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_comb_5
   bl _escrever_tex
   mov w0, 124
-  str w0, [sp, -16]!
+  mov w8, w0
   mov w0, 15 // byte: 0xF
-  ldr w1, [sp], 16
+  mov w1, w8
   and w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_comb_6
@@ -1933,9 +1922,7 @@ testeMemoria:
   ldr x0, = .tex_72
   bl _escrever_tex
   mov w0, 0
-  str w0, [sp, -16]!
-  mov w0, 0
-  ldr w1, [sp], 16
+  mov w1, w0 // otimizado(literal)
   mov w2, 1
   mul w1, w1, w2
   add w0, w0, w1

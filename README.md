@@ -339,6 +339,7 @@ caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador,
 3. primeiros 8 parametros sendo passados por registradores.
 4. usando a marcação -O1, será ativado a eliminação de funções não usadas e labels, + reorganização de sintaxe. (beta)
 5. a marcação -O2 otimiza ainda mais o código juntando textos chamados para serem imprimidos em sequencia, incluindo a eliminação de código morto da O1. (beta)
+6. alocação de registradores para operações temporarias. (beta)
 # requisitos:
 para o compilador funcionar, você precisa ter **ld** e **as** instalados na sua máquina para o binário ser gerado.
 
@@ -354,3 +355,44 @@ o compilador é auto suficiente, sem a necessidade de libc.so para binários **g
 (f.sh é o shell de compilação que uso pra testar o compilador mais rápido).
 
 use *fpb -ajuda* para visualizar todos comandos.
+
+# META ATUAL:
+
+ultrapassar a velocidade do C com otimização -O3.
+
+estado atual:
+
+```Bash
+~ $ cat perf_final.fpb
+#incluir "biblis/impressao.asm";
+#global inicio();
+
+vazio inicio() {
+ int soma = 0;
+ por(int i=0; i<50000000; i++) soma = soma + i;
+ escrever(soma, '\n');
+}
+~ $ cat perf_final.c
+#include <stdio.h>
+int main() {
+ int sum = 0;
+ for(int i=0; i<50000000; i++) sum += i;
+ printf("%d\n", sum);
+ return 0;
+}
+~ $ fpb perf_final.fpb -O2 -s perf_f
+~ $ clang perf_final.c -O3 -o perf_c
+~ $ time ./perf_f
+1283106752
+
+real    0m0.385s
+user    0m0.384s
+sys     0m0.001s
+~ $ time ./perf_c
+1283106752
+
+real    0m0.009s
+user    0m0.004s
+sys     0m0.004s
+~ $
+```

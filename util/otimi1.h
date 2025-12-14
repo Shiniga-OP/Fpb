@@ -13,6 +13,164 @@
 
 static bool debug1 = false;
 
+static bool extrairValorLiteral(const char* linha, char* tipo_reg, long* valor) {
+    // padrões: "mov w0, 5" ou "mov x0, #5" ou "ldr w0, =5"
+    char reg[16], operando[32];
+    
+    // tenta padrão "mov REG, VALOR"
+    if(sscanf(linha, " mov %[^,], %ld", reg, valor) == 2) {
+        strcpy(tipo_reg, reg);
+        return true;
+    }
+    // tenta padrão "mov REG, #VALOR"
+    if(sscanf(linha, " mov %[^,], #%ld", reg, valor) == 2) {
+        strcpy(tipo_reg, reg);
+        return true;
+    }
+    // tenta padrão "\tmov REG, VALOR"(com tabulação)
+    if(sscanf(linha, "\tmov %[^,], %ld", reg, valor) == 2) {
+        strcpy(tipo_reg, reg);
+        return true;
+    }
+    // tenta padrão "\tmov REG, #VALOR"
+    if(sscanf(linha, "\tmov %[^,], #%ld", reg, valor) == 2) {
+        strcpy(tipo_reg, reg);
+        return true;
+    }
+    // limpa e tenta sem espaços iniciais
+    char linha_sem_espaco[256];
+    strcpy(linha_sem_espaco, linha);
+    while(isspace(linha_sem_espaco[0])) {
+        memmove(linha_sem_espaco, linha_sem_espaco + 1, strlen(linha_sem_espaco));
+    }
+    if(sscanf(linha_sem_espaco, "mov %[^,], %ld", reg, valor) == 2) {
+        strcpy(tipo_reg, reg);
+        return true;
+    }
+    if(sscanf(linha_sem_espaco, "mov %[^,], #%ld", reg, valor) == 2) {
+        strcpy(tipo_reg, reg);
+        return true;
+    }
+    return false;
+}
+
+void otimizarLiterais(const char* arquivo_asm) {
+    FILE *arq = fopen(arquivo_asm, "r");
+    if(!arq) return;
+    
+    char temp_nome[300];
+    snprintf(temp_nome, sizeof(temp_nome), "%s.literais", arquivo_asm);
+    FILE *saida = fopen(temp_nome, "w");
+    if(!saida) {
+        fclose(arq);
+        return;
+    }
+    char linha[256];
+    char linha_anterior[256] = "";
+    int otimizacoes = 0;
+    if(debug1) printf("\n[Otimi1]: iniciando busca por operações literais:\n");
+    while(fgets(linha, sizeof(linha), arq)) {
+        // verifica se a linha anterior era um mov literal seguido de armazenamento
+        if(linha_anterior[0] != '\0' && strstr(linha_anterior, "mov") != NULL) {
+            char reg_anterior[16];
+            long valor_anterior;
+            
+            if(extrairValorLiteral(linha_anterior, reg_anterior, &valor_anterior)) {
+                // verifica se a linha atual é um armazenamento do mesmo valor imediatamente apos
+                char reg_store[16];
+                char buffer[256];
+                
+                // padrão: "str REG, [sp, -16]!"
+                if(sscanf(linha, " str %[^,], [sp, -16]!", reg_store) == 1 ||
+                    sscanf(linha, "\tstr %[^,], [sp, -16]!", reg_store) == 1) {
+                    
+                    // verifica se é o mesmo registrador
+                    if(strcmp(reg_anterior, reg_store) == 0) {
+                        // agora verifica a proxima linha(precisa ler mais uma)
+                        char prox_linha[256];
+                        long posicao_atual = ftell(arq);
+                        
+                        if(fgets(prox_linha, sizeof(prox_linha), arq)) {
+                            // berifica se a proxima linha é outro mov com o mesmo valor
+                            char reg_prox[16];
+                            long valor_prox;
+                            
+                            if(extrairValorLiteral(prox_linha, reg_prox, &valor_prox) && 
+                                valor_prox == valor_anterior) {
+                                
+                                // verifica a linha apos essa(carregamento do valor armazenado)
+                                char prox_prox_linha[256];
+                                if(fgets(prox_prox_linha, sizeof(prox_prox_linha), arq)) {
+                                    char reg_load[16];
+                                    
+                                    // padrão: "ldr REG, [sp], 16"
+                                    if(sscanf(prox_prox_linha, " ldr %[^,], [sp], 16", reg_load) == 1 ||
+                                        sscanf(prox_prox_linha, "\tldr %[^,], [sp], 16", reg_load) == 1) {
+                                        
+                                        if(debug1) {
+                                            printf("  otimizando literal redundante: ");
+                                            printf("mov %s, %ld -> str -> mov %s, %ld -> ldr\n", 
+                                                   reg_anterior, valor_anterior, reg_prox, valor_prox);
+                                        }
+                                        // escreve apenas o primeiro mov
+                                        fputs(linha_anterior, saida);
+                                        
+                                        // escreve o segundo mov(ou mov para o registrador de destino)
+                                        // se registradores forem diferentes, faz um mov entre eles
+                                        if(strcmp(reg_prox, reg_load) != 0) {
+                                            // verifica se é ponto flutuante
+                                            if(reg_prox[0] == 's' || reg_prox[0] == 'd') {
+                                                fprintf(saida, "  fmov %s, %s // otimizado(literal)\n", reg_load, reg_prox);
+                                            } else {
+                                                fprintf(saida, "  mov %s, %s // otimizado(literal)\n", 
+                                                        reg_load, reg_prox);
+                                            }
+                                        } else {
+                                            // mesmo registrador, so escreve o mov
+                                            fputs(prox_linha, saida);
+                                        }
+                                        otimizacoes += 2; // removidas 2 instruções(str e ldr)
+                                        
+                                        // limpa linha anterior e pula as linhas processadas
+                                        linha_anterior[0] = '\0';
+                                        continue;
+                                    } else {
+                                        // não é o padrão esperado, volta
+                                        fseek(arq, posicao_atual, SEEK_SET);
+                                    }
+                                } else {
+                                    fseek(arq, posicao_atual, SEEK_SET);
+                                }
+                            } else {
+                                fseek(arq, posicao_atual, SEEK_SET);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // se não otimizou, escreve a linha anterior
+        if(linha_anterior[0] != '\0') {
+            fputs(linha_anterior, saida);
+        }
+        // atualiza linha anterior
+        strcpy(linha_anterior, linha);
+    }
+    // escreve a última linha
+    if(linha_anterior[0] != '\0') {
+        fputs(linha_anterior, saida);
+    }
+    fclose(arq);
+    fclose(saida);
+    // substitui o arquivo
+    remove(arquivo_asm);
+    rename(temp_nome, arquivo_asm);
+    
+    if(debug1 && otimizacoes > 0) {
+        printf("[Otimi1] Otimizações de literais: %d instruções removidas\n", otimizacoes);
+    }
+}
+
 void economiaReg(const char* arquivo_asm) {
     // abre o arquivo gerado anteriormente(ja sem funções mortas)
     FILE *arq = fopen(arquivo_asm, "r");
@@ -335,6 +493,7 @@ void otimizarO1(const char* arquivo_asm) {
     fclose(arquivo);
     fclose(temp);
     economiaReg(arquivo_temp);
+    otimizarLiterais(arquivo_temp);
     // substitui arquivo original pelo temporario
     remove(arquivo_asm);
     rename(arquivo_temp, arquivo_asm);

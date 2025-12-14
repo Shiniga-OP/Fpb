@@ -6,7 +6,7 @@
 * [ARQUITETURA]: AARCH64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 13/12/2025.
+* [ATUAL]: 14/12/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -138,6 +138,12 @@ typedef struct {
     char valor[MAX_TOK];
 } Tex;
 
+typedef struct {
+    bool x[16];
+    bool s[16];
+    bool d[16];
+} Regs;
+
 static Lexer L;
 static Funcao funcs[MAX_FN];
 static int fn_cnt = 0;
@@ -155,6 +161,7 @@ static int espaco_cnt = 0;
 static int rotulos_pare[MAX_FN];  // Pilha de rótulos para 'pare'
 static int rotulo_pare_topo = -1; // Topo da pilha
 static char* arquivoAtual;
+static Regs regs = {0};
 static bool debug_o = false;
 
 // buscar
@@ -195,7 +202,10 @@ void gerar_prelude(FILE* s);
 void processar_args(FILE* s, Funcao* f);
 char* processar_caminho();
 int processar_var_tam(int escopo);
-// etc
+// registradores:
+int alocar_reg(char tipo);
+void liberar_reg(char tipo, int reg);
+// util
 TipoToken expressao(FILE* s, int escopo);
 TipoToken termo(FILE* s, int escopo);
 TipoToken fator(FILE* s, int escopo);
@@ -290,6 +300,69 @@ void excessao(TipoToken t) {
     }
     proximoToken();
 }
+
+// [REGISTRADORES]:
+int alocar_reg(char tipo) {
+    // pra registradores de inteiros(x/w)
+    if(tipo == 'x' || tipo == 'w') {
+        // usa x8-x15 pra temporarios(não preservados pelo chamador)
+        for(int i = 8; i <= 15; i++) {
+            if(!regs.x[i]) {
+                regs.x[i] = true;
+                return i;
+            }
+        }
+        // se não houver registradores temporarios, tenta x19-x22(salvos)
+        for(int i = 19; i <= 22; i++) {
+            if(!regs.x[i]) {
+                regs.x[i] = true;
+                return i;
+            }
+        }
+    }
+    // pra registradores de ponto flutuante(s)
+    else if(tipo == 's') {
+        // s0-s7 são usados pra parametros, então usamos s8-s15
+        for(int i = 8; i <= 15; i++) {
+            if(!regs.s[i]) {
+                regs.s[i] = true;
+                return i;
+            }
+        }
+    }
+    // pra registradores de ponto flutuante dobro(d)
+    else if(tipo == 'd') {
+        // d0-d7 são usados pra parametros, então usamos d8-d15
+        for(int i = 8; i <= 15; i++) {
+            if(!regs.d[i]) {
+                regs.d[i] = true;
+                return i;
+            }
+        }
+    }
+    return -1; // significa SP (pilha)
+}
+
+void liberar_reg(char tipo, int reg) {
+    if(tipo == 'x' || tipo == 'w') {
+        if(reg >= 8 && reg <= 15) {
+            regs.x[reg] = false;
+        } else if(reg >= 19 && reg <= 22) {
+            regs.x[reg] = false;
+        }
+    }
+    else if(tipo == 's') {
+        if(reg >= 8 && reg <= 15) {
+            regs.s[reg] = false;
+        }
+    }
+    else if(tipo == 'd') {
+        if(reg >= 8 && reg <= 15) {
+            regs.d[reg] = false;
+        }
+    }
+}
+
 // [UTIL]:
 int tam_tipo(TipoToken t) {
     switch(t) {
@@ -2514,7 +2587,7 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
             else if(tipo == T_pDOBRO) fprintf(s, "  fadd d0, d1, d0\n");
             else if(tipo == T_pLONGO) fprintf(s, "  add x0, x1, x0\n");
             else if(tipo == T_PONTEIRO) {
-                fprintf(s, "  lsl x0, x0, 3\n"); // multiplica por 8 "<< 3"
+                fprintf(s, "  lsl x0, x0, 3\n");
                 fprintf(s, "  add x0, x1, x0\n");
             } else fprintf(s, "  add w0, w1, w0\n");
         break;
@@ -2563,19 +2636,17 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo) {
             if(tipo == T_pFLU || tipo == T_pDOBRO) {
                 fatal("[gerar_operacao] operador && não suportado para tipos flutuante");
             } else if(tipo == T_pLONGO || tipo == T_PONTEIRO) {
-                // &&: w0 = (w1 != 0) && (w0 != 0)
                 fprintf(s, "  cmp x1, 0\n");
-                fprintf(s, "  cset x1, ne\n"); // w1 = (w1 != 0) ? 1 : 0
+                fprintf(s, "  cset x1, ne\n");
                 fprintf(s, "  cmp x0, 0\n");
-                fprintf(s, "  cset x0, ne\n"); // w0 = (w0 != 0) ? 1 : 0
-                fprintf(s, "  and x0, x1, x0\n"); // w0 = w1 & w0
+                fprintf(s, "  cset x0, ne\n");
+                fprintf(s, "  and x0, x1, x0\n");
             } else {
-                // &&: w0 = (w1 != 0) && (w0 != 0)
                 fprintf(s, "  cmp w1, 0\n");
-                fprintf(s, "  cset w1, ne\n"); // w1 = (w1 != 0) ? 1 : 0
+                fprintf(s, "  cset w1, ne\n");
                 fprintf(s, "  cmp w0, 0\n");
-                fprintf(s, "  cset w0, ne\n"); // w0 = (w0 != 0) ? 1 : 0
-                fprintf(s, "  and w0, w1, w0\n"); // w0 = w1 & w0
+                fprintf(s, "  cset w0, ne\n");
+                fprintf(s, "  and w0, w1, w0\n");
             }
         break;
         case T_MENOR_MENOR: 
@@ -2922,19 +2993,19 @@ void carregar_valor(FILE* s, Variavel* var) {
             switch(tam_tipo(var->tipo_base)) {
                 case 1: 
                     fprintf(s, "  ldrb w0, [x0]\n"); 
-                    break;
+                break;
                 case 4: 
                     if(var->tipo_base == T_pFLU) 
                         fprintf(s, "  ldr s0, [x0]\n");
                     else 
                         fprintf(s, "  ldr w0, [x0]\n");
-                    break;
+                break;
                 case 8:
                     if(var->tipo_base == T_pDOBRO) 
                         fprintf(s, "  ldr d0, [x0]\n");
                     else 
                         fprintf(s, "  ldr x0, [x0]\n");
-                    break;
+                break;
             }
         }
     } else {
@@ -3205,34 +3276,70 @@ TipoToken fator(FILE* s, int escopo) {
 }
 
 TipoToken termo(FILE* s, int escopo) {
-    TipoToken tipo = fator(s, escopo);
-    
+    TipoToken tipo_esq = fator(s, escopo);
     while(L.tk.tipo == T_VEZES || L.tk.tipo == T_DIV ||
     L.tk.tipo == T_PORCEN || L.tk.tipo == T_MENOR_MENOR ||
     L.tk.tipo == T_MAIOR_MAIOR || L.tk.tipo == T_TAMBEM) {
         TipoToken op = L.tk.tipo;
+        
+        int tam = tam_tipo(tipo_esq) > 8 ? 16 : 8;
+        char reg_tipo;
+
+        if(tipo_esq == T_pFLU) {
+            reg_tipo = 's';
+            tam = 4;
+        } else if(tipo_esq == T_pDOBRO) {
+            reg_tipo = 'd';
+            tam = 8;
+        } else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) {
+            reg_tipo = 'x';
+            tam = 8;
+        } else {
+            reg_tipo = 'w';
+            tam = 4;
+        }
+        int reg_temp_esq = alocar_reg(reg_tipo); // tenta alocar reg(w8)
+
+        if(reg_temp_esq >= 8) { // registrador alocado
+            if(debug_o) printf("[termo]: guardando em reg %c%d, pulando pilha\n", reg_tipo, reg_temp_esq);
+            // move o operando esquerdo(w0/x0/s0/d0) pro registrador alocado(w8)
+            if(reg_tipo == 's') fprintf(s, "  fmov s%d, s0\n", reg_temp_esq);
+            else if(reg_tipo == 'd') fprintf(s, "  fmov d%d, d0\n", reg_temp_esq);
+            else if(reg_tipo == 'x') fprintf(s, "  mov x%d, x0\n", reg_temp_esq);
+            else fprintf(s, "  mov w%d, w0\n", reg_temp_esq);
+        } else { // falhou na alocação, usa pilha
+            if(debug_o) printf("[termo]: pilha usada pra operando esquerdo\n");
+            // empilha o operando esquerdo
+            if(tipo_esq == T_pFLU) fprintf(s, "  str s0, [sp, -%d]!\n", tam);
+            else if(tipo_esq == T_pDOBRO) fprintf(s, "  str d0, [sp, -%d]!\n", tam);
+            else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) fprintf(s, "  str x0, [sp, -%d]!\n", tam);
+            else fprintf(s, "  str w0, [sp, -%d]!\n", tam);
+            reg_temp_esq = -1; // marca o uso da pilha
+        }
         proximoToken();
-        
-        if(tipo == T_pFLU) {
-            fprintf(s, "  str s0, [sp, -16]!\n");
-        } else if (tipo == T_pDOBRO) {
-            fprintf(s, "  str d0, [sp, -16]!\n");
-        } else {
-            fprintf(s, "  str w0, [sp, -16]!\n");
-        }
         TipoToken tipo_dir = fator(s, escopo);
-        
-        if(tipo == T_pFLU) {
-            fprintf(s, "  ldr s1, [sp], 16\n");
-        } else if (tipo == T_pDOBRO) {
-            fprintf(s, "  ldr d1, [sp], 16\n");
-        } else {
-            fprintf(s, "  ldr w1, [sp], 16\n");
+        TipoToken tipo_resultado = tipo_dir; 
+
+        // carrega o operando esquerdo pra w1/x1/s1/d1
+        if(reg_temp_esq >= 8) { // registrador usado
+            if(debug_o) printf("[termo]: movendo de registrador %c%d pra %c1\n", reg_tipo, reg_temp_esq, reg_tipo);
+            if(reg_tipo == 's') fprintf(s, "  fmov s1, s%d\n", reg_temp_esq);
+            else if(reg_tipo == 'd') fprintf(s, "  fmov d1, d%d\n", reg_temp_esq);
+            else if(reg_tipo == 'x') fprintf(s, "  mov x1, x%d\n", reg_temp_esq);
+            else fprintf(s, "  mov w1, w%d\n", reg_temp_esq);
+            
+            liberar_reg(reg_tipo, reg_temp_esq); // libera o temporario
+        } else { // pilha foi usada
+            if(debug_o) printf("[termo]: desempilhando para w1/x1/s1\n");
+            if(tipo_esq == T_pFLU) fprintf(s, "  ldr s1, [sp], %d\n", tam);
+            else if(tipo_esq == T_pDOBRO) fprintf(s, "  ldr d1, [sp], %d\n", tam);
+            else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) fprintf(s, "  ldr x1, [sp], %d\n", tam);
+            else fprintf(s, "  ldr w1, [sp], %d\n", tam);
         }
-        tipo = converter_tipos(s, tipo, tipo_dir);
-        gerar_operacao(s, op, tipo);
+        gerar_operacao(s, op, tipo_resultado);
+        tipo_esq = tipo_resultado;
     }
-    return tipo;
+    return tipo_esq;
 }
 
 TipoToken expressao(FILE* s, int escopo) {
@@ -3662,6 +3769,11 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
 }
 
 int main(int argc, char** argv) {
+    for(int i = 0; i < 16; i++) {
+        regs.x[i] = false;
+        regs.s[i] = false;
+        regs.d[i] = false;
+    }
     if(argc < 2) {
         printf("FPB: sem arquivos de entrada\n");
         printf("Use \"fpb -ajuda\" para mais informações\n");

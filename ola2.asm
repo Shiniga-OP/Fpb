@@ -411,27 +411,30 @@ cvtint:
   str x0, [x29, -48]  // param v
   str x1, [x29, -56]  // param tam
   ldr w0, [x29, -56]
+  mov w19, w0
   str w0, [x29, -80]
   ldr w0, [x29, -80]
-  mov w8, w0
-  mov w0, 0
-  mov w1, w8
+  mov w19, w0
+  mov w0, #0
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B0
-  mov w0, 0
+  mov w0, #0
   b 1f
   b .B1
 .B0:
 .B1:
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, -96]
   mov w0, 0
+  mov w19, w0
   strb w0, [x29, -112]
-  mov w0, 0
+  mov w0, #0
   mov w1, w0 // otimizado(literal)
   mov w2, 1
   mul w1, w1, w2
@@ -439,40 +442,41 @@ cvtint:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
+  mov w19, w0
   strb w0, [x29, -128]
   ldrb w0, [x29, -128]
-  mov w8, w0
+  mov w19, w0
   mov w0, 45
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B2
   mov w0, 1
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   strb w0, [x29, -112]
-  mov w0, 1
-  mov w8, w0
-  mov w0, w8
+  mov w0, #1
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -96]
   b .B3
 .B2:
   ldrb w0, [x29, -128]
-  mov w8, w0
+  mov w19, w0
   mov w0, 43
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B4
-  mov w0, 1
-  mov w8, w0
-  mov w0, w8
+  mov w0, #1
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -96]
   b .B5
 .B4:
@@ -483,40 +487,41 @@ cvtint:
   ldr w0, [x29, -96]
   ldr w1, [sp], 16
   sub w0, w1, w0
+  mov w19, w0
   str w0, [x29, -144]
   ldr w0, [x29, -144]
-  mov w8, w0
-  mov w0, 0
-  mov w1, w8
+  mov w19, w0
+  mov w0, #0
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B6
-  mov w0, 0
+  mov w0, #0
   b 1f
   b .B7
 .B6:
 .B7:
   ldr w0, [x29, -144]
-  mov w8, w0
-  mov w0, 4
-  mov w1, w8
+  mov w19, w0
+  mov w0, #4
+  mov w1, w19
   cmp w1, w0
   cset w0, le
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B8
   ldr w0, [x29, -144]
-  mov w8, w0
-  mov w0, 1
-  mov w1, w8
+  mov w19, w0
+  mov w0, #1
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B9
   ldr w0, [x29, -96]
@@ -533,19 +538,19 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, 304]
   b .B10
 .B9:
   ldr w0, [x29, -144]
-  mov w8, w0
-  mov w0, 2
-  mov w1, w8
+  mov w19, w0
+  mov w0, #2
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B11
   ldr w0, [x29, -96]
@@ -562,14 +567,14 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  mov w8, w0  // salva em reg
-  mov w0, 10
-  mov w1, w8  // restaura do reg
+  mov w19, w0  // salva em reg
+  mov w0, #10
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
   str w0, [sp, -16]!
-  mov w0, 1
+  mov w0, #1
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
@@ -587,19 +592,19 @@ cvtint:
   sub w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, 304]
   b .B12
 .B11:
   ldr w0, [x29, -144]
-  mov w8, w0
-  mov w0, 3
-  mov w1, w8
+  mov w19, w0
+  mov w0, #3
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B13
   ldr w0, [x29, -96]
@@ -616,14 +621,14 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  mov w8, w0  // salva em reg
-  mov w0, 100
-  mov w1, w8  // restaura do reg
+  mov w19, w0  // salva em reg
+  mov w0, #100
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
   str w0, [sp, -16]!
-  mov w0, 1
+  mov w0, #1
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
@@ -639,16 +644,16 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  mov w8, w0  // salva em reg
-  mov w0, 10
-  mov w1, w8  // restaura do reg
+  mov w19, w0  // salva em reg
+  mov w0, #10
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
   str w0, [sp, -16]!
-  mov w0, 2
+  mov w0, #2
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
@@ -666,8 +671,8 @@ cvtint:
   sub w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, 304]
   b .B14
 .B13:
@@ -685,14 +690,14 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  mov w8, w0  // salva em reg
-  mov w0, 1000
-  mov w1, w8  // restaura do reg
+  mov w19, w0  // salva em reg
+  mov w0, #1000
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
   str w0, [sp, -16]!
-  mov w0, 1
+  mov w0, #1
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
@@ -708,16 +713,16 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  mov w8, w0  // salva em reg
-  mov w0, 100
-  mov w1, w8  // restaura do reg
+  mov w19, w0  // salva em reg
+  mov w0, #100
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
   str w0, [sp, -16]!
-  mov w0, 2
+  mov w0, #2
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
@@ -733,16 +738,16 @@ cvtint:
   mov w0, 48
   ldr w1, [sp], 16
   sub w0, w1, w0
-  mov w8, w0  // salva em reg
-  mov w0, 10
-  mov w1, w8  // restaura do reg
+  mov w19, w0  // salva em reg
+  mov w0, #10
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
   str w0, [sp, -16]!
-  mov w0, 3
+  mov w0, #3
   ldr w1, [sp], 16
   add w0, w1, w0
   str w0, [sp, -16]!
@@ -760,29 +765,30 @@ cvtint:
   sub w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, 304]
 .B14:
 .B12:
 .B10:
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, 288]
   ldrb w0, [x29, -112]
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B15
   ldr w0, [x29, 304]
   neg w0, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, 288]
   b .B16
 .B15:
   ldr w0, [x29, 304]
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, 288]
 .B16:
   ldr w0, [x29, 288]
@@ -790,23 +796,24 @@ cvtint:
   b .B17
 .B8:
 .B17:
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, -160]
 .B19:
   ldr w0, [x29, -96]
-  mov w8, w0
+  mov w19, w0
   ldr w0, [x29, -80]
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B20
   ldr w0, [x29, -160]
-  mov w8, w0  // salva em reg
-  mov w0, 10
-  mov w1, w8  // restaura do reg
+  mov w19, w0  // salva em reg
+  mov w0, #10
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   str w0, [sp, -16]!
   ldr w0, [x29, -96]
@@ -827,28 +834,29 @@ cvtint:
   sub w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -160]
   b .B19
 .B20:
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, -176]
   ldrb w0, [x29, -112]
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B21
   ldr w0, [x29, -160]
   neg w0, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -176]
   b .B22
 .B21:
   ldr w0, [x29, -160]
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -176]
 .B22:
   ldr w0, [x29, -176]
@@ -873,13 +881,13 @@ cvtflu:
   str x0, [x29, -48]  // param v
   str x1, [x29, -56]  // param tam
   ldr w0, [x29, -56]
-  mov w8, w0
-  mov w0, 0
-  mov w1, w8
+  mov w19, w0
+  mov w0, #0
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B23
   ldr x0, = const_0
@@ -888,11 +896,13 @@ cvtflu:
   b .B24
 .B23:
 .B24:
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, -80]
   mov w0, 0
+  mov w19, w0
   strb w0, [x29, -96]
-  mov w0, 0
+  mov w0, #0
   mov w1, w0 // otimizado(literal)
   mov w2, 1
   mul w1, w1, w2
@@ -900,26 +910,26 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 45
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B25
   mov w0, 1
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   strb w0, [x29, -96]
-  mov w0, 1
-  mov w8, w0
-  mov w0, w8
+  mov w0, #1
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -80]
   b .B26
 .B25:
-  mov w0, 0
+  mov w0, #0
   mov w1, w0 // otimizado(literal)
   mov w2, 1
   mul w1, w1, w2
@@ -927,18 +937,18 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 43
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B27
-  mov w0, 1
-  mov w8, w0
-  mov w0, w8
+  mov w0, #1
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -80]
   b .B28
 .B27:
@@ -946,12 +956,13 @@ cvtflu:
 .B26:
   ldr x0, = const_0
   ldr s0, [x0]
+  fmov s19, s0
   str s0, [x29, -112]
 .B30:
   ldr w0, [x29, -80]
-  mov w8, w0
+  mov w19, w0
   ldr w0, [x29, -56]
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
   str w0, [sp, -16]!
@@ -965,9 +976,9 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 46
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, ne
   str w0, [sp, -16]!
@@ -981,9 +992,9 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 101
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, ne
   str w0, [sp, -16]!
@@ -997,9 +1008,9 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 69
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, ne
   ldr w1, [sp], 16
@@ -1020,8 +1031,8 @@ cvtflu:
   cmp w0, 0
   cset w0, ne
   and w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B31
   ldr w0, [x29, -80]
@@ -1034,9 +1045,9 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 48
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, ge
   str w0, [sp, -16]!
@@ -1050,9 +1061,9 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 57
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, le
   ldr w1, [sp], 16
@@ -1061,15 +1072,15 @@ cvtflu:
   cmp w0, 0
   cset w0, ne
   and w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B32
   ldr s0, [x29, -112]
-  fmov s8, s0  // salva em reg
+  fmov s19, s0  // salva em reg
   ldr x0, = const_1
   ldr s0, [x0]
-  fmov s1, s8  // restaura do reg
+  fmov s1, s19  // restaura do reg
   fmul s0, s1, s0
   str s0, [sp, -16]!
   ldr w0, [x29, -80]
@@ -1090,8 +1101,8 @@ cvtflu:
   scvtf s0, w0
   ldr s1, [sp], 16
   fadd s0, s1, s0
-  fmov s8, s0
-  fmov s0, s8
+  fmov s19, s0
+  fmov s0, s19
   str s0, [x29, -112]
   b .B33
 .B32:
@@ -1102,9 +1113,9 @@ cvtflu:
   b .B30
 .B31:
   ldr w0, [x29, -80]
-  mov w8, w0
+  mov w19, w0
   ldr w0, [x29, -56]
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
   str w0, [sp, -16]!
@@ -1118,9 +1129,9 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 46
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
   ldr w1, [sp], 16
@@ -1129,8 +1140,8 @@ cvtflu:
   cmp w0, 0
   cset w0, ne
   and w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B34
   ldr w0, [x29, -80]
@@ -1138,12 +1149,13 @@ cvtflu:
   str w0, [x29, -80]
   ldr x0, = const_2
   ldr s0, [x0]
+  fmov s19, s0
   str s0, [x29, 224]
 .B36:
   ldr w0, [x29, -80]
-  mov w8, w0
+  mov w19, w0
   ldr w0, [x29, -56]
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
   str w0, [sp, -16]!
@@ -1157,9 +1169,9 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 48
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, ge
   str w0, [sp, -16]!
@@ -1173,9 +1185,9 @@ cvtflu:
   ldr x2, [x29, -48]
   add x2, x2, x0
   ldrb w0, [x2]
-  mov w8, w0
+  mov w19, w0
   mov w0, 57
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, le
   ldr w1, [sp], 16
@@ -1190,8 +1202,8 @@ cvtflu:
   cmp w0, 0
   cset w0, ne
   and w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B37
   ldr s0, [x29, -112]
@@ -1212,23 +1224,23 @@ cvtflu:
   sub w0, w1, w0
   sxtb w0, w0
   scvtf s0, w0
-  fmov s8, s0  // salva em reg
+  fmov s19, s0  // salva em reg
   ldr s0, [x29, 224]
-  fmov s1, s8  // restaura do reg
+  fmov s1, s19  // restaura do reg
   fmul s0, s1, s0
   ldr s1, [sp], 16
   fadd s0, s1, s0
-  fmov s8, s0
-  fmov s0, s8
+  fmov s19, s0
+  fmov s0, s19
   str s0, [x29, -112]
   ldr s0, [x29, 224]
-  fmov s8, s0  // salva em reg
+  fmov s19, s0  // salva em reg
   ldr x0, = const_2
   ldr s0, [x0]
-  fmov s1, s8  // restaura do reg
+  fmov s1, s19  // restaura do reg
   fmul s0, s1, s0
-  fmov s8, s0
-  fmov s0, s8
+  fmov s19, s0
+  fmov s0, s19
   str s0, [x29, 224]
   ldr w0, [x29, -80]
   add w0, w0, 1
@@ -1239,14 +1251,14 @@ cvtflu:
 .B34:
 .B38:
   ldrb w0, [x29, -96]
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B39
   ldr s0, [x29, -112]
   fneg s0, s0
-  fmov s8, s0
-  fmov s0, s8
+  fmov s19, s0
+  fmov s0, s19
   str s0, [x29, -112]
   b .B40
 .B39:
@@ -1313,12 +1325,14 @@ inicio:
   ldr x0, = .tex_2
   bl _escrever_tex
   mov w0, 65
+  mov w19, w0
   strb w0, [x29, -32]
   ldr x0, = .tex_3
   bl _escrever_tex
   ldrb w0, [x29, -32]
   bl _escrever_car
-  mov w0, 42
+  mov w0, #42
+  mov w19, w0
   str w0, [x29, -48]
   ldr x0, = .tex_4
   bl _escrever_tex
@@ -1326,12 +1340,14 @@ inicio:
   bl _escrever_int
   ldr x0, = const_3
   ldr s0, [x0]
+  fmov s19, s0
   str s0, [x29, -64]
   ldr x0, = .tex_5
   bl _escrever_tex
   ldr s0, [x29, -64]
   bl _escrever_flu
   mov w0, 1
+  mov w19, w0
   strb w0, [x29, -80]
   ldr x0, = .tex_6
   bl _escrever_tex
@@ -1339,12 +1355,14 @@ inicio:
   bl _escrever_bool
   add sp, sp, 0  // limpa temporarios
   bl obter_tempo_milis
+  mov x19, x0
   str x0, [x29, -96]
   ldr x0, = .tex_7
   bl _escrever_tex
   ldr x0, [x29, -96]
   bl _escrever_longo
   mov w0, 255 // byte: 0xFF
+  mov w19, w0
   strb w0, [x29, -112]
   ldr x0, = .tex_8
   bl _escrever_tex
@@ -1352,9 +1370,9 @@ inicio:
   bl _escrever_int
   ldr x0, = .tex_comb_0
   bl _escrever_tex
-  mov w0, 5
+  mov w0, #5
   str w0, [sp, -16]!  // salva param 0 (int/bool/char/byte)
-  mov w0, 7
+  mov w0, #7
   str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
   ldr w1, [sp, 0]  // carrega param 1 (int/bool) em w1
   mov x1, x1  // estende pra 64 bits
@@ -1362,12 +1380,14 @@ inicio:
   mov x0, x0  // estende pra 64 bits
   add sp, sp, 32  // limpa temporarios
   bl somar
+  mov w19, w0
   str w0, [x29, -128]
   ldr x0, = .tex_11
   bl _escrever_tex
   ldr w0, [x29, -128]
   bl _escrever_int
-  mov w0, 1
+  mov w0, #1
+  mov w19, w0
   str w0, [x29, -144]
   ldr x0, = .tex_12
   bl _escrever_tex
@@ -1417,13 +1437,13 @@ testeAlteracoes:
   str x2, [x29, -32]  // param letra
   str x3, [x29, -40]  // param marca
   str x4, [x29, -48]  // param numLongo
-  mov w0, 5
+  mov w0, #5
   str w0, [sp, -16]!
-  mov w0, 7
+  mov w0, #7
   ldr w1, [sp], 16
   add w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -16]
   ldr x0, = .tex_14
   bl _escrever_tex
@@ -1431,22 +1451,23 @@ testeAlteracoes:
   bl _escrever_int
   ldr x0, = .tex_15
   bl _escrever_tex
-  mov w0, 100
-  mov w8, w0
-  mov w0, w8
+  mov w0, #100
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -24]
   mov w0, 90
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   strb w0, [x29, -32]
   mov w0, 0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   strb w0, [x29, -40]
-  ldr x0, = const_4
-  ldr x0, [x0]
-  mov x8, x0
-  mov x0, x8
+  movz x0, #43159, lsl #0
+  movk x0, #37600, lsl #16
+  movk x0, #410, lsl #32
+  mov x19, x0
+  mov x0, x19
   str x0, [x29, -48]
   ldr x0, = .tex_16
   bl _escrever_tex
@@ -1468,7 +1489,8 @@ testeAlteracoes:
   bl _escrever_car
   ldr x0, = .tex_20
   bl _escrever_tex
-  mov w0, 1
+  mov w0, #1
+  mov w19, w0
   str w0, [x29, -80]
   ldr x0, = .tex_21
   bl _escrever_tex
@@ -1476,9 +1498,10 @@ testeAlteracoes:
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
-  mov w0, -1
-  mov w8, w0
-  mov w0, w8
+  movz w0, #65535
+  movk w0, #65535, lsl #16
+  mov w19, w0
+  mov w0, w19
   str w0, [x29, -80]
   ldr x0, = .tex_22
   bl _escrever_tex
@@ -1486,8 +1509,9 @@ testeAlteracoes:
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
-  ldr x0, = const_5
+  ldr x0, = const_4
   ldr s0, [x0]
+  fmov s19, s0
   str s0, [x29, -96]
   ldr x0, = .tex_23
   bl _escrever_tex
@@ -1495,10 +1519,10 @@ testeAlteracoes:
   bl _escrever_flu
   mov w0, 10
   bl _escrever_car
-  ldr x0, = const_6
+  ldr x0, = const_5
   ldr s0, [x0]
-  fmov s8, s0
-  fmov s0, s8
+  fmov s19, s0
+  fmov s0, s19
   str s0, [x29, -96]
   ldr x0, = .tex_24
   bl _escrever_tex
@@ -1508,7 +1532,7 @@ testeAlteracoes:
   bl _escrever_car
   ldr x0, = .tex_comb_1
   bl _escrever_tex
-  mov w0, 65
+  mov w0, #65
   and w0, w0, 0xFF
   bl _escrever_car
   add sp, sp, 0  // limpa temporarios
@@ -1540,12 +1564,12 @@ testeOperacoes:
   add x29, sp, 144
   ldr x0, = .tex_comb_2
   bl _escrever_tex
-  mov w0, 5
+  mov w0, #5
   str w0, [sp, -16]!
-  mov w0, 5
-  mov w8, w0  // salva em reg
-  mov w0, 5
-  mov w1, w8  // restaura do reg
+  mov w0, #5
+  mov w19, w0  // salva em reg
+  mov w0, #5
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   ldr w1, [sp], 16
   add w0, w1, w0
@@ -1554,25 +1578,25 @@ testeOperacoes:
   bl _escrever_car
   ldr x0, = .tex_29
   bl _escrever_tex
-  mov w0, 5
+  mov w0, #5
   mov w1, w0 // otimizado(literal)
   add w0, w1, w0
-  mov w8, w0  // salva em reg
-  mov w0, 5
-  mov w1, w8  // restaura do reg
+  mov w19, w0  // salva em reg
+  mov w0, #5
+  mov w1, w19  // restaura do reg
   mul w0, w1, w0
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
-  mov w0, 5
+  mov w0, #5
   mov w1, w0 // otimizado(literal)
   add w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_13
   bl _escrever_tex
-  mov w0, 5
+  mov w0, #5
   str w0, [sp, -16]!  // salva param 0 (int/bool/char/byte)
-  mov w0, 5
+  mov w0, #5
   str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
   ldr w1, [sp, 0]  // carrega param 1 (int/bool) em w1
   mov x1, x1  // estende pra 64 bits
@@ -1585,10 +1609,10 @@ testeOperacoes:
   bl _escrever_car
   ldr x0, = .tex_30
   bl _escrever_tex
-  mov w0, 10
-  mov w8, w0  // salva em reg
-  mov w0, 3
-  mov w1, w8  // restaura do reg
+  mov w0, #10
+  mov w19, w0  // salva em reg
+  mov w0, #3
+  mov w1, w19  // restaura do reg
   sdiv w2, w1, w0
   msub w0, w2, w0, w1
   bl _escrever_int
@@ -1596,10 +1620,12 @@ testeOperacoes:
   bl _escrever_car
   ldr x0, = .tex_31
   bl _escrever_tex
-  mov w0, 3
+  mov w0, #3
+  mov w19, w0
   str w0, [x29, -32]
-  ldr x0, = const_7
+  ldr x0, = const_6
   ldr s0, [x0]
+  fmov s19, s0
   str s0, [x29, -48]
   ldr x0, = .tex_32
   bl _escrever_tex
@@ -1612,51 +1638,51 @@ testeOperacoes:
   ldr x0, = .tex_34
   bl _escrever_tex
   ldr s0, [x29, -48]
-  fmov s8, s0  // salva em reg
+  fmov s19, s0  // salva em reg
   ldr w0, [x29, -32]
   scvtf s0, w0
-  fmov s1, s8  // restaura do reg
+  fmov s1, s19  // restaura do reg
   fmul s0, s1, s0
   bl _escrever_flu
   mov w0, 10
   bl _escrever_car
   ldr x0, = .tex_35
   bl _escrever_tex
-  mov w0, 10
-  mov w8, w0  // salva em reg
-  mov w0, 2
-  mov w1, w8  // restaura do reg
+  mov w0, #10
+  mov w19, w0  // salva em reg
+  mov w0, #2
+  mov w1, w19  // restaura do reg
   lsl w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_comb_3
   bl _escrever_tex
-  mov w0, 10
-  mov w8, w0  // salva em reg
-  mov w0, 2
-  mov w1, w8  // restaura do reg
+  mov w0, #10
+  mov w19, w0  // salva em reg
+  mov w0, #2
+  mov w1, w19  // restaura do reg
   lsr w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_comb_4
   bl _escrever_tex
-  mov w0, 124
-  mov w8, w0  // salva em reg
-  mov w0, 15
-  mov w1, w8  // restaura do reg
+  mov w0, #124
+  mov w19, w0  // salva em reg
+  mov w0, #15
+  mov w1, w19  // restaura do reg
   and w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_comb_5
   bl _escrever_tex
-  mov w0, 124
-  mov w8, w0  // salva em reg
+  mov w0, #124
+  mov w19, w0  // salva em reg
   mov w0, 15 // byte: 0xF
-  mov w1, w8  // restaura do reg
+  mov w1, w19  // restaura do reg
   and w0, w1, w0
   bl _escrever_int
   ldr x0, = .tex_comb_6
   bl _escrever_tex
-  mov w0, 1
+  mov w0, #1
   str w0, [sp, -16]!
-  mov w0, 2
+  mov w0, #2
   ldr w1, [sp], 16
   orr w0, w1, w0
   bl _escrever_int
@@ -1677,16 +1703,17 @@ testeComparacoes:
   add x29, sp, 176
   ldr x0, = .tex_40
   bl _escrever_tex
-  mov w0, 4
+  mov w0, #4
+  mov w19, w0
   str w0, [x29, -32]
   ldr w0, [x29, -32]
-  mov w8, w0
-  mov w0, 5
-  mov w1, w8
+  mov w19, w0
+  mov w0, #5
+  mov w1, w19
   cmp w1, w0
   cset w0, gt
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B41
   ldr x0, = .tex_41
@@ -1694,13 +1721,13 @@ testeComparacoes:
   b .B42
 .B41:
   ldr w0, [x29, -32]
-  mov w8, w0
-  mov w0, 5
-  mov w1, w8
+  mov w19, w0
+  mov w0, #5
+  mov w1, w19
   cmp w1, w0
   cset w0, ge
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B43
   ldr x0, = .tex_42
@@ -1711,19 +1738,20 @@ testeComparacoes:
   bl _escrever_tex
 .B44:
 .B42:
-  mov w0, 5
+  mov w0, #5
+  mov w19, w0
   str w0, [x29, -48]
   ldr w0, [x29, -48]
-  mov w8, w0
-  mov w0, 4
-  mov w1, w8
+  mov w19, w0
+  mov w0, #4
+  mov w1, w19
   cmp w1, w0
   cset w0, ge
   str w0, [sp, -16]!
   ldr w0, [x29, -32]
-  mov w8, w0
-  mov w0, 4
-  mov w1, w8
+  mov w19, w0
+  mov w0, #4
+  mov w1, w19
   cmp w1, w0
   cset w0, gt
   ldr w1, [sp], 16
@@ -1732,8 +1760,8 @@ testeComparacoes:
   cmp w0, 0
   cset w0, ne
   and w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B45
   ldr x0, = .tex_44
@@ -1744,16 +1772,16 @@ testeComparacoes:
   bl _escrever_tex
 .B46:
   ldr w0, [x29, -48]
-  mov w8, w0
+  mov w19, w0
   ldr w0, [x29, -32]
-  mov w1, w8
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
   str w0, [sp, -16]!
   ldr w0, [x29, -32]
-  mov w8, w0
-  mov w0, 3
-  mov w1, w8
+  mov w19, w0
+  mov w0, #3
+  mov w1, w19
   cmp w1, w0
   cset w0, gt
   ldr w1, [sp], 16
@@ -1762,8 +1790,8 @@ testeComparacoes:
   cmp w0, 0
   cset w0, ne
   orr w0, w1, w0
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B47
   ldr x0, = .tex_46
@@ -1795,13 +1823,13 @@ testeComparacoes:
   ldr x0, [sp, 16]  // carrega param 0 (ptr/longo) em x0
   add sp, sp, 32  // limpa temporarios
   bl texcmp
-  mov w8, w0
-  mov w0, 1
-  mov w1, w8
+  mov w19, w0
+  mov w0, #1
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B49
   ldr x0, = .tex_51
@@ -1817,13 +1845,13 @@ testeComparacoes:
   ldr x0, [sp, 16]  // carrega param 0 (ptr/longo) em x0
   add sp, sp, 32  // limpa temporarios
   bl texcmp
-  mov w8, w0
-  mov w0, 0
-  mov w1, w8
+  mov w19, w0
+  mov w0, #0
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B51
   ldr x0, = .tex_52
@@ -1839,13 +1867,13 @@ testeComparacoes:
   ldr x0, [sp, 16]  // carrega param 0 (ptr/longo) em x0
   add sp, sp, 32  // limpa temporarios
   bl texcmp
-  mov w8, w0
-  mov w0, 1
-  mov w1, w8
+  mov w19, w0
+  mov w0, #1
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B53
   ldr x0, = .tex_53
@@ -1886,7 +1914,7 @@ testeMemoria:
   bl _escrever_tex
   add x0, x29, -32
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
   mov w1, w0
   str w1, [sp, -16]!
   mov w0, 88
@@ -1900,21 +1928,23 @@ testeMemoria:
   bl _escrever_tex
   ldr x0, = .tex_58
   bl _escrever_tex
-  mov w0, 10
+  mov w0, #10
+  mov w19, w0
   str w0, [x29, -48]
   ldr x0, = .tex_59
   bl _escrever_tex
   add x0, x29, -48
+  mov x19, x0
   str x0, [x29, -64]
   ldr x0, = .tex_60
   bl _escrever_tex
   ldr x1, [x29, -64]
   ldr w0, [x1]
   str w0, [sp, -16]!
-  mov w0, 5
+  mov w0, #5
   ldr w1, [sp], 16
   add w0, w1, w0
-  mov w8, w0
+  mov w19, w0
   str x0, [x29, -64]
   ldr x0, = .tex_61
   bl _escrever_tex
@@ -1945,15 +1975,16 @@ testeMemoria:
   ldr x0, [sp, 16]  // carrega param 0 (ptr/longo) em x0
   add sp, sp, 32  // limpa temporarios
   bl texcar
+  mov w19, w0
   str w0, [x29, -96]
   ldr w0, [x29, -96]
-  mov w8, w0
-  mov w0, 0
-  mov w1, w8
+  mov w19, w0
+  mov w0, #0
+  mov w1, w19
   cmp w1, w0
   cset w0, ge
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B55
   ldr x0, = .tex_65
@@ -2028,7 +2059,7 @@ testeMemoria:
   bl _escrever_tex
   ldr x0, = .tex_72
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
   mov w1, w0 // otimizado(literal)
   mov w2, 1
   mul w1, w1, w2
@@ -2036,6 +2067,7 @@ testeMemoria:
   add x2, x29, -128
   add x2, x2, x0
   ldrb w0, [x2]
+  mov w19, w0
   strb w0, [x29, -144]
   ldr x0, = .tex_73
   bl _escrever_tex
@@ -2043,27 +2075,28 @@ testeMemoria:
   bl _escrever_car
   mov w0, 10
   bl _escrever_car
-  mov w0, 0
+  mov w0, #0
   str w0, [x29, -160]
-  mov w0, 1
+  mov w0, #1
   str w0, [x29, -156]
-  mov w0, 2
+  mov w0, #2
   str w0, [x29, -152]
-  mov w0, 5
+  mov w0, #5
   str w0, [x29, -148]
   ldr x0, = .tex_74
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, 304]
 .B58:
   ldr w0, [x29, 304]
-  mov w8, w0
-  mov w0, 4
-  mov w1, w8
+  mov w19, w0
+  mov w0, #4
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B59
   ldr x0, = .tex_75
@@ -2090,31 +2123,32 @@ testeMemoria:
   str w0, [x29, 304]
   b .B58
 .B59:
-  ldr x0, = const_8
+  ldr x0, = const_7
   ldr s0, [x0]
   str s0, [x29, -176]
-  ldr x0, = const_9
+  ldr x0, = const_8
   ldr s0, [x0]
   str s0, [x29, -172]
-  ldr x0, = const_10
+  ldr x0, = const_9
   ldr s0, [x0]
   str s0, [x29, -168]
-  ldr x0, = const_10
+  ldr x0, = const_9
   ldr s0, [x0]
   str s0, [x29, -164]
   ldr x0, = .tex_77
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, 288]
 .B61:
   ldr w0, [x29, 288]
-  mov w8, w0
-  mov w0, 4
-  mov w1, w8
+  mov w19, w0
+  mov w0, #4
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B62
   ldr x0, = .tex_75
@@ -2156,17 +2190,18 @@ testeLoops:
   add x29, sp, 160
   ldr x0, = .tex_comb_7
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, -32]
 .B64:
   ldr w0, [x29, -32]
-  mov w8, w0
-  mov w0, 10
-  mov w1, w8
+  mov w19, w0
+  mov w0, #10
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B65
   ldr x0, = .tex_80
@@ -2178,19 +2213,20 @@ testeLoops:
   str w0, [x29, -32]
   b .B64
 .B65:
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, -48]
   ldr x0, = .tex_81
   bl _escrever_tex
 .B67:
   ldr w0, [x29, -48]
-  mov w8, w0
-  mov w0, 10
-  mov w1, w8
+  mov w19, w0
+  mov w0, #10
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B68
   ldr w0, [x29, -48]
@@ -2198,13 +2234,13 @@ testeLoops:
   mov w0, 10
   bl _escrever_car
   ldr w0, [x29, -48]
-  mov w8, w0
-  mov w0, 5
-  mov w1, w8
+  mov w19, w0
+  mov w0, #5
+  mov w1, w19
   cmp w1, w0
   cset w0, eq
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B69
   ldr x0, = .tex_82
@@ -2220,17 +2256,18 @@ testeLoops:
 .B68:
   ldr x0, = .tex_83
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
+  mov w19, w0
   str w0, [x29, 160]
 .B72:
   ldr w0, [x29, 160]
-  mov w8, w0
-  mov w0, 10
-  mov w1, w8
+  mov w19, w0
+  mov w0, #10
+  mov w1, w19
   cmp w1, w0
   cset w0, lt
-  mov w8, w0
-  mov w0, w8
+  mov w19, w0
+  mov w0, w19
   cmp w0, 0
   beq .B73
   ldr x0, = .tex_84
@@ -2259,23 +2296,23 @@ testeMatrizes:
   add x29, sp, 144
   ldr x0, = .tex_85
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
   str w0, [x29, -32]
-  mov w0, 1
+  mov w0, #1
   str w0, [x29, -28]
-  mov w0, 4
+  mov w0, #4
   str w0, [x29, -24]
-  mov w0, 4
+  mov w0, #4
   str w0, [x29, -28]
-  mov w0, 1
+  mov w0, #1
   str w0, [x29, -24]
-  mov w0, 0
+  mov w0, #0
   str w0, [x29, -20]
   ldr x0, = .tex_86
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
   str w0, [sp, -16]!
-  mov w0, 1
+  mov w0, #1
   str w0, [sp, -16]!
   mov w0, 0
   ldr w1, [sp], 16
@@ -2292,19 +2329,19 @@ testeMatrizes:
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
-  ldr x0, = const_11
+  ldr x0, = const_10
   ldr s0, [x0]
   str s0, [x29, -48]
+  ldr x0, = const_11
+  ldr s0, [x0]
+  str s0, [x29, -44]
   ldr x0, = const_12
   ldr s0, [x0]
-  str s0, [x29, -44]
+  str s0, [x29, -40]
   ldr x0, = const_13
   ldr s0, [x0]
-  str s0, [x29, -40]
-  ldr x0, = const_14
-  ldr s0, [x0]
   str s0, [x29, -44]
-  ldr x0, = const_15
+  ldr x0, = const_14
   ldr s0, [x0]
   str s0, [x29, -40]
   ldr x0, = const_1
@@ -2312,9 +2349,9 @@ testeMatrizes:
   str s0, [x29, -36]
   ldr x0, = .tex_87
   bl _escrever_tex
-  mov w0, 0
+  mov w0, #0
   str w0, [sp, -16]!
-  mov w0, 1
+  mov w0, #1
   str w0, [sp, -16]!
   mov w0, 0
   ldr w1, [sp], 16
@@ -2349,13 +2386,13 @@ testeEspaco:
   mov w0, 65
   add x1, x29, -32
   strb w0, [x1]
-  mov w0, 1991
+  mov w0, #1991
   add x1, x29, -24
   str w0, [x1]
   mov w0, 66
   add x1, x29, -48
   strb w0, [x1]
-  mov w0, 1992
+  mov w0, #1992
   add x1, x29, -40
   str w0, [x1]
   ldr x0, = .tex_89
@@ -2397,7 +2434,7 @@ testeConversao:
   bl _escrever_tex
   ldr x0, = .tex_94
   str w0, [sp, -16]!  // salva param 0 (int/bool/char/byte)
-  mov w0, 3
+  mov w0, #3
   str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
   ldr w1, [sp, 0]  // carrega param 1 (int/bool) em w1
   mov x1, x1  // estende pra 64 bits
@@ -2406,7 +2443,7 @@ testeConversao:
   add sp, sp, 32  // limpa temporarios
   bl cvtint
   str w0, [sp, -16]!
-  mov w0, 1
+  mov w0, #1
   ldr w1, [sp], 16
   add w0, w1, w0
   bl _escrever_int
@@ -2416,7 +2453,7 @@ testeConversao:
   bl _escrever_tex
   ldr x0, = .tex_96
   str w0, [sp, -16]!  // salva param 0 (int/bool/char/byte)
-  mov w0, 4
+  mov w0, #4
   str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
   ldr w1, [sp, 0]  // carrega param 1 (int/bool) em w1
   mov x1, x1  // estende pra 64 bits
@@ -2426,7 +2463,7 @@ testeConversao:
   bl cvtflu
   fmov s0, s0
   str s0, [sp, -16]!
-  ldr x0, = const_7
+  ldr x0, = const_6
   ldr s0, [x0]
   ldr s1, [sp], 16
   fadd s0, s1, s0
@@ -2451,28 +2488,26 @@ const_2:
 const_3:
   .float 3.140000
 const_4:
-  .quad 1763400788119
-const_5:
   .float 1.100000
-const_6:
+const_5:
   .float -1.100000
-const_7:
+const_6:
   .float 0.500000
-const_8:
+const_7:
   .float 0.200000
-const_9:
+const_8:
   .float 1.500000
-const_10:
+const_9:
   .float 5.100000
-const_11:
+const_10:
   .float 3.000000
-const_12:
+const_11:
   .float 5.000000
-const_13:
+const_12:
   .float 7.000000
-const_14:
+const_13:
   .float 2.000000
-const_15:
+const_14:
   .float 9.000000
 .section .rodata
 .align 2

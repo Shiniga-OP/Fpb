@@ -2,15 +2,7 @@
 #global inicio();
 
 vazio inicio() {
-    int y = 3;
-    flu x = 0.50f;
-    escrever(x * y);
-}
-
-/*
-vazio inicio() {
-    int soma = 0;
-    por(int i = 0; i < 50000000; i++) soma = soma + i;
+    longo soma = 0;
+    por(longo i = 0; i < 50000000; i++) soma = soma + i;
     escrever(soma, '\n');
 }
-*/

@@ -305,13 +305,14 @@ void excessao(TipoToken t) {
 
 // [REGISTRADORES]:
 int alocar_reg(char tipo) {
+    int regLivre = -1; // -1 = pilha
     // pra registradores de inteiros(x/w)
     if(tipo == 'x' || tipo == 'w') {
         // usa x8-x15 pra temporarios(não preservados pelo chamador)
         for(int i = 8; i <= 19; i++) {
             if(!regs.x[i]) {
                 regs.x[i] = true;
-                return i;
+                regLivre = i;
             }
         }
     }
@@ -321,7 +322,7 @@ int alocar_reg(char tipo) {
         for(int i = 8; i <= 19; i++) {
             if(!regs.s[i]) {
                 regs.s[i] = true;
-                return i;
+                regLivre = i;
             }
         }
     }
@@ -331,30 +332,21 @@ int alocar_reg(char tipo) {
         for(int i = 8; i <= 19; i++) {
             if(!regs.d[i]) {
                 regs.d[i] = true;
-                return i;
+                regLivre = i;
             }
         }
     }
-    return -1; // significa pilha
+    return regLivre;
 }
 
 void liberar_reg(char tipo, int reg) {
     if(tipo == 'x' || tipo == 'w') {
-        if(reg >= 8 && reg <= 19) {
-            regs.x[reg] = false;
-        } else if(reg >= 19 && reg <= 22) {
-            regs.x[reg] = false;
-        }
-    }
-    else if(tipo == 's') {
-        if(reg >= 8 && reg <= 19) {
-            regs.s[reg] = false;
-        }
-    }
-    else if(tipo == 'd') {
-        if(reg >= 8 && reg <= 19) {
-            regs.d[reg] = false;
-        }
+        if(reg >= 8 && reg <= 19) regs.x[reg] = false;
+        else if(reg >= 19 && reg <= 22) regs.x[reg] = false;
+    } else if(tipo == 's') {
+        if(reg >= 8 && reg <= 19) regs.s[reg] = false;
+    } else if(tipo == 'd') {
+        if(reg >= 8 && reg <= 19) regs.d[reg] = false;
     }
 }
 
@@ -1193,33 +1185,50 @@ TipoToken tratar_bool(FILE* s) {
 TipoToken tratar_inteiro(FILE* s) {
     char num[32];
     strcpy(num, L.tk.lex);
-    long l_val = L.tk.valor_l;
+    unsigned long l_val = (unsigned long)L.tk.valor_l;
+
     proximoToken();
-    // verifica se é um sufixo "L" pra longo
-    if(L.tk.tipo == T_ID && (strcmp(L.tk.lex, "L") == 0 || strcmp(L.tk.lex, "l") == 0)) {
-        // é um numero longo
+
+    // longo:
+    if(L.tk.tipo == T_ID &&
+       (strcmp(L.tk.lex, "L") == 0 || strcmp(L.tk.lex, "l") == 0)) {
+
         proximoToken();
-        // pra numeros longos, sempre usa constante para valores maiores que 16 bits
+
         if(l_val <= 0xFFFF) {
-            // numero pequeno cabe em mov imediato
-            fprintf(s, "  mov x0, %ld\n", l_val);
+            fprintf(s, "  mov x0, %lu\n", l_val);
         } else {
-            // numero grande, precisa de constante
-            int titulo = add_const(T_LONGO, num, 0.0, l_val);
-            carregar_const(s, titulo);
+            int shift = 0;
+            int primeiro = 1;
+            unsigned long v = l_val;
+
+            while(v) {
+                unsigned long p = v & 0xFFFF;
+                if(p) {
+                    if(primeiro) {
+                        fprintf(s, "  movz x0, %lu, lsl %d\n", p, shift);
+                        primeiro = 0;
+                    } else {
+                        fprintf(s, "  movk x0, %lu, lsl %d\n", p, shift);
+                    }
+                }
+                v >>= 16;
+                shift += 16;
+            }
         }
         return T_pLONGO;
-    } else {
-        // é um inteiro normal
-        // pra inteiros de 32 bits, usa constante pra valores maiores que 16 bits
-        if(l_val <= 0xFFFF) {
-            fprintf(s, "  mov w0, %ld\n", l_val);
-        } else {
-            int titulo = add_const(T_INT, num, 0.0, l_val);
-            carregar_const(s, titulo);
-        }
-        return T_pINT;
     }
+    // inteiro
+    if(l_val <= 0xFFFF) {
+        fprintf(s, "  mov w0, %lu\n", l_val);
+    } else {
+        fprintf(s, "  movz w0, %lu\n", l_val & 0xFFFF);
+        if((l_val >> 16) & 0xFFFF) {
+            fprintf(s, "  movk w0, %lu, lsl 16\n",
+                    (l_val >> 16) & 0xFFFF);
+        }
+    }
+    return T_pINT;
 }
 
 TipoToken tratar_flutuante(FILE* s) {
@@ -4094,15 +4103,40 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 proximoToken();
             } else {
                 TipoToken tipo_exp = expressao(s, escopo);
-                
-                if(eh_ponteiro) {
-                    if(tipo_exp == T_pINT) {
-                        fprintf(s, "  sxtw x0, w0\n");
-                    }
-                    fprintf(s, "  str x0, [x29, %d]\n", var->pos); 
+
+                // tenta usar um registrador temporario para a expressão
+                char reg_tipo;
+                int reg_temp = -1;
+
+                if(tipo_exp == T_pFLU) {
+                    reg_tipo = 's';
+                    reg_temp = alocar_reg(reg_tipo);
+                } else if(tipo_exp == T_pDOBRO) {
+                    reg_tipo = 'd';
+                    reg_temp = alocar_reg(reg_tipo);
+                } else if(tipo_exp == T_PONTEIRO || tipo_exp == T_pLONGO) {
+                    reg_tipo = 'x';
+                    reg_temp = alocar_reg(reg_tipo);
                 } else {
-                    armazenar_valor(s, var);
+                    reg_tipo = 'w';
+                    reg_temp = alocar_reg('x'); // w é tratado como x
                 }
+                if(reg_temp >= 0) {
+                    if(debug_o) printf("[declaracao_var]: usando registrador %c%d\n", reg_tipo, reg_temp);
+                    // tem registrador temporario, salvar nele
+                    if(reg_tipo == 's') fprintf(s, "  fmov s%d, s0\n", reg_temp);
+                    else if(reg_tipo == 'd') fprintf(s, "  fmov d%d, d0\n", reg_temp);
+                    else if(reg_tipo == 'x') fprintf(s, "  mov x%d, x0\n", reg_temp);
+                    else fprintf(s, "  mov w%d, w0\n", reg_temp);
+                }
+                if(eh_ponteiro) {
+                    if(tipo_exp == T_pINT) fprintf(s, "  sxtw x0, w0\n");
+                    
+                    fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                } else armazenar_valor(s, var);
+                
+                // se usou registrador temporario, liberar
+                if(reg_temp >= 0) liberar_reg(reg_tipo, reg_temp);
             }
         }
     }

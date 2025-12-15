@@ -368,28 +368,28 @@ estado atual:
 #global inicio();
 
 vazio inicio() {
- int soma = 0;
- por(int i=0; i<50000000; i++) soma = soma + i;
+ longo soma = 0;
+ por(longo i=0; i<50000000L; i++) soma = soma + i;
  escrever(soma, '\n');
 }
 ~ $ cat perf_final.c
 #include <stdio.h>
 int main() {
- int sum = 0;
- for(int i=0; i<50000000; i++) sum += i;
- printf("%d\n", sum);
+ long long sum = 0;
+ for(long long i=0; i<50000000L; i++) sum += i;
+ printf("%lld\n", sum);
  return 0;
 }
 ~ $ fpb perf_final.fpb -O2 -s perf_f
 ~ $ clang perf_final.c -O3 -o perf_c
 ~ $ time ./perf_f
-1283106752
+1249999975000000
 
-real    0m0.385s
-user    0m0.384s
-sys     0m0.001s
+real    0m0.309s
+user    0m0.305s
+sys     0m0.004s
 ~ $ time ./perf_c
-1283106752
+1249999975000000
 
 real    0m0.009s
 user    0m0.004s

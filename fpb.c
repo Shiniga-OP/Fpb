@@ -6,7 +6,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 14/12/2025.
+* [ATUAL]: 15/12/2025.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,16 +17,6 @@
 
 #include "util/otimi1.h"
 #include "util/otimi2.h"
-
-#define MAX_TOK 18192 // maximo de tolens
-#define MAX_CODIGO 18192 // maximo de codhgk
-#define MAX_FN 1552 // maximo de funções
-#define MAX_VAR 1552 // maximo de variaveis
-#define MAX_CONST 1552 // maxmio de constantes
-#define MAX_PARAMS 8 // maximo de parametros
-#define MAX_TEX 1552 // mqximo de textos
-#define MAX_DIMS 6  // máximo de dimensões para matrizes
-#define MAX_MACROS 1556 // maximo de macros
 
 typedef enum {
     // mutação:
@@ -69,15 +59,15 @@ typedef struct {
 
 typedef struct {
     TipoToken tipo;
-    char lex[MAX_TOK];
+    char lex[64];
     double valor_d; // pra constantes de ponto flutuante
     long valor_l; // pra constantes inteiras grandes
     Posicao pos;
 } Token;
 
 typedef struct {
-    char nome[32];
-    char espaco[32];
+    char nome[64];
+    char espaco[64];
     TipoToken tipo_base;
     int eh_ponteiro;
     int eh_array;
@@ -85,7 +75,7 @@ typedef struct {
     int espaco_id; // 0 se não for espaço
     int eh_final;
     int num_dims; // numero de dimensões
-    int dims[MAX_DIMS]; // tamanho de cada dimensão
+    int* dims; // tamanho de cada dimensão
     int bytes;
     int pos;
     int escopo;
@@ -95,9 +85,9 @@ typedef struct {
 } Variavel;
 
 typedef struct {
-    char nome[32];
+    char nome[64];
     TipoToken retorno;
-    Variavel vars[MAX_VAR];
+    Variavel* vars;
     int var_conta;
     int escopo_atual;
     int frame_tam;
@@ -115,27 +105,27 @@ typedef struct {
 
 typedef struct {
     TipoToken tipo;
-    char lex[32];
+    char lex[64];
     double d_val;
     long l_val;
     int titulo;
 } Constante;
 
 typedef struct {
-    char nome[32];
+    char nome[64];
     long valor;
 } Macro;
 
 typedef struct {
-    char nome[32];
-    Variavel campos[MAX_VAR];
+    char nome[64];
+    Variavel* campos;
     int campo_cnt;
     int tam_total;
 } Espaco;
 
 typedef struct {
-    char nome[32];
-    char valor[MAX_TOK];
+    char nome[64];
+    char* valor;
 } Tex;
 
 typedef struct {
@@ -144,22 +134,33 @@ typedef struct {
     bool d[19];
 } Regs;
 
+// maximos:
+static int MAX_VAR = 128; // maximo de variaveis
+static int MAX_MACROS = 128;
+static int MAX_TOK = 556; // maximo de tokens
+static int MAX_TEX = 128; // mqximo de textos
+static int MAX_FN = 128; // maximo de funções
+static int MAX_PARE = 128;
+static int MAX_ESPACO = 128;
+static int MAX_CONST = 128; // maxmio de constantes
+static int MAX_DIMS = 6; // máximo de dimensões para matrizes
+
 static Lexer L;
-static Funcao funcs[MAX_FN];
+static Funcao* funcs;
 static int fn_cnt = 0;
 static int escopo_global = 0;
-static Constante constantes[MAX_CONST];
+static Constante* constantes;
 static int const_cnt = 0;
-static Tex texs[MAX_TEX];
+static Tex* texs;
 static int tex_cnt = 0;
-static Macro macros[MAX_MACROS];
+static Macro* macros;
 static int macro_cnt = 0;
-static Variavel globais[MAX_VAR];
+static Variavel* globais;
 static int global_cnt = 0;
-static Espaco espacos[MAX_FN];
+static Espaco* espacos;
 static int espaco_cnt = 0;
-static int rotulos_pare[MAX_FN];  // Pilha de rótulos para 'pare'
-static int rotulo_pare_topo = -1; // Topo da pilha
+static int* rotulos_pare; // pilha de rotulos pra "pare"
+static int rotulo_pare_topo = -1; // topo da pilha
 static bool em_loop = false;
 static int nivel_loop = 0;
 static char* arquivoAtual;
@@ -204,9 +205,12 @@ void gerar_prelude(FILE* s);
 void processar_args(FILE* s, Funcao* f);
 char* processar_caminho();
 int processar_var_tam(int escopo);
-// registradores:
+// alocação:
 int alocar_reg(char tipo);
 void liberar_reg(char tipo, int reg);
+void alocar_buf();
+void realocar_buf(void* p, char* tipo);
+void liberar_buf();
 // util
 TipoToken expressao(FILE* s, int escopo);
 TipoToken termo(FILE* s, int escopo);
@@ -290,7 +294,8 @@ const char* token_str(TipoToken t) {
 }
 
 void fatal(const char* m) {
-    fprintf(stderr, "%s [ERRO] linha: %d coluna: %d, %s próximo de \"%s\"\n", arquivoAtual, L.tk.pos.linha + 1, L.tk.pos.coluna + 1, m, L.tk.lex);
+    printf("%s [ERRO] linha: %d coluna: %d, %s próximo de \"%s\"\n", arquivoAtual, L.tk.pos.linha + 1, L.tk.pos.coluna + 1, m, L.tk.lex);
+    liberar_buf();
     exit(1);
 }
 
@@ -303,7 +308,42 @@ void excessao(TipoToken t) {
     proximoToken();
 }
 
-// [REGISTRADORES]:
+// [ALOCAÇÃO]:
+void alocar_buf() {
+    funcs = malloc(MAX_FN * sizeof(Funcao));
+    if(!funcs) fatal("[alocar_buf]: erro ao alocar funcs");
+    espacos = malloc(MAX_ESPACO * sizeof(Espaco));
+    if(!espacos) fatal("[alocar_buf]: erro ao alocar espacos");
+    rotulos_pare = malloc(MAX_PARE * sizeof(int));
+    if(!rotulos_pare) fatal("[alocar_buf]: erro ao alocar rotulos_pare");
+    texs = malloc(MAX_TEX * sizeof(Tex));
+    if(!texs) fatal("[alocar_buf]: erro ao alocar texs");
+    constantes = malloc(MAX_CONST * sizeof(Constante));
+    if(!constantes) fatal("[alocar_buf]: erro ao alocar constantes");
+    macros = malloc(MAX_MACROS * sizeof(Macro));
+    if(!macros) fatal("[alocar_buf]: erro ao alocar macros");
+    globais = malloc(MAX_VAR * sizeof(Variavel));
+    if(!globais) fatal("[alocar_buf]: erro ao alocar globais");
+}
+
+void liberar_buf() {
+    for(int i = 0; i < espaco_cnt; i++) {
+        for(int j = 0; j < espacos[i].campo_cnt; i++) free(espacos[i].campos[i].dims);
+        free(espacos[i].campos);
+    }
+    for(int i = 0; i < fn_cnt; i++) {
+        for(int j = 0; j < funcs[i].var_conta; i++) free(funcs[i].vars[i].dims);
+        free(funcs[i].vars);
+    }
+    free(funcs);
+    free(espacos);
+    free(rotulos_pare);
+    free(texs);
+    free(constantes);
+    free(macros);
+    free(globais);
+}
+
 int alocar_reg(char tipo) {
     int regLivre = -1; // -1 = pilha
     // pra registradores de inteiros(x/w)
@@ -385,7 +425,14 @@ int eh_tipo(TipoToken tipo) {
 }
 
 void empilhar_pare(int rotulo) {
-    if(rotulo_pare_topo >= MAX_FN - 1) fatal("[empilhar_pare] excesso de loops aninhados");
+    if(rotulo_pare_topo >= MAX_PARE - 1) {
+        MAX_PARE += 2;
+        int *temp = realloc(rotulos_pare, MAX_PARE * sizeof(int));
+        if(!temp) {
+            printf("[empilhar_pare]: Erro ao alocar memória, rotulos %d\n", rotulo_pare_topo);
+            exit(1);
+        }
+    }
     rotulos_pare[++rotulo_pare_topo] = rotulo;
 }
 
@@ -865,8 +912,7 @@ TipoToken tratar_id(FILE* s, int escopo) {
         if(var->tipo_base != T_ESPACO_ID) {
             fatal("[tratar_id] tentativa de acessar campo em tipo não-estrutura");
         }
-        
-        proximoToken(); // Consome o ponto
+        proximoToken(); // consome o ponto
         
         if(L.tk.tipo != T_ID) {
             fatal("[tratar_id] nome do campo esperado após ponto");
@@ -905,7 +951,7 @@ TipoToken tratar_id(FILE* s, int escopo) {
         proximoToken(); // consome o nome do campo
         
         // calcula endereço do campo
-        if(var->escopo == -1) { // Global
+        if(var->escopo == -1) { // global
             fprintf(s, "  ldr x0, = global_%s\n", var->nome);
             fprintf(s, "  add x0, x0, %d\n", campo->pos);
         } else { // Local
@@ -1000,7 +1046,7 @@ TipoToken tratar_id(FILE* s, int escopo) {
     }
     // acesso a matriz/array
     if(L.tk.tipo == T_COL_ESQ) {
-        int indices[MAX_DIMS] = {0};
+        int* indices = malloc(MAX_DIMS * sizeof(int));
         int dim_atual = 0;
         // coleta todos os indices
         while(L.tk.tipo == T_COL_ESQ && dim_atual < var->num_dims) {
@@ -1084,18 +1130,18 @@ TipoToken tratar_id(FILE* s, int escopo) {
 TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* fn) {
     if(fn == NULL) fatal("INTERNO CRITICO, FUNÇÃO INEXISTENTE!");
     
-    // Guarda valores dos parâmetros
-    TipoToken param_tipos[MAX_PARAMS];
+    // guarda valores dos parametros
+    TipoToken param_tipos[8];
     int param_conta = 0;
     
-    // **PRIMEIRO PASSO:** Avalia e salva TODOS os parâmetros em temporários
+    // passo 1: avalia e salva todos os args em temporarios
     int params_pilha = 0;
     
     if(L.tk.tipo != T_PAREN_DIR) {
         do {
             param_tipos[param_conta] = expressao(s, escopo);
             
-            // Salva o valor atual (está em x0/w0/s0/d0)
+            // salva o valor atual(ta em x0/w0/s0/d0)
             if(param_tipos[param_conta] == T_pFLU) {
                 fprintf(s, "  str s0, [sp, -16]!  // salva param %d (float)\n", param_conta);
             } else if(param_tipos[param_conta] == T_pDOBRO) {
@@ -1106,7 +1152,6 @@ TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* f
                 fprintf(s, "  str w0, [sp, -16]!  // salva param %d (int/bool/char/byte)\n", param_conta);
             }
             param_conta++;
-            if(param_conta >= MAX_PARAMS) fatal("excesso de parâmetros");
         } while(L.tk.tipo == T_VIRGULA && (proximoToken(), 1));
     }
     excessao(T_PAREN_DIR);
@@ -1517,8 +1562,16 @@ void verificar_def() {
     
     if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA); // consome o ;
     
-    if(macro_cnt >= MAX_MACROS) fatal("[verificar_def] excesso de macros");
-    
+    if(macro_cnt >= MAX_MACROS) {
+        MAX_MACROS += 2;
+        Macro *temp = realloc(macros, MAX_MACROS * sizeof(Macro));
+        if(temp == NULL) {
+            printf("[verificar_def]: Erro ao realocar memória, macros: %d\n", macro_cnt);
+            free(macros);
+            exit(EXIT_FAILURE);
+        }
+        macros = temp;
+    }
     Macro* m = &macros[macro_cnt++];
     strcpy(m->nome, nome_macro);
     m->valor = valor;
@@ -1529,7 +1582,7 @@ void verificar_espaco(FILE* s) {
     
     if(L.tk.tipo != T_ID) fatal("nome do espaço esperado");
     
-    char nome_espaco[32];
+    char nome_espaco[64];
     strcpy(nome_espaco, L.tk.lex);
     proximoToken();
     
@@ -1539,10 +1592,18 @@ void verificar_espaco(FILE* s) {
             fatal("[verificar_espaco] espaço já definido");
         }
     }
-    if(espaco_cnt >= MAX_FN) fatal("[verificar_espaco] excesso de espaços definidos");
-    
+    if(espaco_cnt >= MAX_ESPACO) {
+        MAX_ESPACO += 2;
+        Espaco *temp = realloc(espacos, MAX_ESPACO * sizeof(Espaco));
+        if(!temp) {
+            printf("[verificar_espaco]: Erro ao alocar memória, espacos %d\n", espaco_cnt);
+            exit(1);
+        }
+        espacos = temp;
+    }
     Espaco* esp = &espacos[espaco_cnt++];
     strcpy(esp->nome, nome_espaco);
+    esp->campos = malloc(MAX_VAR * sizeof(Variavel));
     esp->campo_cnt = 0;
     esp->tam_total = 0;
     
@@ -1568,7 +1629,7 @@ void verificar_espaco(FILE* s) {
         
         int eh_ponteiro = 0;
         int num_dims = 0;
-        int dims[MAX_DIMS] = {0};
+        int* dims = malloc(MAX_DIMS * sizeof(int));
         
         // verifica se é ponteiro
         if(L.tk.tipo == T_VEZES) {
@@ -1577,7 +1638,16 @@ void verificar_espaco(FILE* s) {
         } else {
             // verifica se é array
             while(L.tk.tipo == T_COL_ESQ) {
-                if(num_dims >= MAX_DIMS) fatal("[verificar_espaco] excesso de dimensões");
+                if(num_dims >= MAX_DIMS) {
+                    MAX_DIMS += 2;
+                    int *temp = realloc(dims, MAX_DIMS * sizeof(int));
+                    if(!temp) {
+                        printf("[verificar_espaco]: Erro ao alocar memória, dimensões %d\n", num_dims);
+                        free(dims);
+                        exit(1);
+                    }
+                    dims = temp;
+                }
                 proximoToken();
                 
                 if(L.tk.tipo == T_INT) {
@@ -1597,7 +1667,6 @@ void verificar_espaco(FILE* s) {
                     }
                     proximoToken();
                 }
-                
                 excessao(T_COL_DIR);
                 num_dims++;
             }
@@ -1610,7 +1679,7 @@ void verificar_espaco(FILE* s) {
         campo->eh_ponteiro = eh_ponteiro;
         campo->eh_array = (num_dims > 0);
         campo->num_dims = num_dims;
-        memcpy(campo->dims, dims, sizeof(dims));
+        campo->dims = dims;
         campo->eh_final = 0;
         campo->escopo = 0;
         campo->eh_parametro = 0;
@@ -2704,6 +2773,7 @@ void verificar_fn(FILE* s) {
     strcpy(fnome, L.tk.lex);
     TipoToken tipo_real = (eh_ponteiro || eh_array) ? T_PONTEIRO : rt;
     
+    funcs[fn_cnt].vars = malloc(MAX_VAR * sizeof(Variavel));
     funcs[fn_cnt].var_conta = 0;
     funcs[fn_cnt].retorno = tipo_real;
     funcs[fn_cnt].escopo_atual = 0;
@@ -3390,7 +3460,15 @@ int add_const(TipoToken tipo, const char* lex, double d_val, long l_val) {
         if(tipo == T_LONGO && constantes[i].tipo == T_LONGO && constantes[i].l_val == l_val)
             return constantes[i].titulo;
     }
-    if(const_cnt >= MAX_CONST) fatal("[add_const] excesso de constantes");
+    if(const_cnt >= MAX_CONST) {
+        MAX_CONST += 2;
+        Constante *temp = realloc(constantes, MAX_CONST * sizeof(Constante));
+        if(!temp) {
+            printf("[add_const]: Erro ao alocar memória, constantes %d\n", const_cnt);
+            exit(1);
+        }
+        constantes = temp;
+    }
     Constante* c = &constantes[const_cnt];
     c->tipo = tipo;
     strcpy(c->lex, lex);
@@ -3405,8 +3483,18 @@ int add_tex(const char* valor) {
     for(int i = 0; i < tex_cnt; i++) {
         if(strcmp(texs[i].valor, valor) == 0) return i;
     }
-    if(tex_cnt >= MAX_TEX) fatal("[add_tex] excesso de textos");
+    if(tex_cnt >= MAX_TEX) {
+        MAX_TEX += 2;
+        Tex *temp = realloc(texs, MAX_TEX * sizeof(Tex));
+        if(temp == NULL) {
+            printf("[gerar_texs]: Erro ao realocar memória, textos: %d\n", tex_cnt);
+            free(texs);
+            exit(EXIT_FAILURE);
+        }
+        texs = temp;
+    }
     Tex* tex = &texs[tex_cnt];
+    tex->valor = malloc(MAX_TOK * sizeof(char));
     strcpy(tex->valor, valor);
     sprintf(tex->nome, ".tex_%d", tex_cnt);
     tex_cnt++;
@@ -3806,7 +3894,6 @@ TipoToken expressao(FILE* s, int escopo) {
             fprintf(s, "  cset w0, ne\n");
             fprintf(s, "  orr w0, w1, w0\n");
         }
-        
         tipo = T_pBOOL;
     }
     // processa operadores aritmeticos restantes
@@ -3840,7 +3927,6 @@ TipoToken expressao(FILE* s, int escopo) {
         tipo = converter_tipos(s, tipo, tipo_dir);
         gerar_operacao(s, op, tipo);
     }
-    
     return tipo;
 }
 
@@ -3848,9 +3934,9 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
     TipoToken tipo_base = L.tk.tipo;
     int eh_ponteiro = 0;
     int num_dims = 0;
-    int dims[MAX_DIMS] = {0};
+    int* dims = malloc(MAX_DIMS * sizeof(int));
     
-    char nome_espaco[32] = {0};
+    char nome_espaco[64] = {0};
     int eh_espaco = 0;
     int tam_total = 0;
     if(debug_o) printf("[declaracao_var]: o tipo é: %s\n", L.tk.lex);
@@ -3869,7 +3955,16 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
         proximoToken();
     } else {
         while(L.tk.tipo == T_COL_ESQ) {
-            if(num_dims >= MAX_DIMS) fatal("[declaracao_var] excesso de dimensões");
+            if(num_dims >= MAX_DIMS) {
+                MAX_DIMS += 2;
+                int *temp = realloc(dims, MAX_DIMS * sizeof(int));
+                if(!temp) {
+                    printf("[declaracao_var]: Erro ao alocar memória, dimensões %d\n", num_dims);
+                    free(dims);
+                    exit(1);
+                }
+                dims = temp;
+            }
             proximoToken();
             long tam_array = 0;
             
@@ -3877,7 +3972,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 tam_array = L.tk.valor_l;
                 proximoToken();
             } else if(L.tk.tipo == T_ID) { 
-                char id_tam[32];
+                char id_tam[64];
                 strcpy(id_tam, L.tk.lex);
                 
                 Variavel* var_tam = buscar_var(id_tam, escopo);
@@ -3905,7 +4000,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
     }
     if(L.tk.tipo != T_ID) fatal("[declaracao_var] nome de variável esperado");
     
-    char nome_var[32];
+    char nome_var[64];
     strcpy(nome_var, L.tk.lex); // salva o nome da variavel
     proximoToken(); // consome o nome da variavel
 
@@ -3914,14 +4009,32 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
     
     if(eh_global) {
         if(debug_o) printf("[declaracao_var]: variavel global: %s\n", nome_var);
-        if(global_cnt >= MAX_VAR) fatal("[declaracao_var] excesso de variáveis globais");
+        if(global_cnt >= MAX_VAR) {
+            MAX_VAR += 2;
+            Variavel *temp = realloc(globais, MAX_VAR * sizeof(Variavel));
+            if(temp == NULL) {
+                printf("[declaracao_var]: Erro ao realocar memória, globais: %d\n", global_cnt);
+                free(globais);
+                exit(EXIT_FAILURE);
+            }
+            globais = temp;
+        }
         var = &globais[global_cnt++];
         var->escopo = -1; // global
         var->eh_parametro = 0;
     } else {
         if(debug_o) printf("[declaracao_var]: variavel comum: %s\n", nome_var);
         Funcao* f = &funcs[fn_cnt - 1];
-        if(f->var_conta >= MAX_VAR) fatal("[declaracao_var] excesso de variáveis");
+        if(f->var_conta >= MAX_VAR) {
+            MAX_VAR += 2;
+            Variavel *temp = realloc(f->vars, MAX_VAR * sizeof(Variavel));
+            if(temp == NULL) {
+                printf("[declaracao_var]: Erro ao realocar memória, função: %s vars: %d\n", f->nome, f->var_conta);
+                free(f->vars);
+                exit(EXIT_FAILURE);
+            }
+            f->vars = temp;
+        }
         var = &f->vars[f->var_conta];
         var->escopo = escopo;
         var->eh_parametro = eh_parametro;
@@ -3935,7 +4048,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
     var->num_dims = num_dims;
     var->eh_final = eh_final;
     var->valor = 0;
-    memcpy(var->dims, dims, sizeof(dims));
+    var->dims = dims;
     if(eh_espaco) strcpy(var->espaco, nome_espaco);
     
     // calcula tamanho
@@ -4093,7 +4206,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 proximoToken();
             } else if(num_dims > 0) {
                 excessao(T_CHAVE_ESQ);
-                int indices[MAX_DIMS] = {0};
+                int* indices = malloc(MAX_DIMS * sizeof(int));
                 verificar_matriz(s, var, escopo, indices, 0);
                 excessao(T_CHAVE_DIR);
             } else if(eh_ponteiro && L.tk.tipo == T_TEX) {
@@ -4143,6 +4256,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
 }
 
 int main(int argc, char** argv) {
+    alocar_buf();
     for(int i = 0; i < 16; i++) {
         regs.x[i] = false;
         regs.s[i] = false;
@@ -4206,19 +4320,19 @@ int main(int argc, char** argv) {
         return 0;
     }
     if(modoVersao) {
-        printf("[FOCA-DO ESTÚDIOS]\nFPB (Fácil Programação Baixo nivel) - v0.0.1 (beta)\n");
+        printf("[FOCA-DO ESTÚDIOS]\nFPB (Fácil Programação Baixo nivel) - v0.0.3 (beta)\n");
         return 0;
     }
     if(modoConfig) {
         printf("[configuração]:\n");
-        printf("arquitetura padrão: ARM64 Linux Android\n");
-        printf("max codigo: %i\n", MAX_CODIGO);
-        printf("max variaveis: %i\n", MAX_VAR);
-        printf("max constantes: %i\n", MAX_CONST);
-        printf("max texs: %i\n", MAX_TEX);
-        printf("max funcoes: %i\n", MAX_FN);
-        printf("max dimensões: %i\n", MAX_DIMS);
-        printf("max macros: %i\n", MAX_MACROS);
+        printf("arquitetura padrão: ARM64 Linux Android\n\n");
+        printf("buffers iniciais:\n");
+        printf("variaveis: %i\n", MAX_VAR);
+        printf("constantes: %i\n", MAX_CONST);
+        printf("texs: %i\n", MAX_TEX);
+        printf("funcoes: %i\n", MAX_FN);
+        printf("dimensões: %i\n", MAX_DIMS);
+        printf("macros: %i\n", MAX_MACROS);
         return 0;
     }
     // verificar se tem arquivo de entrada
@@ -4257,8 +4371,19 @@ int main(int argc, char** argv) {
         printf("FPB: [ERRO] não foi possível abrir %s\n", nomeArquivo);
         return 2;
     }
-    char* buf = malloc(MAX_CODIGO);
-    size_t n = fread(buf, 1, MAX_CODIGO, en);
+    // obtem o tamanho do arquivo
+    fseek(en, 0, SEEK_END);
+    long tam = ftell(en);
+    fseek(en, 0, SEEK_SET);
+    // alocar exatamente o necessario + 1 pro \0
+    char* buf = malloc(tam + 1);
+    if(!buf) {
+        printf("Erro de alocação de memória\n");
+        fclose(en);
+        return 1;
+    }
+    // le o arquivo
+    size_t n = fread(buf, 1, tam, en);
     buf[n] = 0;
     fclose(en);
 
@@ -4308,5 +4433,6 @@ int main(int argc, char** argv) {
     if(!manter_asm) remove(asm_s);
     remove(asm_o);
     free(buf);
+    liberar_buf();
     return 0;
 }

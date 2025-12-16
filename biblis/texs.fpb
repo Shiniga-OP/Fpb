@@ -1,0 +1,5 @@
+#incluir "biblis/texs.asm";
+int textam(car[] p);
+bool texcar(car[] texto, car alvo);
+bool texcmp(car[] x, car[] y);
+vazio subscar(car[] array, car alvo, car novo);

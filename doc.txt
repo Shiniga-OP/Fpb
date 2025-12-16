@@ -1,4 +1,4 @@
-documentação da FPB.
+documentação da FPB (Fácil Programação Baixo nível).
 
 ## BÁSICO ##
 
@@ -28,11 +28,34 @@ agora a explicação de cada parte:
 
 "escrever();" é da categoria de funções nativas do compilador, ela é uma abstração padrão que divide o trabalho em outras funções do sistema. Quando você faz:
 
+## FUNÇÕES NATIVAS DO COMPILADOR ##
+
 [código]
 escrever("texto", 15, 15.0f);
 [código]
 
 na verdade isso vira: "_escrever_tex();", "_escrever_int();", e "_escrever_flu();" em sequência.
+
+também existe o _asm_(...); que é o assembly manual, onde você pode utilizar assim por exemplo:
+
+[código]
+#global inicio();
+
+vazio inicio() {
+    car* p = "texto";
+    _asm_(
+        "   mov x0, ", 1, '\n',
+        "   ldr x1, ", p, '\n',
+        "   mov x2, ", 5, '\n',
+        "   mov x8, ", 64, '\n',
+        "   svc ", 0
+    );
+}
+[código]
+
+no assembly manual, ponteiros e variaveis sempre dão seus endereços, mesmo sem o operador "@", a unica excessão são números literais.
+
+toda e qualquer operação externa que interaja com o assembly manual precisa ser via ponteiro, variavel global, macro, ou literal, nunca variaveis locais mesmo que sejam finais.
 
 "biblis/impressao.asm" é a biblioteca de impressão que contém as funções de impressão padrão, como as anteriores e "_escrever_car();", "_escrever_longo();", a mais.
 
@@ -70,6 +93,16 @@ bool[] booleanos = { verdade, verdade, verdade };
 longo[] longos = { 1L, 1L, 1L };
 byte[] bytes = { 0xFF, 0xFF, 0xFF };
 [código]
+
+ao imprimir hexadecimal, ele aparecerá em decimal comum.
+
+você também pode tornar uma variavel imútavel com "final".
+
+[código]
+final int x = 0;
+[código]
+
+agora ela nunca poderá ser reatribuida no código FPB.
 
 ## CONDICIONAIS ##
 

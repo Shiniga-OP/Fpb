@@ -60,6 +60,9 @@ int somar(int a, int b) {
 }
 
 vazio inicio() {
+    escrever("Testando escape:\n");
+    escrever("\"teste\"\n\n");
+    
     escrever("Testando tipos básicos:\n");
     car letra = 'A';
     escrever("\ncaractere: ", letra);

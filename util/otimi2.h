@@ -54,12 +54,33 @@ void otimizarO2(const char* arquivo_asm) {
                 texs[num_texs].nome[nome_fim - nome_inicio] = '\0';
                 texs[num_texs].usada = 1;
                 
-                char *aspas1 = strchr(partes, '\"');
-                char *aspas2 = aspas1 ? strchr(aspas1 + 1, '\"') : NULL;
-                if(aspas1 && aspas2) {
-                    strncpy(texs[num_texs].conteudo, aspas1 + 1, aspas2 - aspas1 - 1);
-                    texs[num_texs].conteudo[aspas2 - aspas1 - 1] = '\0';
-                    num_texs++;
+                // encontra a primeira aspa não escapada
+                char *aspas1 = partes;
+                while(*aspas1 && *aspas1 != '"') aspas1++;
+                
+                if(*aspas1 == '"') {
+                    // encontra a segunda aspa não escapada
+                    char *aspas2 = aspas1 + 1;
+                    int escape = 0;
+                    
+                    while(*aspas2 && !(*aspas2 == '"' && !escape)) {
+                        if(*aspas2 == '\\' && !escape) {
+                            escape = 1;
+                        } else {
+                            escape = 0;
+                        }
+                        aspas2++;
+                    }
+                    
+                    if(*aspas2 == '"') {
+                        // copia o conteudo entre aspas(incluindo escapes)
+                        int len = aspas2 - aspas1 - 1;
+                        if(len < 1024) {
+                            strncpy(texs[num_texs].conteudo, aspas1 + 1, len);
+                            texs[num_texs].conteudo[len] = '\0';
+                            num_texs++;
+                        }
+                    }
                 }
             }
         }

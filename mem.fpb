@@ -1,8 +1,28 @@
-#incluir "biblis/impressao.asm";
+#incluir "biblis/texs.fpb";
+
 #global inicio();
+#global int tam = 0;
+
+vazio testeAsm();
+
+vazio testeMatrizes() {
+    int[] m2 = {0, 1};
+    flu[] m2f = {3f, 5f};
+}
+
+vazio testeAsm() {
+    car* p = "mensagem\n";
+    tam = textam(p);
+    _asm_(
+        "   mov x0, 1\n",
+        "   ldr x1, ", p, '\n',
+        "   ldr x2, ", tam, '\n',
+        "   mov x8, 64\n",
+        "   svc 0\n"
+    );
+}
 
 vazio inicio() {
-    longo soma = 0;
-    por(longo i = 0; i < 50000000; i++) soma = soma + i;
-    escrever(soma, '\n');
+    testeMatrizes();
+    testeAsm();
 }

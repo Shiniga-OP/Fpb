@@ -2951,14 +2951,10 @@ TipoToken termo(FILE* s, int escopo) {
             // pilha
             if(debug_o) printf("[termo]: pilha usada para operando\n");
             
-            int tam = (reg_tipo == 's') ? 4 : 
-                     (reg_tipo == 'd') ? 8 : 
-                     (reg_tipo == 'x') ? 8 : 4;
-            
-            if(tipo_esq == T_pFLU) fprintf(s, "  str s0, [sp, -%d]!\n", tam);
-            else if(tipo_esq == T_pDOBRO) fprintf(s, "  str d0, [sp, -%d]!\n", tam);
-            else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) fprintf(s, "  str x0, [sp, -%d]!\n", tam);
-            else fprintf(s, "  str w0, [sp, -%d]!\n", tam);
+            if(tipo_esq == T_pFLU) fprintf(s, "  str s0, [sp, -16]!\n");
+            else if(tipo_esq == T_pDOBRO) fprintf(s, "  str d0, [sp, -16]!\n");
+            else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) fprintf(s, "  str x0, [sp, -16]!\n");
+            else fprintf(s, "  str w0, [sp, -16]!\n");
         }
         proximoToken();
         TipoToken tipo_dir = fator(s, escopo);
@@ -2977,14 +2973,10 @@ TipoToken termo(FILE* s, int escopo) {
             }
             liberar_reg(reg_tipo, reg_temp_esq);
         } else {
-            int tam = (reg_tipo == 's') ? 4 : 
-                     (reg_tipo == 'd') ? 8 : 
-                     (reg_tipo == 'x') ? 8 : 4;
-            
-            if(tipo_esq == T_pFLU) fprintf(s, "  ldr s1, [sp], %d\n", tam);
-            else if(tipo_esq == T_pDOBRO) fprintf(s, "  ldr d1, [sp], %d\n", tam);
-            else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) fprintf(s, "  ldr x1, [sp], %d\n", tam);
-            else fprintf(s, "  ldr w1, [sp], %d\n", tam);
+            if(tipo_esq == T_pFLU) fprintf(s, "  ldr s1, [sp], 16\n");
+            else if(tipo_esq == T_pDOBRO) fprintf(s, "  ldr d1, [sp], 16\n");
+            else if(tipo_esq == T_pLONGO || tipo_esq == T_PONTEIRO) fprintf(s, "  ldr x1, [sp], 16\n");
+            else fprintf(s, "  ldr w1, [sp], 16\n");
         }
         gerar_operacao(s, op, tipo_resultado);
         tipo_esq = tipo_resultado;

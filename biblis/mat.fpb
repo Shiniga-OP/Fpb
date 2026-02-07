@@ -1,0 +1,21 @@
+flu ftanh(flu x);
+
+flu ftanh(flu x) {
+    // ímpar: tanh(-x) = -tanh(x)
+    se(x < 0.0f) retorne -ftanh(-x);
+    
+    // para x grande
+    se(x > 4.0f) retorne 1.0f;
+    
+    // calcula e^(2x) usando série otimizada
+    flu exp2x = 1.0f;
+    flu termo = 1.0f;
+    flu doisx = 2.0f * x;
+    
+    por(int n = 1; n < 16; n++) {
+        termo = termo * (doisx / n);
+        exp2x = exp2x + termo;
+    }
+    // tanh(x) = (e^(2x) - 1) / (e^(2x) + 1)
+    retorne (exp2x - 1.0f) / (exp2x + 1.0f);
+}

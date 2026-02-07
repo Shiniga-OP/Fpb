@@ -1,6 +1,11 @@
 #incluir "biblis/impressao.asm";
+#incluir "biblis/mat.fpb";
+
 #global inicio();
 
 vazio inicio() {
-    
+    escrever("ftanh(x) com flutuante:\n");
+    por(flu x = -2.0f; x <= 2.0f; x = x + 0.5f) {
+        escrever(x, "\t\t", ftanh(x), '\n');
+    }
 }

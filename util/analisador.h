@@ -1,6 +1,14 @@
 #pragma once
 /*
-*
+* [FUNÇÃO]: Analisador de semantica e sinetica.
+* [IMPLEMENTAÇÃO]: @Shiniga-OP.
+* [BASE]: Assembly.
+* [SISTEMA OPERACIONAL]: ANDROID.
+* [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
+* [LINGUAGEM]: Português Brasil(PT-BR).
+* [DATA]: 07/02/2026.
+* [ATUAL]: 07/02/2026.
+* [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // buscar
 Variavel* buscar_var(const char* nome, int escopo);
@@ -2273,8 +2281,7 @@ TipoToken tratar_id(FILE* s, int escopo) {
             else return T_PONTEIRO;
         } else if(campo->eh_array) {
             // retorna endereço do array
-            if(campo->tipo_base == T_pCAR) return T_TEX;
-            else return T_PONTEIRO;
+            return T_PONTEIRO;
         } else {
             // carrega baseado no tipo
             if(campo->tipo_base == T_pCAR || campo->tipo_base == T_pBOOL || campo->tipo_base == T_pBYTE)
@@ -3178,4 +3185,19 @@ TipoToken expressao(FILE* s, int escopo) {
         gerar_operacao(s, op, tipo);
     }
     return tipo;
+}
+
+void iniciar(FILE* s) {
+    while(L.tk.tipo != T_FIM) {
+        if(L.tk.tipo == T_INCLUIR) {
+            int pos = 0;
+            verificar_stmt(s, &pos, 0);
+        } else if(L.tk.tipo == T_DEF) verificar_def();
+        else if(L.tk.tipo == T_ESPACO) verificar_espaco(s);
+        else if(L.tk.tipo == T_GLOBAL) verificar_global(s);
+        else verificar_fn(s);
+    }
+    gerar_consts(s);
+    gerar_texs(s);
+    gerar_globais(s);
 }

@@ -1,6 +1,14 @@
 #pragma once
 /*
-*
+* [FUNÇÃO]: Gerador de código.
+* [IMPLEMENTAÇÃO]: @Shiniga-OP.
+* [BASE]: Assembly.
+* [SISTEMA OPERACIONAL]: ANDROID.
+* [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
+* [LINGUAGEM]: Português Brasil(PT-BR).
+* [DATA]: 07/02/2026.
+* [ATUAL]: 07/02/2026.
+* [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // carregar
 void carregar_valor(FILE* s, Variavel* var);
@@ -460,8 +468,8 @@ void escrever_valor(FILE* s, TipoToken tipo) {
     if(tipo == T_pFLU) fprintf(s, "  bl _escrever_flu\n");
     else if(tipo == T_pCAR) fprintf(s, "  bl _escrever_car\n");
     else if(tipo == T_pBOOL) fprintf(s, "  bl _escrever_bool\n");
-    else if(tipo == T_TEX) fprintf(s, "  bl _escrever_tex\n");
-    else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  bl _escrever_longo\n");
+    else if(tipo == T_TEX || tipo == T_PONTEIRO) fprintf(s, "  bl _escrever_tex\n");
+    else if(tipo == T_pLONGO) fprintf(s, "  bl _escrever_longo\n");
     else fprintf(s, "  bl _escrever_int\n");
 }
 

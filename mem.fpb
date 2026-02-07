@@ -1,18 +1,6 @@
 #incluir "biblis/impressao.asm";
-
 #global inicio();
 
-#espaco Pessoa {
-    car[2] nome;
-}
-
-vazio tex(car[] p) {
-    p[0] = 'A';
-}
-
 vazio inicio() {
-    Pessoa p;
-    tex(p.nome);
-    p.nome[1] = '\n';
-    escrever(p.nome);
+    
 }

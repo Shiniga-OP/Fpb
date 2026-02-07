@@ -30,7 +30,7 @@ suportados
 
 // estrutura de dados:
 #espaco Pessoa {
-    car nome;
+    car[32] nome;
     int idade;
 }
 
@@ -264,11 +264,11 @@ vazio testeMatrizes() {
 vazio testeEspaco() {
     escrever("\nTeste de estrutura de dados (#espaco):\n\n");
     Pessoa p;
-    p.nome = 'A';
+    texcp(p.nome, "ronaldo");
     p.idade = 1991;
     
     Pessoa p2;
-    p2.nome = 'B';
+    texcp(p2.nome, "el pepe");
     p2.idade = 1992;
     
     escrever("Pessoa 1:\nNome: ", p.nome, "\nIdade: ", p.idade);

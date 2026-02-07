@@ -7,7 +7,6 @@
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
 * [ATUAL]: 07/02/2026.
-* [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -810,18 +809,7 @@ int main(int argc, char** argv) {
         free(buf);
         return 1;
     }
-    while(L.tk.tipo != T_FIM) {
-        if(L.tk.tipo == T_INCLUIR) {
-            int pos = 0;
-            verificar_stmt(s, &pos, 0);
-        } else if(L.tk.tipo == T_DEF) verificar_def();
-        else if(L.tk.tipo == T_ESPACO) verificar_espaco(s);
-        else if(L.tk.tipo == T_GLOBAL) verificar_global(s);
-        else verificar_fn(s);
-    }
-    gerar_consts(s);
-    gerar_texs(s);
-    gerar_globais(s);
+    iniciar(s);
     fclose(s);
     // aplica otimizações
     if(otimizar1) otimizarO1(asm_s);

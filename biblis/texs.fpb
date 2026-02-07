@@ -6,7 +6,7 @@ vazio subscar(car[] array, car alvo, car novo);
 
 vazio texcp(car[] arr, car[] p) {
     int i = 0;
-    enq(1) {
+    enq(verdade) {
         arr[i] = p[i];
         se(p[i] == '\0') pare;
         i++;

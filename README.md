@@ -16,10 +16,10 @@ multi linhas
 suportados
 */
 #incluir "biblis/impressao.asm";
-#incluir "biblis/texs.asm";
+#incluir "biblis/texs.fpb";
 #incluir "biblis/mem.asm";
-#incluir "biblis/sistema.asm";
-#incluir "biblis/cvts.fpb"; // pode usar .fpb também
+#incluir "biblis/sistema.asm"; // .asm e .s são colados no intermediario
+#incluir "biblis/cvts.fpb"; // .fpb e .FPB são colados durante a compilação
 
 // macro:
 #def TAM 14;
@@ -43,12 +43,8 @@ vazio testeLoops();
 vazio testeMatrizes();
 vazio testeEspaco();
 vazio testeConversao();
+vazio testeAsm();
 
-int textam(car* texto);
-int texcar(car* texto, car alvo);
-int texcmp(car* x, car* y);
-
-vazio subscar(car[] array, car alvo, car novo);
 vazio memcp(car[] array, car* p, int tam);
 
 longo obter_tempo_milis();
@@ -118,6 +114,7 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     testeMatrizes();
     testeEspaco();
     testeConversao();
+    testeAsm();
 }
 
 vazio testeOperacoes() {
@@ -165,13 +162,13 @@ vazio testeComparacoes() {
     car* t1 = "texto 1";
     car* t2 = "texto 2";
     escrever(t1, '\n', t2, '\n');
-    se(texcmp(t1, t2) == 1) {
+    se(texcmp(t1, t2)) {
         escrever("texto 1 é igual a texto 2\n");
     }
-    se(texcmp(t1, t2) == 0) {
+    se(!texcmp(t1, t2)) {
         escrever("texto 1 não é igual a texto 2\n");
     }
-    se(texcmp(t1, t1) == 1) {
+    se(texcmp(t1, t1)) {
         escrever("o primeiro texto é texto 1");
     } senao {
         escrever("o primeiro texto não é texto 1");
@@ -282,6 +279,19 @@ vazio testeConversao() {
     escrever("\nTeste de conversão de texto:\n");
     escrever("123 + 1 = ", cvtint("123", 3) + 1, '\n');
     escrever("1.50 + 0.50 = ", cvtflu("1.50", 4) + 0.50f, '\n');
+}
+
+vazio testeAsm() {
+    escrever("\nTestando assembly manual:\n");
+    car* msg = "assembly testado com sucesso\n";
+    int* tam = textam(msg);
+    _asm_(
+        "   mov x0, 1\n",
+        "   ldr x1, ", msg, '\n',
+        "   ldr x2, ", tam, '\n',
+        "   mov x8, 64\n",
+        "   svc 0\n"
+    );
 }
 ```
 ## info extra:

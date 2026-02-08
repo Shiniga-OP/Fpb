@@ -440,6 +440,8 @@ void gerar_globais(FILE* s) {
                 // variaveis mutaveis
                 switch(var->tipo_base) {
                     case T_pBYTE:
+                        fprintf(s, "  .word %d\n", (int)var->valor);
+                    break;
                     case T_pCAR:
                     case T_pBOOL:
                         fprintf(s, "  .byte %d\n", (int)var->valor);

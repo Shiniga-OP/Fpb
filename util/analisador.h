@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 07/02/2026.
+* [ATUAL]: 08/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // buscar
@@ -277,11 +277,11 @@ void proximoToken() {
             c = L.fonte[L.pos];
         }
         L.tk.lex[i] = 0;
-        // converte pra valor(garantir que é so 1 byte)
+        // converte pra valor sem mascarar
         if(eh_hex) {
-            L.tk.valor_l = strtol(L.tk.lex + 2, NULL, 16) & 0xFF;
+            L.tk.valor_l = strtoul(L.tk.lex + 2, NULL, 16);
         } else {
-            L.tk.valor_l = strtol(L.tk.lex + 2, NULL, 2) & 0xFF;
+            L.tk.valor_l = strtoul(L.tk.lex + 2, NULL, 2);
         }
         L.tk.tipo = T_BYTE;
         return;
@@ -2610,10 +2610,18 @@ TipoToken tratar_caractere(FILE* s) {
 TipoToken tratar_byte(FILE* s) {
     char num[32];
     strcpy(num, L.tk.lex);
-    long byte_val = L.tk.valor_l;
+    unsigned long byte_val = (unsigned long)L.tk.valor_l;  // MUDOU: unsigned long para aceitar valores 32-bit
     proximoToken();
-    // bytes sempre usam valor imediato(são pequenos)
-    fprintf(s, "  mov w0, %ld // byte: %s\n", byte_val, num);
+    // bytes sempre usam valor imediato
+    if(byte_val <= 0xFFFF) {
+        fprintf(s, "  mov w0, %lu // byte: %s\n", byte_val, num);
+    } else {
+        // valores maiores que 16 bits precisam de movz/movk
+        fprintf(s, "  movz w0, %lu // byte: %s\n", byte_val & 0xFFFF, num);
+        if((byte_val >> 16) & 0xFFFF) {
+            fprintf(s, "  movk w0, %lu, lsl 16\n", (byte_val >> 16) & 0xFFFF);
+        }
+    }
     return T_pBYTE;
 }
 // [PROCESSAMENTO]:

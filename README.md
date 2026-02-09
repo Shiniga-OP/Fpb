@@ -1,7 +1,7 @@
 # FPB (Fácil Programação Baixo nivel)
 
 ## estado:
-em desenvolvimento.
+em desenvolvimento. 7 anos de existencia da FPB como meu primeiro projeto em C. :D
 
 ## sintaxe
 este é um código que testa maior parte dos recursos e margem de erros:

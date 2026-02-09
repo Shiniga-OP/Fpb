@@ -1393,6 +1393,340 @@ cvtflu:
 
 // fim de biblis/cvts.fpb
 
+
+// inicio de biblis/mat.fpb
+// fn: [ftanh] (vars: 64, total: 240)
+.align 2
+ftanh:
+  sub sp, sp, 240
+  stp x29, x30, [sp, 224]
+  add x29, sp, 224
+  stp x19, x20, [x29, -16]
+  stp x21, x22, [x29, -32]
+  str d0, [x29, -48]  // param x
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B48
+  ldr s0, [x29, -48]
+  fneg s0, s0
+  str s0, [sp, -16]!  // salva param 0 (float)
+  ldr s0, [sp, 0]  // carrega param 0 (flu) em s0
+  add sp, sp, 16  // limpa temporarios
+  bl ftanh
+  fmov s0, s0
+  fneg s0, s0
+  b 1f
+  b .B49
+.B48:
+.B49:
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_3
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, gt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B50
+  ldr x0, = const_4
+  ldr s0, [x0]
+  b 1f
+  b .B51
+.B50:
+.B51:
+  ldr x0, = const_4
+  ldr s0, [x0]
+  fmov s19, s0
+  str s0, [x29, -80]
+  ldr x0, = const_4
+  ldr s0, [x0]
+  fmov s19, s0
+  str s0, [x29, -96]
+  ldr x0, = const_5
+  ldr s0, [x0]
+  fmov s19, s0  // salva em reg
+  ldr s0, [x29, -48]
+  fmov s1, s19  // restaura do reg
+  fmul s0, s1, s0
+  fmov s19, s0
+  str s0, [x29, -112]
+  mov w0, 1
+  mov w19, w0
+  str w0, [x29, 224]
+.B53:
+  ldr w0, [x29, 224]
+  mov w19, w0
+  mov w0, 16
+  mov w1, w19
+  cmp w1, w0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B54
+  ldr s0, [x29, -96]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -112]
+  fmov s19, s0  // salva em reg
+  ldr w0, [x29, 224]
+  scvtf s0, w0
+  fmov s1, s19  // restaura do reg
+  fdiv s0, s1, s0
+  ldr s1, [sp], 16
+  fmul s0, s1, s0
+  str s0, [x29, -96]
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -96]
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  str s0, [x29, -80]
+  ldr w0, [x29, 224]
+  add w0, w0, 1
+  str w0, [x29, 224]
+  b .B53
+.B54:
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr x0, = const_4
+  ldr s0, [x0]
+  ldr s1, [sp], 16
+  fsub s0, s1, s0
+  fmov s19, s0  // salva em reg
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr x0, = const_4
+  ldr s0, [x0]
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  fmov s1, s19  // restaura do reg
+  fdiv s0, s1, s0
+  b 1f
+  b 1f
+// epilogo
+1:
+  ldp x19, x20, [x29, -16]
+  ldp x21, x22, [x29, -32]
+  ldp x29, x30, [sp, 224]
+  add sp, sp, 240
+  ret
+// fim: [ftanh]
+// fn: [fexp] (vars: 48, total: 224)
+.align 2
+fexp:
+  sub sp, sp, 224
+  stp x29, x30, [sp, 208]
+  add x29, sp, 208
+  stp x19, x20, [x29, -16]
+  stp x21, x22, [x29, -32]
+  str d0, [x29, -48]  // param x
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, eq
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B55
+  ldr x0, = const_4
+  ldr s0, [x0]
+  b 1f
+  b .B56
+.B55:
+.B56:
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B57
+  ldr x0, = const_4
+  ldr s0, [x0]
+  fmov s19, s0  // salva em reg
+  ldr s0, [x29, -48]
+  fneg s0, s0
+  str s0, [sp, -16]!  // salva param 0 (float)
+  ldr s0, [sp, 0]  // carrega param 0 (flu) em s0
+  add sp, sp, 16  // limpa temporarios
+  bl fexp
+  fmov s0, s0
+  fmov s1, s19  // restaura do reg
+  fdiv s0, s1, s0
+  b 1f
+  b .B58
+.B57:
+.B58:
+  ldr x0, = const_4
+  ldr s0, [x0]
+  fmov s19, s0
+  str s0, [x29, -80]
+  ldr x0, = const_4
+  ldr s0, [x0]
+  fmov s19, s0
+  str s0, [x29, -96]
+  mov w0, 1
+  mov w19, w0
+  str w0, [x29, 208]
+.B60:
+  ldr w0, [x29, 208]
+  mov w19, w0
+  mov w0, 16
+  mov w1, w19
+  cmp w1, w0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B61
+  ldr s0, [x29, -96]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -48]
+  fmov s19, s0  // salva em reg
+  ldr w0, [x29, 208]
+  scvtf s0, w0
+  fmov s1, s19  // restaura do reg
+  fdiv s0, s1, s0
+  ldr s1, [sp], 16
+  fmul s0, s1, s0
+  str s0, [x29, -96]
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -96]
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  fmov s19, s0
+  fmov s0, s19
+  str s0, [x29, -80]
+  ldr w0, [x29, 208]
+  add w0, w0, 1
+  str w0, [x29, 208]
+  b .B60
+.B61:
+  ldr s0, [x29, -80]
+  b 1f
+  b 1f
+// epilogo
+1:
+  ldp x19, x20, [x29, -16]
+  ldp x21, x22, [x29, -32]
+  ldp x29, x30, [sp, 208]
+  add sp, sp, 224
+  ret
+// fim: [fexp]
+// fn: [fraiz] (vars: 32, total: 208)
+.align 2
+fraiz:
+  sub sp, sp, 208
+  stp x29, x30, [sp, 192]
+  add x29, sp, 192
+  stp x19, x20, [x29, -16]
+  stp x21, x22, [x29, -32]
+  str d0, [x29, -48]  // param x
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B62
+  ldr x0, = const_0
+  ldr s0, [x0]
+  b 1f
+  b .B63
+.B62:
+.B63:
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, eq
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B64
+  ldr x0, = const_0
+  ldr s0, [x0]
+  b 1f
+  b .B65
+.B64:
+.B65:
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  str s0, [x29, -80]
+  mov w0, 0
+  mov w19, w0
+  str w0, [x29, 192]
+.B67:
+  ldr w0, [x29, 192]
+  mov w19, w0
+  mov w0, 10
+  mov w1, w19
+  cmp w1, w0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B68
+  ldr x0, = const_6
+  ldr s0, [x0]
+  fmov s19, s0  // salva em reg
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -48]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -80]
+  ldr s1, [sp], 16
+  fdiv s0, s1, s0
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  fmov s1, s19  // restaura do reg
+  fmul s0, s1, s0
+  fmov s19, s0
+  fmov s0, s19
+  str s0, [x29, -80]
+  ldr w0, [x29, 192]
+  add w0, w0, 1
+  str w0, [x29, 192]
+  b .B67
+.B68:
+  ldr s0, [x29, -80]
+  b 1f
+  b 1f
+// epilogo
+1:
+  ldp x19, x20, [x29, -16]
+  ldp x21, x22, [x29, -32]
+  ldp x29, x30, [sp, 192]
+  add sp, sp, 208
+  ret
+// fim: [fraiz]
+
+// fim de biblis/mat.fpb
+
 .global inicio
 // Espaço "Pessoa" definido: 48 bytes
 // fn: [somar] (vars: 0, total: 176)
@@ -1456,7 +1790,7 @@ inicio:
   bl _escrever_tex
   ldr w0, [x29, -48]
   bl _escrever_int
-  ldr x0, = const_3
+  ldr x0, = const_7
   ldr s0, [x0]
   fmov s19, s0
   str s0, [x29, -64]
@@ -1627,7 +1961,7 @@ testeAlteracoes:
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
-  ldr x0, = const_4
+  ldr x0, = const_8
   ldr s0, [x0]
   fmov s19, s0
   str s0, [x29, -96]
@@ -1637,7 +1971,7 @@ testeAlteracoes:
   bl _escrever_flu
   mov w0, 10
   bl _escrever_car
-  ldr x0, = const_5
+  ldr x0, = const_9
   ldr s0, [x0]
   fmov s19, s0
   fmov s0, s19
@@ -1669,6 +2003,8 @@ testeAlteracoes:
   bl testeConversao
   add sp, sp, 0  // limpa temporarios
   bl testeAsm
+  add sp, sp, 0  // limpa temporarios
+  bl testeMat
   b 1f
 // epilogo
 1:
@@ -1676,12 +2012,12 @@ testeAlteracoes:
   add sp, sp, 208
   ret
 // fim: [testeAlteracoes]
-// fn: [testeOperacoes] (vars: 32, total: 160)
+// fn: [testeOperacoes] (vars: 48, total: 176)
 .align 2
 testeOperacoes:
-  sub sp, sp, 160
-  stp x29, x30, [sp, 144]
-  add x29, sp, 144
+  sub sp, sp, 176
+  stp x29, x30, [sp, 160]
+  add x29, sp, 160
   ldr x0, = .tex_comb_3
   bl _escrever_tex
   mov w0, 5
@@ -1808,20 +2144,90 @@ testeOperacoes:
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
+  ldr x0, = .tex_42
+  bl _escrever_tex
+  ldr s0, [x29, -48]
+  str s0, [sp, -16]!
+  ldr x0, = const_10
+  ldr s0, [x0]
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  str s0, [x29, -48]
+  ldr x0, = .tex_43
+  bl _escrever_tex
+  ldr s0, [x29, -48]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr s0, [x29, -48]
+  str s0, [sp, -16]!
+  mov w0, 2
+  ldr s1, [sp], 16
+  scvtf s0, w0
+  fmul s0, s1, s0
+  str s0, [x29, -48]
+  ldr x0, = .tex_44
+  bl _escrever_tex
+  ldr s0, [x29, -48]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr s0, [x29, -48]
+  str s0, [sp, -16]!
+  mov w0, 2
+  ldr s1, [sp], 16
+  scvtf s0, w0
+  fsub s0, s1, s0
+  str s0, [x29, -48]
+  ldr x0, = .tex_45
+  bl _escrever_tex
+  ldr s0, [x29, -48]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr s0, [x29, -48]
+  str s0, [sp, -16]!
+  mov w0, 2
+  ldr s1, [sp], 16
+  scvtf s0, w0
+  fdiv s0, s1, s0
+  str s0, [x29, -48]
+  ldr x0, = .tex_46
+  bl _escrever_tex
+  ldr s0, [x29, -48]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  mov w0, 10
+  mov w19, w0
+  str w0, [x29, -64]
+  ldr w0, [x29, -64]
+  str w0, [sp, -16]!
+  mov w0, 5
+  ldr w1, [sp], 16
+  sdiv w2, w1, w0
+  msub w0, w2, w0, w1
+  str w0, [x29, -64]
+  ldr x0, = .tex_47
+  bl _escrever_tex
+  ldr w0, [x29, -64]
+  bl _escrever_int
+  mov w0, 10
+  bl _escrever_car
   b 1f
 // epilogo
 1:
-  ldp x29, x30, [sp, 144]
-  add sp, sp, 160
+  ldp x29, x30, [sp, 160]
+  add sp, sp, 176
   ret
 // fim: [testeOperacoes]
-// fn: [testeComparacoes] (vars: 64, total: 192)
+// fn: [testeComparacoes] (vars: 80, total: 208)
 .align 2
 testeComparacoes:
-  sub sp, sp, 192
-  stp x29, x30, [sp, 176]
-  add x29, sp, 176
-  ldr x0, = .tex_42
+  sub sp, sp, 208
+  stp x29, x30, [sp, 192]
+  add x29, sp, 192
+  ldr x0, = .tex_48
   bl _escrever_tex
   mov w0, 4
   mov w19, w0
@@ -1835,11 +2241,11 @@ testeComparacoes:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B48
-  ldr x0, = .tex_43
+  beq .B69
+  ldr x0, = .tex_49
   bl _escrever_tex
-  b .B49
-.B48:
+  b .B70
+.B69:
   ldr w0, [x29, -32]
   mov w19, w0
   mov w0, 5
@@ -1849,15 +2255,15 @@ testeComparacoes:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B50
-  ldr x0, = .tex_44
+  beq .B71
+  ldr x0, = .tex_50
   bl _escrever_tex
-  b .B51
-.B50:
-  ldr x0, = .tex_45
+  b .B72
+.B71:
+  ldr x0, = .tex_51
   bl _escrever_tex
-.B51:
-.B49:
+.B72:
+.B70:
   mov w0, 5
   mov w19, w0
   str w0, [x29, -48]
@@ -1883,14 +2289,14 @@ testeComparacoes:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B52
-  ldr x0, = .tex_46
+  beq .B73
+  ldr x0, = .tex_52
   bl _escrever_tex
-  b .B53
-.B52:
-  ldr x0, = .tex_47
+  b .B74
+.B73:
+  ldr x0, = .tex_53
   bl _escrever_tex
-.B53:
+.B74:
   ldr w0, [x29, -48]
   mov w19, w0
   ldr w0, [x29, -32]
@@ -1913,19 +2319,19 @@ testeComparacoes:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B54
-  ldr x0, = .tex_48
+  beq .B75
+  ldr x0, = .tex_54
   bl _escrever_tex
-  b .B55
-.B54:
-  ldr x0, = .tex_49
+  b .B76
+.B75:
+  ldr x0, = .tex_55
   bl _escrever_tex
-.B55:
-  ldr x0, = .tex_50
+.B76:
+  ldr x0, = .tex_56
   bl _escrever_tex
-  ldr x0, = .tex_51
+  ldr x0, = .tex_57
   str x0, [x29, -64]
-  ldr x0, = .tex_52
+  ldr x0, = .tex_58
   str x0, [x29, -80]
   ldr x0, [x29, -64]
   bl _escrever_tex
@@ -1946,12 +2352,12 @@ testeComparacoes:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B56
-  ldr x0, = .tex_53
+  beq .B77
+  ldr x0, = .tex_59
   bl _escrever_tex
-  b .B57
-.B56:
-.B57:
+  b .B78
+.B77:
+.B78:
   ldr x0, [x29, -64]
   str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
   ldr x0, [x29, -80]
@@ -1965,12 +2371,12 @@ testeComparacoes:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B58
-  ldr x0, = .tex_54
+  beq .B79
+  ldr x0, = .tex_60
   bl _escrever_tex
-  b .B59
-.B58:
-.B59:
+  b .B80
+.B79:
+.B80:
   ldr x0, [x29, -64]
   str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
   ldr x0, [x29, -64]
@@ -1982,19 +2388,42 @@ testeComparacoes:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B60
-  ldr x0, = .tex_55
+  beq .B81
+  ldr x0, = .tex_61
   bl _escrever_tex
-  b .B61
-.B60:
-  ldr x0, = .tex_56
+  b .B82
+.B81:
+  ldr x0, = .tex_62
   bl _escrever_tex
-.B61:
+.B82:
+  ldr x0, = .tex_63
+  bl _escrever_tex
+  mov w0, 5
+  mov w19, w0
+  mov w0, 6
+  mov w1, w19
+  cmp w1, w0
+  cset w0, gt
+  cmp w0, 0
+  beq .ternario_falso_0
+  mov w0, 10
+  b .ternario_fim_0
+.ternario_falso_0:
+  mov w0, 20
+.ternario_fim_0:
+  mov w19, w0
+  str w0, [x29, -96]
+  ldr x0, = .tex_64
+  bl _escrever_tex
+  ldr w0, [x29, -96]
+  bl _escrever_int
+  mov w0, 10
+  bl _escrever_car
   b 1f
 // epilogo
 1:
-  ldp x29, x30, [sp, 176]
-  add sp, sp, 192
+  ldp x29, x30, [sp, 192]
+  add sp, sp, 208
   ret
 // fim: [testeComparacoes]
 // fn: [testeMemoria] (vars: 192, total: 320)
@@ -2003,7 +2432,7 @@ testeMemoria:
   sub sp, sp, 320
   stp x29, x30, [sp, 304]
   add x29, sp, 304
-  ldr x0, = .tex_57
+  ldr x0, = .tex_65
   bl _escrever_tex
   mov w1, 116
   strb w1, [x29, -32]
@@ -2017,7 +2446,7 @@ testeMemoria:
   strb w1, [x29, -28]
   mov w1, 0
   strb w1, [x29, -27]
-  ldr x0, = .tex_58
+  ldr x0, = .tex_66
   bl _escrever_tex
   add x0, x29, -32
   bl _escrever_tex
@@ -2029,21 +2458,23 @@ testeMemoria:
   add x2, x29, -32
   add x2, x2, x1
   strb w0, [x2]
-  ldr x0, = .tex_59
+  ldr x0, = .tex_67
   bl _escrever_tex
   add x0, x29, -32
   bl _escrever_tex
-  ldr x0, = .tex_60
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_68
   bl _escrever_tex
   mov w0, 10
   mov w19, w0
   str w0, [x29, -48]
-  ldr x0, = .tex_61
+  ldr x0, = .tex_69
   bl _escrever_tex
   add x0, x29, -48
   mov x19, x0
   str x0, [x29, -64]
-  ldr x0, = .tex_62
+  ldr x0, = .tex_70
   bl _escrever_tex
   ldr x1, [x29, -64]
   ldr w0, [x1]
@@ -2053,19 +2484,19 @@ testeMemoria:
   add w0, w1, w0
   mov w19, w0
   str x0, [x29, -64]
-  ldr x0, = .tex_63
+  ldr x0, = .tex_71
   bl _escrever_tex
   ldr w0, [x29, -48]
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
-  ldr x0, = .tex_64
+  ldr x0, = .tex_72
   str x0, [x29, -80]
-  ldr x0, = .tex_65
+  ldr x0, = .tex_73
   bl _escrever_tex
   ldr x0, [x29, -80]
   bl _escrever_tex
-  ldr x0, = .tex_66
+  ldr x0, = .tex_74
   bl _escrever_tex
   ldr x0, [x29, -80]
   str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
@@ -2093,19 +2524,19 @@ testeMemoria:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B62
-  ldr x0, = .tex_67
+  beq .B83
+  ldr x0, = .tex_75
   bl _escrever_tex
   ldr w0, [x29, -96]
   bl _escrever_int
-  b .B63
-.B62:
-  ldr x0, = .tex_68
+  b .B84
+.B83:
+  ldr x0, = .tex_76
   bl _escrever_tex
-.B63:
-  ldr x0, = .tex_69
+.B84:
+  ldr x0, = .tex_77
   bl _escrever_tex
-  ldr x0, = .tex_70
+  ldr x0, = .tex_78
   str x0, [x29, -112]
   mov w1, 101
   strb w1, [x29, -128]
@@ -2123,7 +2554,7 @@ testeMemoria:
   strb w1, [x29, -122]
   mov w1, 0
   strb w1, [x29, -121]
-  ldr x0, = .tex_71
+  ldr x0, = .tex_79
   bl _escrever_tex
   add x0, x29, -128
   bl _escrever_tex
@@ -2143,7 +2574,7 @@ testeMemoria:
   ldr x0, [sp, 32]  // carrega param 0 (ptr/longo) em x0
   add sp, sp, 48  // limpa temporarios
   bl memcp
-  ldr x0, = .tex_72
+  ldr x0, = .tex_80
   bl _escrever_tex
   add x0, x29, -128
   bl _escrever_tex
@@ -2160,11 +2591,13 @@ testeMemoria:
   ldr x0, [sp, 32]  // carrega param 0 (ptr/longo) em x0
   add sp, sp, 48  // limpa temporarios
   bl subscar
-  ldr x0, = .tex_73
+  ldr x0, = .tex_81
   bl _escrever_tex
   add x0, x29, -128
   bl _escrever_tex
-  ldr x0, = .tex_74
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_82
   bl _escrever_tex
   mov w0, 0
   mov w1, w0 // otimizado(literal)
@@ -2176,7 +2609,7 @@ testeMemoria:
   ldrb w0, [x2]
   mov w19, w0
   strb w0, [x29, -144]
-  ldr x0, = .tex_75
+  ldr x0, = .tex_83
   bl _escrever_tex
   ldrb w0, [x29, -144]
   bl _escrever_car
@@ -2190,12 +2623,12 @@ testeMemoria:
   str w0, [x29, -152]
   mov w0, 5
   str w0, [x29, -148]
-  ldr x0, = .tex_76
+  ldr x0, = .tex_84
   bl _escrever_tex
   mov w0, 0
   mov w19, w0
   str w0, [x29, 304]
-.B65:
+.B86:
   ldr w0, [x29, 304]
   mov w19, w0
   mov w0, 4
@@ -2205,12 +2638,12 @@ testeMemoria:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B66
-  ldr x0, = .tex_77
+  beq .B87
+  ldr x0, = .tex_85
   bl _escrever_tex
   ldr w0, [x29, 304]
   bl _escrever_int
-  ldr x0, = .tex_78
+  ldr x0, = .tex_86
   bl _escrever_tex
   ldr w0, [x29, 304]
   str w0, [sp, -16]!
@@ -2228,26 +2661,26 @@ testeMemoria:
   ldr w0, [x29, 304]
   add w0, w0, 1
   str w0, [x29, 304]
-  b .B65
-.B66:
-  ldr x0, = const_7
+  b .B86
+.B87:
+  ldr x0, = const_11
   ldr s0, [x0]
   str s0, [x29, -176]
-  ldr x0, = const_8
+  ldr x0, = const_10
   ldr s0, [x0]
   str s0, [x29, -172]
-  ldr x0, = const_9
+  ldr x0, = const_12
   ldr s0, [x0]
   str s0, [x29, -168]
-  ldr x0, = const_9
+  ldr x0, = const_12
   ldr s0, [x0]
   str s0, [x29, -164]
-  ldr x0, = .tex_79
+  ldr x0, = .tex_87
   bl _escrever_tex
   mov w0, 0
   mov w19, w0
   str w0, [x29, 288]
-.B68:
+.B89:
   ldr w0, [x29, 288]
   mov w19, w0
   mov w0, 4
@@ -2257,12 +2690,12 @@ testeMemoria:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B69
-  ldr x0, = .tex_77
+  beq .B90
+  ldr x0, = .tex_85
   bl _escrever_tex
   ldr w0, [x29, 288]
   bl _escrever_int
-  ldr x0, = .tex_78
+  ldr x0, = .tex_86
   bl _escrever_tex
   ldr w0, [x29, 288]
   str w0, [sp, -16]!
@@ -2280,8 +2713,8 @@ testeMemoria:
   ldr w0, [x29, 288]
   add w0, w0, 1
   str w0, [x29, 288]
-  b .B68
-.B69:
+  b .B89
+.B90:
   b 1f
 // epilogo
 1:
@@ -2300,7 +2733,7 @@ testeLoops:
   mov w0, 0
   mov w19, w0
   str w0, [x29, -32]
-.B71:
+.B92:
   ldr w0, [x29, -32]
   mov w19, w0
   mov w0, 10
@@ -2310,22 +2743,22 @@ testeLoops:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B72
-  ldr x0, = .tex_82
+  beq .B93
+  ldr x0, = .tex_90
   bl _escrever_tex
   ldr w0, [x29, -32]
   bl _escrever_int
   ldr w0, [x29, -32]
   add w0, w0, 1
   str w0, [x29, -32]
-  b .B71
-.B72:
+  b .B92
+.B93:
   mov w0, 0
   mov w19, w0
   str w0, [x29, -48]
-  ldr x0, = .tex_83
+  ldr x0, = .tex_91
   bl _escrever_tex
-.B74:
+.B95:
   ldr w0, [x29, -48]
   mov w19, w0
   mov w0, 10
@@ -2335,7 +2768,7 @@ testeLoops:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B75
+  beq .B96
   ldr w0, [x29, -48]
   bl _escrever_int
   mov w0, 10
@@ -2349,24 +2782,24 @@ testeLoops:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B76
-  ldr x0, = .tex_84
+  beq .B97
+  ldr x0, = .tex_92
   bl _escrever_tex
-  b .B75
-  b .B77
-.B76:
-.B77:
+  b .B96
+  b .B98
+.B97:
+.B98:
   ldr w0, [x29, -48]
   add w0, w0, 1
   str w0, [x29, -48]
-  b .B74
-.B75:
-  ldr x0, = .tex_85
+  b .B95
+.B96:
+  ldr x0, = .tex_93
   bl _escrever_tex
   mov w0, 0
   mov w19, w0
   str w0, [x29, 160]
-.B79:
+.B100:
   ldr w0, [x29, 160]
   mov w19, w0
   mov w0, 10
@@ -2376,8 +2809,8 @@ testeLoops:
   mov w19, w0
   mov w0, w19
   cmp w0, 0
-  beq .B80
-  ldr x0, = .tex_86
+  beq .B101
+  ldr x0, = .tex_94
   bl _escrever_tex
   ldr w0, [x29, 160]
   bl _escrever_int
@@ -2386,8 +2819,8 @@ testeLoops:
   ldr w0, [x29, 160]
   add w0, w0, 1
   str w0, [x29, 160]
-  b .B79
-.B80:
+  b .B100
+.B101:
   b 1f
 // epilogo
 1:
@@ -2401,7 +2834,7 @@ testeMatrizes:
   sub sp, sp, 160
   stp x29, x30, [sp, 144]
   add x29, sp, 144
-  ldr x0, = .tex_87
+  ldr x0, = .tex_95
   bl _escrever_tex
   mov w0, 0
   str w0, [x29, -32]
@@ -2415,7 +2848,7 @@ testeMatrizes:
   str w0, [x29, -24]
   mov w0, 0
   str w0, [x29, -20]
-  ldr x0, = .tex_88
+  ldr x0, = .tex_96
   bl _escrever_tex
   mov w0, 0
   str w0, [sp, -16]!
@@ -2436,25 +2869,25 @@ testeMatrizes:
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
-  ldr x0, = const_10
-  ldr s0, [x0]
-  str s0, [x29, -48]
-  ldr x0, = const_11
-  ldr s0, [x0]
-  str s0, [x29, -44]
-  ldr x0, = const_12
-  ldr s0, [x0]
-  str s0, [x29, -40]
   ldr x0, = const_13
   ldr s0, [x0]
-  str s0, [x29, -44]
+  str s0, [x29, -48]
   ldr x0, = const_14
+  ldr s0, [x0]
+  str s0, [x29, -44]
+  ldr x0, = const_15
+  ldr s0, [x0]
+  str s0, [x29, -40]
+  ldr x0, = const_5
+  ldr s0, [x0]
+  str s0, [x29, -44]
+  ldr x0, = const_16
   ldr s0, [x0]
   str s0, [x29, -40]
   ldr x0, = const_1
   ldr s0, [x0]
   str s0, [x29, -36]
-  ldr x0, = .tex_89
+  ldr x0, = .tex_97
   bl _escrever_tex
   mov w0, 0
   str w0, [sp, -16]!
@@ -2488,11 +2921,11 @@ testeEspaco:
   sub sp, sp, 128
   stp x29, x30, [sp, 112]
   add x29, sp, 112
-  ldr x0, = .tex_90
+  ldr x0, = .tex_98
   bl _escrever_tex
   add x0, x29, -64
   str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
-  ldr x0, = .tex_91
+  ldr x0, = .tex_99
   str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
   ldr w1, [sp, 0]  // carrega param 1 (int/bool) em w1
   mov x1, x1  // estende pra 64 bits
@@ -2504,7 +2937,7 @@ testeEspaco:
   str w0, [x1]
   add x0, x29, -112
   str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
-  ldr x0, = .tex_92
+  ldr x0, = .tex_100
   str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
   ldr w1, [sp, 0]  // carrega param 1 (int/bool) em w1
   mov x1, x1  // estende pra 64 bits
@@ -2514,20 +2947,20 @@ testeEspaco:
   mov w0, 1992
   add x1, x29, -80
   str w0, [x1]
-  ldr x0, = .tex_93
+  ldr x0, = .tex_101
   bl _escrever_tex
   add x0, x29, -64
   bl _escrever_tex
-  ldr x0, = .tex_94
+  ldr x0, = .tex_102
   bl _escrever_tex
   add x0, x29, -32
   ldr w0, [x0]
   bl _escrever_int
-  ldr x0, = .tex_95
+  ldr x0, = .tex_103
   bl _escrever_tex
   add x0, x29, -112
   bl _escrever_tex
-  ldr x0, = .tex_94
+  ldr x0, = .tex_102
   bl _escrever_tex
   add x0, x29, -80
   ldr w0, [x0]
@@ -2549,7 +2982,7 @@ testeConversao:
   add x29, sp, 112
   ldr x0, = .tex_comb_9
   bl _escrever_tex
-  ldr x0, = .tex_98
+  ldr x0, = .tex_106
   str w0, [sp, -16]!  // salva param 0 (int/bool/char/byte)
   mov w0, 3
   str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
@@ -2566,9 +2999,9 @@ testeConversao:
   bl _escrever_int
   mov w0, 10
   bl _escrever_car
-  ldr x0, = .tex_99
+  ldr x0, = .tex_107
   bl _escrever_tex
-  ldr x0, = .tex_100
+  ldr x0, = .tex_108
   str w0, [sp, -16]!  // salva param 0 (int/bool/char/byte)
   mov w0, 4
   str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
@@ -2600,9 +3033,9 @@ testeAsm:
   sub sp, sp, 160
   stp x29, x30, [sp, 144]
   add x29, sp, 144
-  ldr x0, = .tex_101
+  ldr x0, = .tex_109
   bl _escrever_tex
-  ldr x0, = .tex_102
+  ldr x0, = .tex_110
   str x0, [x29, -32]
   ldr x0, [x29, -32]
   str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
@@ -2627,6 +3060,90 @@ testeAsm:
   add sp, sp, 160
   ret
 // fim: [testeAsm]
+// fn: [testeMat] (vars: 0, total: 128)
+.align 2
+testeMat:
+  sub sp, sp, 128
+  stp x29, x30, [sp, 112]
+  add x29, sp, 112
+  ldr x0, = .tex_comb_10
+  bl _escrever_tex
+  ldr x0, = const_6
+  ldr s0, [x0]
+  str s0, [sp, -16]!  // salva param 0 (float)
+  ldr s0, [sp, 0]  // carrega param 0 (flu) em s0
+  add sp, sp, 16  // limpa temporarios
+  bl ftanh
+  fmov s0, s0
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_113
+  bl _escrever_tex
+  ldr x0, = const_17
+  ldr s0, [x0]
+  str s0, [sp, -16]!  // salva param 0 (float)
+  ldr s0, [sp, 0]  // carrega param 0 (flu) em s0
+  add sp, sp, 16  // limpa temporarios
+  bl fexp
+  fmov s0, s0
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_114
+  bl _escrever_tex
+  ldr x0, = const_18
+  ldr s0, [x0]
+  str s0, [sp, -16]!  // salva param 0 (float)
+  ldr s0, [sp, 0]  // carrega param 0 (flu) em s0
+  add sp, sp, 16  // limpa temporarios
+  bl fraiz
+  fmov s0, s0
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_115
+  bl _escrever_tex
+  ldr x0, = global_PI
+  ldr s0, [x0]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_116
+  bl _escrever_tex
+  ldr x0, = global_E
+  ldr s0, [x0]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_117
+  bl _escrever_tex
+  ldr x0, = global_RAIZ2
+  ldr s0, [x0]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_118
+  bl _escrever_tex
+  ldr x0, = global_LOG2E
+  ldr s0, [x0]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, = .tex_119
+  bl _escrever_tex
+  ldr x0, = global_LOGE10
+  ldr s0, [x0]
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  b 1f
+// epilogo
+1:
+  ldp x29, x30, [sp, 112]
+  add sp, sp, 128
+  ret
+// fim: [testeMat]
   .section .rodata
   .align 8
 const_0:
@@ -2636,29 +3153,37 @@ const_1:
 const_2:
   .float 0.100000
 const_3:
-  .float 3.140000
+  .float 4.000000
 const_4:
-  .float 1.100000
+  .float 1.000000
 const_5:
-  .float -1.100000
+  .float 2.000000
 const_6:
   .float 0.500000
 const_7:
-  .float 0.200000
+  .float 3.140000
 const_8:
-  .float 1.500000
+  .float 1.100000
 const_9:
-  .float 5.100000
+  .float -1.100000
 const_10:
-  .float 3.000000
+  .float 1.500000
 const_11:
-  .float 5.000000
+  .float 0.200000
 const_12:
-  .float 7.000000
+  .float 5.100000
 const_13:
-  .float 2.000000
+  .float 3.000000
 const_14:
+  .float 5.000000
+const_15:
+  .float 7.000000
+const_16:
   .float 9.000000
+const_17:
+  .float 0.800000
+const_18:
+  .float 25.000000
 .section .rodata
 .align 2
 .tex_0: .asciz "valor a: "
@@ -2672,6 +3197,7 @@ const_14:
 .tex_8: .asciz "\nbooleano: "
 .tex_9: .asciz "\nlongo: "
 .tex_10: .asciz "\nbyte: "
+.tex_11: .asciz " (0xFF)"
 .tex_13: .asciz "\nsoma com retorno 5 + 7 = esperando 12, veio: "
 .tex_14: .asciz "\n\nVariavel final inteira:\n"
 .tex_15: .asciz "\n"
@@ -2693,65 +3219,93 @@ const_14:
 .tex_35: .asciz " * y: "
 .tex_36: .asciz ", resultado: "
 .tex_37: .asciz "10 << 2, resultado: "
-.tex_42: .asciz "\nTeste compara\303\247\303\265es:\n\n"
-.tex_43: .asciz "x \303\251 maior que 5\n"
-.tex_44: .asciz "x \303\251 maior ou igual a 5\n"
-.tex_45: .asciz "x n\303\243o \303\251 maior nem igual a 5\n"
-.tex_46: .asciz "y >= 4 && x > 4 \303\251 verdadeiro\n"
-.tex_47: .asciz "y >= 4 && x > 4 \303\251 falso\n"
-.tex_48: .asciz "y == x || x > 3 \303\251 verdadeiro\n"
-.tex_49: .asciz "y == x || x > 3 \303\251 falso\n"
-.tex_50: .asciz "\nCompara\303\247\303\243o com textos:\n\n"
-.tex_51: .asciz "texto 1"
-.tex_52: .asciz "texto 2"
-.tex_53: .asciz "texto 1 \303\251 igual a texto 2\n"
-.tex_54: .asciz "texto 1 n\303\243o \303\251 igual a texto 2\n"
-.tex_55: .asciz "o primeiro texto \303\251 texto 1"
-.tex_56: .asciz "o primeiro texto n\303\243o \303\251 texto 1"
-.tex_57: .asciz "\nTeste de array:\n"
-.tex_58: .asciz "\nvalor do array: "
-.tex_59: .asciz "\narray mudado no indice 0: "
-.tex_60: .asciz "\n\nTeste de ponteiro:\n\n"
-.tex_61: .asciz "int x1 = 10; int* p1 = @x1;\n"
-.tex_62: .asciz "p1 = p1 + 5; x1 = ?\n"
-.tex_63: .asciz "x1 = "
-.tex_64: .asciz "exemplo de ponteiro"
-.tex_65: .asciz "\nponteiro texto, valor: "
-.tex_66: .asciz "\ntamamho em bytes: "
-.tex_67: .asciz "\no ponteiro tem t no indice: "
-.tex_68: .asciz "\no ponteiro n\303\243o tem t\n"
-.tex_69: .asciz "\nTeste de manipula\303\247\303\243o da memoria:\n"
-.tex_70: .asciz "XxXmplo maior"
-.tex_71: .asciz "\nArray padr\303\243o: "
-.tex_72: .asciz "\nArray copiado da memoria: "
-.tex_73: .asciz "\nArray usando subscar(array2, 'X', 'e'): "
-.tex_74: .asciz "\nTeste de acesso a itens array:\n"
-.tex_75: .asciz "item do indice 0 do array: "
-.tex_76: .asciz "\nArray de inteiros: \n\n"
-.tex_77: .asciz "no indice: "
-.tex_78: .asciz " valor: "
-.tex_79: .asciz "\nArray de flutuantes: \n\n"
-.tex_82: .asciz "\nvalor de i: "
-.tex_83: .asciz "\n\nTeste de parada do loop (deve parar em 5)\n"
-.tex_84: .asciz "parando\n"
-.tex_85: .asciz "\nLoop Por:\n"
-.tex_86: .asciz "indice: "
-.tex_87: .asciz "\n\nTeste de matrizes:\n\n"
-.tex_88: .asciz "matriz 2D int m2[0][1]: "
-.tex_89: .asciz "matriz 2D flu m2f[0][1]: "
-.tex_90: .asciz "\nTeste de estrutura de dados (#espaco):\n\n"
-.tex_91: .asciz "ronaldo"
-.tex_92: .asciz "el pepe"
-.tex_93: .asciz "Pessoa 1:\nNome: "
-.tex_94: .asciz "\nIdade: "
-.tex_95: .asciz "\nPessoa 2:\nNome: "
-.tex_98: .asciz "123"
-.tex_99: .asciz "1.50 + 0.50 = "
-.tex_100: .asciz "1.50"
-.tex_101: .asciz "\nTestando assembly manual:\n"
-.tex_102: .asciz "assembly testado com sucesso\n"
+.tex_42: .asciz "\nTeste de atribui\303\247\303\265es compostas:\n\n"
+.tex_43: .asciz "x = 0.5f, x += 1.5f, x agora \303\251 "
+.tex_44: .asciz "x = 2.0f, x *= 2, x agora \303\251 "
+.tex_45: .asciz "x = 4.0f, x -= 2, x agora \303\251 "
+.tex_46: .asciz "x = 2.0f, x /= 2, x agora \303\251 "
+.tex_47: .asciz "x2 = 10, x2 %= 5, x2 agora \303\251 "
+.tex_48: .asciz "\nTeste compara\303\247\303\265es:\n\n"
+.tex_49: .asciz "x \303\251 maior que 5\n"
+.tex_50: .asciz "x \303\251 maior ou igual a 5\n"
+.tex_51: .asciz "x n\303\243o \303\251 maior nem igual a 5\n"
+.tex_52: .asciz "y >= 4 && x > 4 \303\251 verdadeiro\n"
+.tex_53: .asciz "y >= 4 && x > 4 \303\251 falso\n"
+.tex_54: .asciz "y == x || x > 3 \303\251 verdadeiro\n"
+.tex_55: .asciz "y == x || x > 3 \303\251 falso\n"
+.tex_56: .asciz "\nCompara\303\247\303\243o com textos:\n\n"
+.tex_57: .asciz "texto 1"
+.tex_58: .asciz "texto 2"
+.tex_59: .asciz "texto 1 \303\251 igual a texto 2\n"
+.tex_60: .asciz "texto 1 n\303\243o \303\251 igual a texto 2\n"
+.tex_61: .asciz "o primeiro texto \303\251 texto 1\n"
+.tex_62: .asciz "o primeiro texto n\303\243o \303\251 texto 1\n"
+.tex_63: .asciz "\nTeste de operador Tern\303\241rio:\n\n"
+.tex_64: .asciz "int x = 5 > 6 ? 10 : 20; x \303\251 igual a = "
+.tex_65: .asciz "\nTeste de array:\n"
+.tex_66: .asciz "\nvalor do array: "
+.tex_67: .asciz "\narray mudado no indice 0: "
+.tex_68: .asciz "\nTeste de ponteiro:\n\n"
+.tex_69: .asciz "int x1 = 10; int* p1 = @x1;\n"
+.tex_70: .asciz "p1 = p1 + 5; x1 = ?\n"
+.tex_71: .asciz "x1 = "
+.tex_72: .asciz "exemplo de ponteiro"
+.tex_73: .asciz "\nponteiro texto, valor: "
+.tex_74: .asciz "\ntamamho em bytes: "
+.tex_75: .asciz "\no ponteiro tem t no indice: "
+.tex_76: .asciz "\no ponteiro n\303\243o tem t\n"
+.tex_77: .asciz "\nTeste de manipula\303\247\303\243o da memoria:\n\n"
+.tex_78: .asciz "XxXmplo maior"
+.tex_79: .asciz "\nArray padr\303\243o: "
+.tex_80: .asciz "\nArray copiado da memoria: "
+.tex_81: .asciz "\nArray usando subscar(array2, 'X', 'e'): "
+.tex_82: .asciz "\nTeste de acesso a itens array:\n\n"
+.tex_83: .asciz "item do indice 0 do array: "
+.tex_84: .asciz "\nArray de inteiros: \n\n"
+.tex_85: .asciz "no indice: "
+.tex_86: .asciz " valor: "
+.tex_87: .asciz "\nArray de flutuantes: \n\n"
+.tex_90: .asciz "\nvalor de i: "
+.tex_91: .asciz "\n\nTeste de parada do loop (deve parar em 5)\n"
+.tex_92: .asciz "parando\n"
+.tex_93: .asciz "\nLoop Por:\n"
+.tex_94: .asciz "indice: "
+.tex_95: .asciz "\nTeste de matrizes:\n\n"
+.tex_96: .asciz "matriz 2D int m2[0][1]: "
+.tex_97: .asciz "matriz 2D flu m2f[0][1]: "
+.tex_98: .asciz "\nTeste de estrutura de dados (#espaco):\n\n"
+.tex_99: .asciz "ronaldo"
+.tex_100: .asciz "el pepe"
+.tex_101: .asciz "Pessoa 1:\nNome: "
+.tex_102: .asciz "\nIdade: "
+.tex_103: .asciz "\nPessoa 2:\nNome: "
+.tex_106: .asciz "123"
+.tex_107: .asciz "1.50 + 0.50 = "
+.tex_108: .asciz "1.50"
+.tex_109: .asciz "\nTestando assembly manual:\n"
+.tex_110: .asciz "assembly testado com sucesso\n"
+.tex_113: .asciz "fexp(0.8f) = "
+.tex_114: .asciz "fraiz(25f) = "
+.tex_115: .asciz "PI = "
+.tex_116: .asciz "E = "
+.tex_117: .asciz "RAIZ2 = "
+.tex_118: .asciz "LOG2E = "
+.tex_119: .asciz "LOGE10 = "
 .section .text
 
+
+.section .rodata
+.align 3
+global_PI:
+  .float 3.141593
+global_E:
+  .float 2.718282
+global_RAIZ2:
+  .float 1.414214
+global_LOG2E:
+  .float 1.442695
+global_LOGE10:
+  .float 2.302585
 
 .section .data
 .align 3
@@ -2763,10 +3317,11 @@ global_varGlobal:
 .tex_comb_0: .asciz "Testando escape:\n\"teste\"\n\n"
 .tex_comb_1: .asciz " (0xFF)\n\nTestando fun\303\247\303\243o soma:\n"
 .tex_comb_2: .asciz "\nTeste de convers\303\243o:\n\n(car)65 = "
-.tex_comb_3: .asciz "\n\nTeste de opera\303\247\303\265es matematicas:\n\nopera\303\247\303\243o 5 + 5 * 5, esperado: 30, veio: "
+.tex_comb_3: .asciz "\nTeste de opera\303\247\303\265es matematicas:\n\nopera\303\247\303\243o 5 + 5 * 5, esperado: 30, veio: "
 .tex_comb_4: .asciz "\n10 >> 2, resultado: "
 .tex_comb_5: .asciz "\n124 & 15, resultado: "
 .tex_comb_6: .asciz "\n124 & 0xF, resultado: "
 .tex_comb_7: .asciz "\n1 | 2, resultado: "
-.tex_comb_8: .asciz "\n\nTeste de loops:\nEnquanto:"
+.tex_comb_8: .asciz "\nTeste de loops:\nLoop Enquanto:"
 .tex_comb_9: .asciz "\nTeste de convers\303\243o de texto:\n123 + 1 = "
+.tex_comb_10: .asciz "\nTeste da biblioteca de matematica:\n\nftanh(0.5f) = "

@@ -1,8 +1,7 @@
 #incluir "biblis/impressao.asm";
+#incluir "biblis/mat.fpb";
 #global inicio();
 
 vazio inicio() {
-    longo soma = 0;
-    por(longo i=0; i<50000000L; i++) soma = soma + i;
-    escrever(soma);
+    escrever(fraiz(25), '\n');
 }

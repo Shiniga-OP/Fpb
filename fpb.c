@@ -30,14 +30,15 @@ typedef enum {
     T_CHAVE_ESQ, T_CHAVE_DIR,
     T_COL_ESQ, T_COL_DIR,
     T_PONTO_VIRGULA, T_VIRGULA, 
-    T_PONTO, T_LAMBDA, T_ARROBA, T_CONVERT,
+    T_PONTO, T_LAMBDA, T_ARROBA, T_CONVERTA,
     // operadores:
     T_IGUAL, T_MAIS, T_MENOS, T_VEZES, T_DIV, T_PORCEN,
-    T_MAIS_MAIS, T_MENOS_MENOS,
+    T_MAIS_MAIS, T_MENOS_MENOS, T_MAIS_IGUAL, T_MENOS_IGUAL,
+    T_VEZES_IGUAL, T_DIV_IGUAL, T_PORCEN_IGUAL,
     // condicionais:
     T_SE, T_SENAO, T_IGUAL_IGUAL, T_DIFERENTE, T_DIFERENTE_ABS,
     T_MAIOR, T_MENOR, T_MAIOR_IGUAL, T_MENOR_IGUAL,
-    T_TAMBEM_TAMBEM, T_OU_OU, T_NAO,
+    T_TAMBEM_TAMBEM, T_OU_OU, T_NAO, T_INTERROGACAO, T_DOIS_PONTOS,
     // loops:
     T_POR, T_ENQ, T_PARE,
     // retornos:
@@ -176,6 +177,7 @@ void alocar_buf();
 void realocar_buf(void* p, char* tipo);
 void liberar_buf();
 // util
+bool eh_atribuicao(TipoToken t);
 int eh_tipo(TipoToken tipo);
 int tipos_compativeis(TipoToken tipo1, TipoToken tipo2);
 int tam_tipo(TipoToken t);
@@ -272,6 +274,12 @@ void liberar_reg(char tipo, int reg) {
 }
 
 // [UTIL]:
+bool eh_atribuicao(TipoToken t) {
+    return t == T_IGUAL || t == T_MAIS_IGUAL ||
+    t == T_MENOS_IGUAL || t == T_VEZES_IGUAL ||
+    t == T_DIV_IGUAL || t == T_PORCEN_IGUAL;
+}
+
 int tam_tipo(TipoToken t) {
     switch(t) {
         case T_pBYTE: case T_pCAR: case T_pBOOL: return 1;

@@ -1,21 +1,62 @@
+// constantes matematicas:
+#global final flu PI = 3.14159265f;
+#global final flu E = 2.71828182f;
+#global final flu RAIZ2 = 1.41421356f;
+#global final flu LOG2E = 1.44269504f;
+#global final flu LOGE10 = 2.30258509f;
+
 flu ftanh(flu x);
+flu fexp(flu x);
+flu fraiz(flu x);
 
 flu ftanh(flu x) {
-    // ímpar: tanh(-x) = -tanh(x)
+    // impar: tanh(-x) = -tanh(x)
     se(x < 0.0f) retorne -ftanh(-x);
     
-    // para x grande
+    // pra x grande
     se(x > 4.0f) retorne 1.0f;
     
-    // calcula e^(2x) usando série otimizada
+    // calcula e^(2x) usando serie otimizada
     flu exp2x = 1.0f;
     flu termo = 1.0f;
     flu doisx = 2.0f * x;
     
     por(int n = 1; n < 16; n++) {
-        termo = termo * (doisx / n);
-        exp2x = exp2x + termo;
+        termo *= doisx / n;
+        exp2x += termo;
     }
     // tanh(x) = (e^(2x) - 1) / (e^(2x) + 1)
     retorne (exp2x - 1.0f) / (exp2x + 1.0f);
+}
+
+flu fexp(flu x) {
+    // caso base: e^0 = 1
+    se(x == 0.0f) retorne 1.0f;
+
+    // pra expoentes negativos: e^(-x) = 1 / e^x
+    se(x < 0.0f) retorne 1.0f / fexp(-x);
+
+    flu resultado = 1.0f;
+    flu termo = 1.0f;
+
+    // serie de taylor(16 iterações pra manter precisão similar a ftanh)
+    por(int n = 1; n < 16; n++) {
+        termo *= x / n;
+        resultado = resultado + termo;
+    }
+    retorne resultado;
+}
+
+flu fraiz(flu x) {
+    // não existe raiz real de numero negativo
+    se(x < 0.0f) retorne 0.0f; 
+    se(x == 0.0f) retorne 0.0f;
+
+    flu estimativa = x;
+    
+    // 10 iterações costumam ser suficientes pra precisão de 32 bits
+    por(int i = 0; i < 10; i++) {
+        estimativa = 0.5f * (estimativa + x / estimativa);
+    }
+    retorne estimativa;
 }

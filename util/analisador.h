@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 08/02/2026.
+* [ATUAL]: 09/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // buscar
@@ -82,7 +82,12 @@ const char* token_str(TipoToken t) {
         case T_VEZES: return "*";
         case T_DIV: return "/";
         case T_PORCEN: return "%";
-        case T_CONVERT: return "(converter)";
+        case T_MAIS_IGUAL: return "+=";
+        case T_MENOS_IGUAL: return "-=";
+        case T_VEZES_IGUAL: return "*=";
+        case T_DIV_IGUAL: return "/=";
+        case T_PORCEN_IGUAL: return "%=";
+        case T_CONVERTA: return "(converter)";
         case T_IGUAL_IGUAL: return "==";
         case T_DIFERENTE: return "!=";
         case T_DIFERENTE_ABS: return "!";
@@ -93,6 +98,8 @@ const char* token_str(TipoToken t) {
         case T_MENOR_IGUAL: return "<=";
         case T_TAMBEM_TAMBEM: return "&&";
         case T_OU_OU: return "||";
+        case T_INTERROGACAO: return "?";
+        case T_DOIS_PONTOS: return ":";
         case T_pCAR: return "car";
         case T_pINT: return "int";
         case T_pFLU: return "flu";
@@ -435,7 +442,7 @@ void proximoToken() {
             strcmp(tipo_tex, "flu") == 0 || strcmp(tipo_tex, "dobro") == 0 ||
             strcmp(tipo_tex, "longo") == 0 || strcmp(tipo_tex, "bool") == 0) {
                 if(L.fonte[salvo] == ')') {
-                    L.tk.tipo = T_CONVERT;
+                    L.tk.tipo = T_CONVERTA;
                     strcpy(L.tk.lex, tipo_tex);
                     L.pos = salvo + 1; // pula ')'
                     L.coluna_atual += (salvo - L.pos + 1);
@@ -467,6 +474,10 @@ void proximoToken() {
                 L.tk.tipo = T_MAIS_MAIS;
                 L.pos++;
                 L.coluna_atual++;
+            } else if(L.fonte[L.pos + 1] == '=') {
+                L.pos++;
+                L.coluna_atual++;
+                L.tk.tipo = T_MAIS_IGUAL;
             } else L.tk.tipo = T_MAIS;
         break;
         case '-': 
@@ -474,11 +485,33 @@ void proximoToken() {
                 L.tk.tipo = T_MENOS_MENOS;
                 L.pos++;
                 L.coluna_atual++;
+            } else if(L.fonte[L.pos + 1] == '=') {
+                L.pos++;
+                L.coluna_atual++;
+                L.tk.tipo = T_MENOS_IGUAL;
             } else L.tk.tipo = T_MENOS;
         break;
-        case '*': L.tk.tipo = T_VEZES; break;
-        case '/': L.tk.tipo = T_DIV; break;
-        case '%': L.tk.tipo = T_PORCEN; break;
+        case '*':
+            if(L.fonte[L.pos + 1] == '=') {
+                L.pos++;
+                L.coluna_atual++;
+                L.tk.tipo = T_VEZES_IGUAL;
+            } else L.tk.tipo = T_VEZES;
+        break;
+        case '/':
+            if(L.fonte[L.pos + 1] == '=') {
+                L.pos++;
+                L.coluna_atual++;
+                L.tk.tipo = T_DIV_IGUAL;
+            } else L.tk.tipo = T_DIV;
+        break;
+        case '%':
+            if(L.fonte[L.pos + 1] == '=') {
+                L.pos++;
+                L.coluna_atual++;
+                L.tk.tipo = T_PORCEN_IGUAL;
+            } else L.tk.tipo = T_PORCEN;
+        break;
         case '>':
             if(L.fonte[L.pos + 1] == '=') {
                 L.tk.tipo = T_MAIOR_IGUAL;
@@ -524,6 +557,12 @@ void proximoToken() {
             L.pos++;
             L.coluna_atual++;
         } else L.tk.tipo = T_OU;
+        break;
+        case '?':
+            L.tk.tipo = T_INTERROGACAO;
+        break;
+        case ':':
+            L.tk.tipo = T_DOIS_PONTOS;
         break;
         default: fatal("Símbolo inválido"); break;
     }
@@ -807,9 +846,9 @@ void verificar_retorno(FILE* s, int escopo) {
         return;
     }
     TipoToken tipo_exp = expressao(s, escopo);
-    // em funções que retornam ponteiro/array espera T_PONTEIRO
-    if(funcs[fn_cnt - 1].retorno == T_PONTEIRO) {
-        if(tipo_exp != T_PONTEIRO) fatal("[verificar_retorno] retorno deve ser ponteiro ou endereço");
+    // em funções que retornam ponteiro/array espera T_PONTEIRO ou T_TEX
+    if(funcs[fn_cnt - 1].retorno == T_PONTEIRO || funcs[fn_cnt - 1].retorno == T_TEX) {
+        if(tipo_exp != T_PONTEIRO && tipo_exp != T_TEX) fatal("[verificar_retorno] retorno deve ser ponteiro ou endereço");
     } else if(!tipos_compativeis(funcs[fn_cnt - 1].retorno, tipo_exp)) {
         fatal("[verificar_retorno] tipo de retorno incompatível");
     }
@@ -868,9 +907,9 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
         }
         if(!campo) fatal("[verificar_atribuicao] campo não encontrado");
         
-        // acesso a array(campo[índice])
+        // acesso a array(campo[indice])
         if(L.tk.tipo == T_COL_ESQ && campo->eh_array) {
-            // Processa índice
+            // processa indice
             excessao(T_COL_ESQ);
             expressao(s, escopo); // indice em w0
             fprintf(s, "  str w0, [sp, -16]!\n"); // salva indice
@@ -967,60 +1006,131 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
     if(var->eh_final) fatal("[verificar_atribuicao] não é possível alterar uma variável final");
     if(var->eh_array) fatal("[verificar_atribuicao] não é possível armazenar valor direto em array");
     
-    excessao(T_IGUAL);
+    // verifica qual operador de atribuição foi usado
+    TipoToken op_atrib = L.tk.tipo;
+    TipoToken op_aritmetico = T_FIM;
     
-    TipoToken tipo_exp = expressao(s, escopo);
+    if(op_atrib == T_MAIS_IGUAL) op_aritmetico = T_MAIS;
+    else if(op_atrib == T_MENOS_IGUAL) op_aritmetico = T_MENOS;
+    else if(op_atrib == T_VEZES_IGUAL) op_aritmetico = T_VEZES;
+    else if(op_atrib == T_DIV_IGUAL) op_aritmetico = T_DIV;
+    else if(op_atrib == T_PORCEN_IGUAL) op_aritmetico = T_PORCEN;
+    else if(op_atrib != T_IGUAL) {
+        fatal("[verificar_atribuicao] operador de atribuição esperado");
+    }
+    proximoToken(); // consome o operador
     
-    // determina o tipo do registrador baseado no tipo da variavel
-    char reg_tipo;
-    int reg_num;
-    
-    if(var->tipo_base == T_pFLU) reg_tipo = 's';
-    else if(var->tipo_base == T_pDOBRO) reg_tipo = 'd';
-    else if(var->tipo_base == T_pLONGO || var->tipo_base == T_PONTEIRO) reg_tipo = 'x';
-    else reg_tipo = 'w';
-    
-    // tenta alocar um registrador temporario
-    reg_num = alocar_reg(reg_tipo);
-    
-    if(reg_num >= 0) {
-        // tem registrador disponivel
-        if(debug_o) printf("[verificar_atribuicao]: usando registrador %c%d pra valor temporário\n", reg_tipo, reg_num);
-        
-        // move o resultado da expressão pra o registrador temporario
-        if(reg_tipo == 's') {
-            fprintf(s, "  fmov s%d, s0\n", reg_num);
-        } else if(reg_tipo == 'd') {
-            fprintf(s, "  fmov d%d, d0\n", reg_num);
-        } else if(reg_tipo == 'x') {
-            fprintf(s, "  mov x%d, x0\n", reg_num);
-        } else {
-            fprintf(s, "  mov w%d, w0\n", reg_num);
-        }
-        // armazena o valor
-        if(var->eh_ponteiro) {
-            fprintf(s, "  str x0, [x29, %d]\n", var->pos);
-        } else {
-            // restaura do registrador temporario antes de armazenar
-            if(reg_tipo == 's') {
-                fprintf(s, "  fmov s0, s%d\n", reg_num);
-            } else if(reg_tipo == 'd') {
-                fprintf(s, "  fmov d0, d%d\n", reg_num);
-            } else if(reg_tipo == 'x') {
-                fprintf(s, "  mov x0, x%d\n", reg_num);
-            } else {
-                fprintf(s, "  mov w0, w%d\n", reg_num);
+    if(op_aritmetico != T_FIM) {
+        // atribuição composta: var += expr, var -= expr, etc
+        // primeiro carrega o valor atual da variavel
+        if(var->escopo == -1) {
+            if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE) {
+                fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+                fprintf(s, "  ldrb w0, [x0]\n");
+            } else if(var->tipo_base == T_pINT) {
+                fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+                fprintf(s, "  ldr w0, [x0]\n");
+            } else if(var->tipo_base == T_pFLU) {
+                fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+                fprintf(s, "  ldr s0, [x0]\n");
+            } else if(var->tipo_base == T_pDOBRO) {
+                fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+                fprintf(s, "  ldr d0, [x0]\n");
+            } else if(var->tipo_base == T_pLONGO || var->eh_ponteiro) {
+                fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+                fprintf(s, "  ldr x0, [x0]\n");
             }
-            armazenar_valor(s, var);
-        }
-        // libera o registrador
-        liberar_reg(reg_tipo, reg_num);
-    } else {
-        // sem registradores disponiveis, usa pilha
-        if(var->eh_ponteiro) {
-            fprintf(s, "  str x0, [x29, %d]\n", var->pos);
         } else {
-            armazenar_valor(s, var);
+            if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE) {
+                fprintf(s, "  ldrb w0, [x29, %d]\n", var->pos);
+            } else if(var->tipo_base == T_pINT) {
+                fprintf(s, "  ldr w0, [x29, %d]\n", var->pos);
+            } else if(var->tipo_base == T_pFLU) {
+                fprintf(s, "  ldr s0, [x29, %d]\n", var->pos);
+            } else if(var->tipo_base == T_pDOBRO) {
+                fprintf(s, "  ldr d0, [x29, %d]\n", var->pos);
+            } else if(var->tipo_base == T_pLONGO || var->eh_ponteiro) {
+                fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+            }
+        }
+        // salva o valor atual na pilha
+        if(var->tipo_base == T_pFLU) fprintf(s, "  str s0, [sp, -16]!\n");
+        else if(var->tipo_base == T_pDOBRO) fprintf(s, "  str d0, [sp, -16]!\n");
+        else if(var->tipo_base == T_pLONGO || var->eh_ponteiro) fprintf(s, "  str x0, [sp, -16]!\n");
+        else fprintf(s, "  str w0, [sp, -16]!\n");
+        
+        // processa a expressão do lado direito
+        TipoToken tipo_exp = expressao(s, escopo);
+        
+        // recupera o valor original em registrador alternativo
+        if(var->tipo_base == T_pFLU) fprintf(s, "  ldr s1, [sp], 16\n");
+        else if(var->tipo_base == T_pDOBRO) fprintf(s, "  ldr d1, [sp], 16\n");
+        else if(var->tipo_base == T_pLONGO || var->eh_ponteiro) fprintf(s, "  ldr x1, [sp], 16\n");
+        else fprintf(s, "  ldr w1, [sp], 16\n");
+        
+        // converte tipos se necessario
+        TipoToken tipo_final = converter_tipos(s, var->tipo_base, tipo_exp);
+        
+        // aplica a operação aritmetica
+        gerar_operacao(s, op_aritmetico, tipo_final);
+        
+        // armazena o resultado de volta na variavel
+        armazenar_valor(s, var);
+    } else {
+        // atribuição simples: var = expr
+        TipoToken tipo_exp = expressao(s, escopo);
+        
+        // determina o tipo do registrador baseado no tipo da variavel
+        char reg_tipo;
+        int reg_num;
+        
+        if(var->tipo_base == T_pFLU) reg_tipo = 's';
+        else if(var->tipo_base == T_pDOBRO) reg_tipo = 'd';
+        else if(var->tipo_base == T_pLONGO || var->tipo_base == T_PONTEIRO) reg_tipo = 'x';
+        else reg_tipo = 'w';
+        
+        // tenta alocar um registrador temporario
+        reg_num = alocar_reg(reg_tipo);
+        
+        if(reg_num >= 0) {
+            // tem registrador disponivel
+            if(debug_o) printf("[verificar_atribuicao]: usando registrador %c%d pra valor temporário\n", reg_tipo, reg_num);
+            
+            // move o resultado da expressão pra o registrador temporario
+            if(reg_tipo == 's') {
+                fprintf(s, "  fmov s%d, s0\n", reg_num);
+            } else if(reg_tipo == 'd') {
+                fprintf(s, "  fmov d%d, d0\n", reg_num);
+            } else if(reg_tipo == 'x') {
+                fprintf(s, "  mov x%d, x0\n", reg_num);
+            } else {
+                fprintf(s, "  mov w%d, w0\n", reg_num);
+            }
+            // armazena o valor
+            if(var->eh_ponteiro) {
+                fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+            } else {
+                // restaura do registrador temporario antes de armazenar
+                if(reg_tipo == 's') {
+                    fprintf(s, "  fmov s0, s%d\n", reg_num);
+                } else if(reg_tipo == 'd') {
+                    fprintf(s, "  fmov d0, d%d\n", reg_num);
+                } else if(reg_tipo == 'x') {
+                    fprintf(s, "  mov x0, x%d\n", reg_num);
+                } else {
+                    fprintf(s, "  mov w0, w%d\n", reg_num);
+                }
+                armazenar_valor(s, var);
+            }
+            // libera o registrador
+            liberar_reg(reg_tipo, reg_num);
+        } else {
+            // sem registradores disponiveis, usa pilha
+            if(var->eh_ponteiro) {
+                fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+            } else {
+                armazenar_valor(s, var);
+            }
         }
     }
 }
@@ -1498,7 +1608,7 @@ void verificar_enq(FILE* s, int escopo) {
 
 void verificar_stmt(FILE* s, int* pos, int escopo) {
     if(escopo == 0) escopo = escopo_global;
-    
+    if(debug_o) printf("[verificar_stmt]: token tipo: %s", token_str(L.tk.tipo));
     while(L.tk.tipo == T_COMENTARIO) proximoToken();
     int eh_final = 0;
     if(L.tk.tipo == T_FINAL) {
@@ -1708,7 +1818,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                 return;
             }
             // agora verifica se é uma atribuição(n.i = 0)
-            if(L.tk.tipo == T_IGUAL) {
+            if(eh_atribuicao(L.tk.tipo)) {
                 // concatena pra passar pra verificar_atribuicao
                 char nome_completo[128];
                 snprintf(nome_completo, sizeof(nome_completo), "%s.%s", var_nome, campo_nome);
@@ -1717,7 +1827,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                 return;
             }
         }
-        if(L.tk.tipo == T_IGUAL) {
+        if(eh_atribuicao(L.tk.tipo)) {
             verificar_atribuicao(s, idn, escopo);
             if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
             return;
@@ -2453,6 +2563,28 @@ TipoToken tratar_chamada_funcao(FILE* s, int escopo, const char* nome, Funcao* f
         do {
             param_tipos[param_conta] = expressao(s, escopo);
             
+            if(param_conta < fn->var_conta) {
+                Variavel* param_esperado = &fn->vars[param_conta];
+                TipoToken tipo_esperado = param_esperado->tipo_base;
+                TipoToken tipo_fornecido = param_tipos[param_conta];
+                
+                // so converte se:
+                // 1. não for array
+                // 2. tipos esperado e fornecido não forem ponteiros
+                // 3. tipos forem diferentes
+                int eh_array = param_esperado->eh_array;
+                int eh_ponteiro = (tipo_esperado == T_PONTEIRO || tipo_fornecido == T_PONTEIRO ||
+                tipo_esperado == T_TEX || tipo_fornecido == T_TEX);
+                
+                if(!eh_array && !eh_ponteiro && tipo_esperado != tipo_fornecido) {
+                    if(debug_o) {
+                        printf("[tratar_chamada_funcao]: convertendo param %d de %s para %s\n",
+                        param_conta, token_str(tipo_fornecido), token_str(tipo_esperado));
+                    }
+                    gerar_convert(s, tipo_fornecido, tipo_esperado);
+                    param_tipos[param_conta] = tipo_esperado;
+                }
+            }
             // salva o valor atual(ta em x0/w0/s0/d0)
             if(param_tipos[param_conta] == T_pFLU) {
                 fprintf(s, "  str s0, [sp, -16]!  // salva param %d (float)\n", param_conta);
@@ -2789,7 +2921,7 @@ int processar_var_tam(int escopo) {
 }
 
 TipoToken fator(FILE* s, int escopo) {
-    if(L.tk.tipo == T_CONVERT) {
+    if(L.tk.tipo == T_CONVERTA) {
         char* tipo_destino_str = L.tk.lex;
         TipoToken tipo_destino;
         // converte texto pra TipoToken
@@ -3022,6 +3154,7 @@ TipoToken expressao(FILE* s, int escopo) {
             L.tk = tk_salvo;
         }
     }
+    
     // processa primeiro nível: comparações e operadores aritmeticos
     TipoToken tipo = termo(s, escopo);
     
@@ -3183,6 +3316,39 @@ TipoToken expressao(FILE* s, int escopo) {
         
         tipo = converter_tipos(s, tipo, tipo_dir);
         gerar_operacao(s, op, tipo);
+    }
+    // operador ternario: condição ? valor_verdadeiro : valor_falso
+    if(L.tk.tipo == T_INTERROGACAO) {
+        if(debug_o) printf("[expressao]: processando operador ternário\n");
+        proximoToken();
+        
+        // a condição ja ta em w0/x0
+        // gera labels únicos
+        static int ternario_id = 0;
+        int id_atual = ternario_id++;
+        
+        // testa a condição
+        if(tipo == T_pFLU) fprintf(s, "  fcmp s0, 0.0\n");
+        else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d0, 0.0\n");
+        else if(tipo == T_pLONGO || tipo == T_PONTEIRO) fprintf(s, "  cmp x0, 0\n");
+        else fprintf(s, "  cmp w0, 0\n");
+        fprintf(s, "  beq .ternario_falso_%d\n", id_atual);
+        
+        // caso verdadeiro
+        TipoToken tipo_verdadeiro = expressao(s, escopo);
+        fprintf(s, "  b .ternario_fim_%d\n", id_atual);
+        
+        // verifica o :
+        excessao(T_DOIS_PONTOS);
+        
+        // caso falso
+        fprintf(s, ".ternario_falso_%d:\n", id_atual);
+        TipoToken tipo_falso = expressao(s, escopo);
+        
+        fprintf(s, ".ternario_fim_%d:\n", id_atual);
+        
+        // converte tipos se necessario
+        tipo = converter_tipos(s, tipo_verdadeiro, tipo_falso);
     }
     return tipo;
 }

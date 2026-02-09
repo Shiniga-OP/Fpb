@@ -8,6 +8,7 @@ suportados
 #incluir "biblis/mem.asm";
 #incluir "biblis/sistema.asm"; // .asm e .s são colados no intermediario
 #incluir "biblis/cvts.fpb"; // .fpb e .FPB são colados durante a compilação
+#incluir "biblis/mat.fpb"; // biblioteca de matematica
 
 // macro:
 #def TAM 14;
@@ -32,6 +33,7 @@ vazio testeMatrizes();
 vazio testeEspaco();
 vazio testeConversao();
 vazio testeAsm();
+vazio testeMat();
 
 vazio memcp(car[] array, car* p, int tam);
 
@@ -103,10 +105,11 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     testeEspaco();
     testeConversao();
     testeAsm();
+    testeMat();
 }
 
 vazio testeOperacoes() {
-    escrever("\n\nTeste de operações matematicas:\n\n");
+    escrever("\nTeste de operações matematicas:\n\n");
     // testando ordem de precedencia:
     escrever("operação 5 + 5 * 5, esperado: 30, veio: ", 5 + 5 * 5, '\n');
     escrever("operação (5 + 5) * 5, esperado: 50, veio: ", (5 + 5) * 5, '\n');
@@ -124,6 +127,24 @@ vazio testeOperacoes() {
     escrever("124 & 15, resultado: ", 124 & 15, "\n");
     escrever("124 & 0xF, resultado: ", 124 & 0xF, "\n");
     escrever("1 | 2, resultado: ", 1 | 2, '\n');
+    
+    escrever("\nTeste de atribuições compostas:\n\n");
+    x += 1.5f;
+    
+    escrever("x = 0.5f, x += 1.5f, x agora é ", x, '\n');
+    x *= 2;
+    
+    escrever("x = 2.0f, x *= 2, x agora é ", x, '\n');
+    x -= 2;
+    
+    escrever("x = 4.0f, x -= 2, x agora é ", x, '\n');
+    x /= 2;
+    
+    escrever("x = 2.0f, x /= 2, x agora é ", x, '\n');
+    int x2 = 10
+    x2 %= 5;
+    
+    escrever("x2 = 10, x2 %= 5, x2 agora é ", x2, '\n');
 }
 
 vazio testeComparacoes() {
@@ -157,10 +178,14 @@ vazio testeComparacoes() {
         escrever("texto 1 não é igual a texto 2\n");
     }
     se(texcmp(t1, t1)) {
-        escrever("o primeiro texto é texto 1");
+        escrever("o primeiro texto é texto 1\n");
     } senao {
-        escrever("o primeiro texto não é texto 1");
+        escrever("o primeiro texto não é texto 1\n");
     }
+    escrever("\nTeste de operador Ternário:\n\n");
+    
+    int x = 5 > 6 ? 10 : 20;
+    escrever("int x = 5 > 6 ? 10 : 20; x é igual a = ", x, '\n');
 }
 
 vazio testeMemoria() {
@@ -168,9 +193,9 @@ vazio testeMemoria() {
     car[] array = "texto";
     escrever("\nvalor do array: ", array);
     array[0] = 'X';
-    escrever("\narray mudado no indice 0: ", array);
+    escrever("\narray mudado no indice 0: ", array, '\n');
     
-    escrever("\n\nTeste de ponteiro:\n\n");
+    escrever("\nTeste de ponteiro:\n\n");
     int x1 = 10;
     escrever("int x1 = 10; int* p1 = @x1;\n");
     int* p1 = @x1;
@@ -187,7 +212,7 @@ vazio testeMemoria() {
     se(i >= 0) escrever("\no ponteiro tem t no indice: ", i);
     senao escrever("\no ponteiro não tem t\n");
     
-    escrever("\nTeste de manipulação da memoria:\n");
+    escrever("\nTeste de manipulação da memoria:\n\n");
     
     car* p = "XxXmplo maior";
     
@@ -199,9 +224,9 @@ vazio testeMemoria() {
     
     subscar(array2, 'X', 'e');
     
-    escrever("\nArray usando subscar(array2, 'X', 'e'): ", array2);
+    escrever("\nArray usando subscar(array2, 'X', 'e'): ", array2, '\n');
     
-    escrever("\nTeste de acesso a itens array:\n");
+    escrever("\nTeste de acesso a itens array:\n\n");
     car ca = array2[0];
     escrever("item do indice 0 do array: ", ca, '\n');
     
@@ -218,8 +243,8 @@ vazio testeMemoria() {
 }
 
 vazio testeLoops() {
-    escrever("\n\nTeste de loops:");
-    escrever("\nEnquanto:");
+    escrever("\nTeste de loops:");
+    escrever("\nLoop Enquanto:");
     int i = 0;
     enq(i < 10) {
         escrever("\nvalor de i: ", i);
@@ -242,7 +267,7 @@ vazio testeLoops() {
 }
 
 vazio testeMatrizes() {
-    escrever("\n\nTeste de matrizes:\n\n");
+    escrever("\nTeste de matrizes:\n\n");
     int[][] m2 = { {0, 1, 4}, {4, 1, 0} };
     escrever("matriz 2D int m2[0][1]: ", m2[0][1], '\n');
     flu[][] m2f = { {3f, 5f, 7f}, {2f, 9f, 10f} };
@@ -280,4 +305,16 @@ vazio testeAsm() {
         "   mov x8, 64\n",
         "   svc 0\n"
     );
+}
+
+vazio testeMat() {
+    escrever("\nTeste da biblioteca de matematica:\n\n")
+    escrever("ftanh(0.5f) = ", ftanh(0.5f), '\n');
+    escrever("fexp(0.8f) = ", fexp(0.8f), '\n');
+    escrever("fraiz(25f) = ", fraiz(25f), '\n');
+    escrever("PI = ", PI, '\n');
+    escrever("E = ", E, '\n');
+    escrever("RAIZ2 = ", RAIZ2, '\n');
+    escrever("LOG2E = ", LOG2E, '\n');
+    escrever("LOGE10 = ", LOGE10, '\n');
 }

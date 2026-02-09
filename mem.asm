@@ -1,73 +1,6 @@
 .section .text
 
 // inicio de biblis/impressao.asm
-// fn: [_escrever_tex]
-.align 2
-_escrever_tex:
-    mov x1, x0 // x1 = texto
-    mov x2, 0 // x2 = contador
-    // conta caracteres ate encontrar nulo
-1:
-    ldrb w3, [x1, x2]
-    cbz w3, 2f
-    add x2, x2, 1
-    b 1b
-2:
-    mov x0, 1
-    mov x8, 64
-    svc 0
-    ret
-// fim: [_escrever_tex]
-// fn: [_escrever_int]
-.align 2
-_escrever_int:
-    mov w1, w0 // w1 = numero
-    ldr x0, = 5f // x0 = buffer
-    mov x19, 0 // x19 = contador de caracteres
-    
-    cmp w1, 0
-    b.ge 1f
-    neg w1, w1 // torna positivo
-    mov w2, '-'
-    strb w2, [x0], 1 // escreve sinal
-    mov x19, 1 // contador = 1
-1:
-    // escreve dígitos em ordem reversa
-    mov x2, x0 // x2: aponta pra posição atual
-2:
-    mov w3, 10
-    udiv w4, w1, w3 // w4 = quociente
-    msub w5, w4, w3, w1 // w5 = resto
-    add w5, w5, '0' // caractere
-    strb w5, [x2], 1 // armazena
-    add x19, x19, 1 // incrementa contador
-    mov w1, w4
-    cbnz w1, 2b
-    // inverte a string de dígitos(a parte após o sinal, se existir)
-    // x0: aponta pro início dos dígitos(pode ser buffer_int ou buffer_int+1)
-    // x2-1: é o último dígito
-    sub x2, x2, 1 // x2 aponta para o último dígito
-    mov x3, x0 // x3 aponta para o primeiro dígito
-3:
-    cmp x3, x2
-    b.ge 4f
-    ldrb w4, [x3]
-    ldrb w5, [x2]
-    strb w5, [x3], 1
-    strb w4, [x2], -1
-    b 3b
-4:
-    ldr x1, = 5f
-    mov x0, 1
-    mov x2, x19 // x19: o número de caracteres
-    mov x8, 64
-    svc 0
-    ret
-.section .data
-  .align 2
-5: // buffer do inteiro
-    .fill   32, 1, 0
-// fim: [_escrever_int]
 // fn: [_escrever_flu] (vars: 176, total: 320)
 .align 2
 _escrever_flu:
@@ -166,54 +99,6 @@ _escrever_flu:
 1:
     .float 100.0
 // fim: [_escrever_flu]
-// fn: [_escrever_longo]
-.align 2
-_escrever_longo:
-    mov x1, x0 // x1 = numero(64 bits)
-    ldr x0, =5f // x0 = buffer
-    mov x19, 0 // x19 = contador de caracteres
-    
-    cmp x1, 0 // compara 64 bits
-    b.ge 1f
-    neg x1, x1 // torna positivo(64 bits)
-    mov w2, '-'
-    strb w2, [x0], 1 // escreve sinal(w2 é 32 bits)
-    mov x19, 1 // contador = 1
-1:
-    // escreve digitos em ordem reversa
-    mov x2, x0 // x2: aponta pra posição atual
-2:
-    mov x3, 10
-    udiv x4, x1, x3 // x4 = quociente(64 bits)
-    msub x5, x4, x3, x1 // x5 = resto(64 bits)
-    add w5, w5, '0' // converte resto pra caractere (w5)
-    strb w5, [x2], 1 // armazena o byte(w5)
-    add x19, x19, 1 // incrementa contador
-    mov x1, x4
-    cbnz x1, 2b // continua se x1 != 0
-    // inverte o texto de digitos
-    sub x2, x2, 1 // x2 aponta para o ultimo digito
-    mov x3, x0 // x3 aponta para o primeiro digito
-3:
-    cmp x3, x2
-    b.ge 4f
-    ldrb w4, [x3] // carrega byte(w4)
-    ldrb w5, [x2] // carrega byte(w5)
-    strb w5, [x3], 1 // armazena byte(w5)
-    strb w4, [x2], -1 // armazena byte(w4)
-    b 3b
-4:
-    ldr     x1, = 5f
-    mov     x0, 1
-    mov     x2, x19 // x19: o numero de caracteres
-    mov x8, 64
-    svc 0
-    ret
-.section .data
-  .align 2
-5: // buffer do inteiro
-    .fill   32, 1, 0
-// fim: [_escrever_longo]
 // fn: [_escrever_car]
 .align 2
 _escrever_car:
@@ -226,77 +111,394 @@ _escrever_car:
     add sp, sp, 1
     ret
 // fim: [_escrever_car]
-// fn: [_escrever_bool]
-.align 2
-_escrever_bool:
-    cmp w0, 0
-    b.eq 1f
-    adr x1, 3f
-    mov x2, 7
-    b 2f
-1:
-    adr x1, 4f
-    mov x2, 5
-2:
-    mov x0, 1
-    mov x8, 64
-    svc 0
-    ret
-// buffers do booleano
-3:
-    .asciz "verdade"
-4:
-    .asciz "falso"
-// fim: [_escrever_bool]
 // fim de biblis/impressao.asm
 
-.global inicio
-// fn: [inicio] (vars: 32, total: 160)
+
+// inicio de biblis/mat.fpb
+// fn: [ftanh] (vars: 64, total: 240)
 .align 2
-inicio:
-  sub sp, sp, 160
-  stp x29, x30, [sp, 144]
-  add x29, sp, 144
-  mov w0, 0
+ftanh:
+  sub sp, sp, 240
+  stp x29, x30, [sp, 224]
+  add x29, sp, 224
+  stp x19, x20, [x29, -16]
+  stp x21, x22, [x29, -32]
+  str d0, [x29, -48]  // param x
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, lt
   mov w19, w0
-  str x0, [x29, -32]
-  mov w0, 0
-  mov w19, w0
-  str x0, [x29, 144]
+  mov w0, w19
+  cmp w0, 0
+  beq .B0
+  ldr s0, [x29, -48]
+  fneg s0, s0
+  str s0, [sp, -16]!  // salva param 0 (float)
+  ldr s0, [sp, 0]  // carrega param 0 (flu) em s0
+  add sp, sp, 16  // limpa temporarios
+  bl ftanh
+  fmov s0, s0
+  fneg s0, s0
+  b 1f
+  b .B1
+.B0:
 .B1:
-  ldr x0, [x29, 144]
-  mov x19, x0
-  movz x0, 61568, lsl 0
-  movk x0, 762, lsl 16
-  mov x1, x19
-  cmp x1, x0
-  cset x0, lt
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_1
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, gt
   mov w19, w0
   mov w0, w19
   cmp w0, 0
   beq .B2
-  ldr x0, [x29, -32]
-  str x0, [sp, -16]!
-  ldr x0, [x29, 144]
-  ldr x1, [sp], 16
-  add x0, x1, x0
-  mov x19, x0
-  mov x0, x19
-  str x0, [x29, -32]
-  ldr x0, [x29, 144]
-  add x0, x0, 1
-  str x0, [x29, 144]
-  b .B1
+  ldr x0, = const_2
+  ldr s0, [x0]
+  b 1f
+  b .B3
 .B2:
-  ldr x0, [x29, -32]
-  bl _escrever_longo
+.B3:
+  ldr x0, = const_2
+  ldr s0, [x0]
+  fmov s19, s0
+  str s0, [x29, -80]
+  ldr x0, = const_2
+  ldr s0, [x0]
+  fmov s19, s0
+  str s0, [x29, -96]
+  ldr x0, = const_3
+  ldr s0, [x0]
+  fmov s19, s0  // salva em reg
+  ldr s0, [x29, -48]
+  fmov s1, s19  // restaura do reg
+  fmul s0, s1, s0
+  fmov s19, s0
+  str s0, [x29, -112]
+  mov w0, 1
+  mov w19, w0
+  str w0, [x29, 224]
+.B5:
+  ldr w0, [x29, 224]
+  mov w19, w0
+  mov w0, 16
+  mov w1, w19
+  cmp w1, w0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B6
+  ldr s0, [x29, -96]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -112]
+  fmov s19, s0  // salva em reg
+  ldr w0, [x29, 224]
+  scvtf s0, w0
+  fmov s1, s19  // restaura do reg
+  fdiv s0, s1, s0
+  ldr s1, [sp], 16
+  fmul s0, s1, s0
+  str s0, [x29, -96]
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -96]
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  str s0, [x29, -80]
+  ldr w0, [x29, 224]
+  add w0, w0, 1
+  str w0, [x29, 224]
+  b .B5
+.B6:
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr x0, = const_2
+  ldr s0, [x0]
+  ldr s1, [sp], 16
+  fsub s0, s1, s0
+  fmov s19, s0  // salva em reg
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr x0, = const_2
+  ldr s0, [x0]
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  fmov s1, s19  // restaura do reg
+  fdiv s0, s1, s0
+  b 1f
   b 1f
 // epilogo
 1:
-  ldp x29, x30, [sp, 144]
-  add sp, sp, 160
+  ldp x19, x20, [x29, -16]
+  ldp x21, x22, [x29, -32]
+  ldp x29, x30, [sp, 224]
+  add sp, sp, 240
+  ret
+// fim: [ftanh]
+// fn: [fexp] (vars: 48, total: 224)
+.align 2
+fexp:
+  sub sp, sp, 224
+  stp x29, x30, [sp, 208]
+  add x29, sp, 208
+  stp x19, x20, [x29, -16]
+  stp x21, x22, [x29, -32]
+  str d0, [x29, -48]  // param x
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, eq
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B7
+  ldr x0, = const_2
+  ldr s0, [x0]
+  b 1f
+  b .B8
+.B7:
+.B8:
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B9
+  ldr x0, = const_2
+  ldr s0, [x0]
+  fmov s19, s0  // salva em reg
+  ldr s0, [x29, -48]
+  fneg s0, s0
+  str s0, [sp, -16]!  // salva param 0 (float)
+  ldr s0, [sp, 0]  // carrega param 0 (flu) em s0
+  add sp, sp, 16  // limpa temporarios
+  bl fexp
+  fmov s0, s0
+  fmov s1, s19  // restaura do reg
+  fdiv s0, s1, s0
+  b 1f
+  b .B10
+.B9:
+.B10:
+  ldr x0, = const_2
+  ldr s0, [x0]
+  fmov s19, s0
+  str s0, [x29, -80]
+  ldr x0, = const_2
+  ldr s0, [x0]
+  fmov s19, s0
+  str s0, [x29, -96]
+  mov w0, 1
+  mov w19, w0
+  str w0, [x29, 208]
+.B12:
+  ldr w0, [x29, 208]
+  mov w19, w0
+  mov w0, 16
+  mov w1, w19
+  cmp w1, w0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B13
+  ldr s0, [x29, -96]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -48]
+  fmov s19, s0  // salva em reg
+  ldr w0, [x29, 208]
+  scvtf s0, w0
+  fmov s1, s19  // restaura do reg
+  fdiv s0, s1, s0
+  ldr s1, [sp], 16
+  fmul s0, s1, s0
+  str s0, [x29, -96]
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -96]
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  fmov s19, s0
+  fmov s0, s19
+  str s0, [x29, -80]
+  ldr w0, [x29, 208]
+  add w0, w0, 1
+  str w0, [x29, 208]
+  b .B12
+.B13:
+  ldr s0, [x29, -80]
+  b 1f
+  b 1f
+// epilogo
+1:
+  ldp x19, x20, [x29, -16]
+  ldp x21, x22, [x29, -32]
+  ldp x29, x30, [sp, 208]
+  add sp, sp, 224
+  ret
+// fim: [fexp]
+// fn: [fraiz] (vars: 32, total: 208)
+.align 2
+fraiz:
+  sub sp, sp, 208
+  stp x29, x30, [sp, 192]
+  add x29, sp, 192
+  stp x19, x20, [x29, -16]
+  stp x21, x22, [x29, -32]
+  str d0, [x29, -48]  // param x
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B14
+  ldr x0, = const_0
+  ldr s0, [x0]
+  b 1f
+  b .B15
+.B14:
+.B15:
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  ldr x0, = const_0
+  ldr s0, [x0]
+  fmov s1, s19
+  fcmp s1, s0
+  cset w0, eq
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B16
+  ldr x0, = const_0
+  ldr s0, [x0]
+  b 1f
+  b .B17
+.B16:
+.B17:
+  ldr s0, [x29, -48]
+  fmov s19, s0
+  str s0, [x29, -80]
+  mov w0, 0
+  mov w19, w0
+  str w0, [x29, 192]
+.B19:
+  ldr w0, [x29, 192]
+  mov w19, w0
+  mov w0, 10
+  mov w1, w19
+  cmp w1, w0
+  cset w0, lt
+  mov w19, w0
+  mov w0, w19
+  cmp w0, 0
+  beq .B20
+  ldr x0, = const_4
+  ldr s0, [x0]
+  fmov s19, s0  // salva em reg
+  ldr s0, [x29, -80]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -48]
+  str s0, [sp, -16]!
+  ldr s0, [x29, -80]
+  ldr s1, [sp], 16
+  fdiv s0, s1, s0
+  ldr s1, [sp], 16
+  fadd s0, s1, s0
+  fmov s1, s19  // restaura do reg
+  fmul s0, s1, s0
+  fmov s19, s0
+  fmov s0, s19
+  str s0, [x29, -80]
+  ldr w0, [x29, 192]
+  add w0, w0, 1
+  str w0, [x29, 192]
+  b .B19
+.B20:
+  ldr s0, [x29, -80]
+  b 1f
+  b 1f
+// epilogo
+1:
+  ldp x19, x20, [x29, -16]
+  ldp x21, x22, [x29, -32]
+  ldp x29, x30, [sp, 192]
+  add sp, sp, 208
+  ret
+// fim: [fraiz]
+
+// fim de biblis/mat.fpb
+
+.global inicio
+// fn: [inicio] (vars: 0, total: 128)
+.align 2
+inicio:
+  sub sp, sp, 128
+  stp x29, x30, [sp, 112]
+  add x29, sp, 112
+  mov w0, 25
+  scvtf s0, w0
+  str s0, [sp, -16]!  // salva param 0 (float)
+  ldr s0, [sp, 0]  // carrega param 0 (flu) em s0
+  add sp, sp, 16  // limpa temporarios
+  bl fraiz
+  fmov s0, s0
+  bl _escrever_flu
+  mov w0, 10
+  bl _escrever_car
+  b 1f
+// epilogo
+1:
+  ldp x29, x30, [sp, 112]
+  add sp, sp, 128
   mov x0, 0
   mov x8, 93
   svc 0
   ret
 // fim: [inicio]
+  .section .rodata
+  .align 8
+const_0:
+  .float 0.000000
+const_1:
+  .float 4.000000
+const_2:
+  .float 1.000000
+const_3:
+  .float 2.000000
+const_4:
+  .float 0.500000
+
+.section .rodata
+.align 3
+global_PI:
+  .float 3.141593
+global_E:
+  .float 2.718282
+global_RAIZ2:
+  .float 1.414214
+global_LOG2E:
+  .float 1.442695
+global_LOGE10:
+  .float 2.302585
+
+.section .rodata
+.align 2

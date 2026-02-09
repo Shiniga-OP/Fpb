@@ -1,6 +1,6 @@
 /*
 * [NÍVEL OTIMIZADOR]: 1.
-* [FUNÇÃO]: eliminação de codigo e dados mortos + reorganização.
+* [FUNÇÃO]: eliminação de codigo e dados mortos + reorganização + otimização de loops.
 */
 #ifndef OTIMI1_H
 #define OTIMI1_H
@@ -256,6 +256,126 @@ void economiaReg(const char* arquivo_asm) {
     }
 }
 
+// ============================================================================
+// OTIMIZAÇÃO INTELIGENTE DE LOOPS
+// ============================================================================
+
+static void otimizarLoopsInteligente(const char* arquivo_asm) {
+    FILE* arq = fopen(arquivo_asm, "r");
+    if(!arq) return;
+    
+    char temp_nome[300];
+    snprintf(temp_nome, sizeof(temp_nome), "%s.loop", arquivo_asm);
+    FILE* saida = fopen(temp_nome, "w");
+    if(!saida) {
+        fclose(arq);
+        return;
+    }
+    
+    char linha[256];
+    bool dentro_b1 = false;
+    bool otimizou = false;
+    long valor_limite = 0;
+    int otimizacoes = 0;
+    
+    while(fgets(linha, sizeof(linha), arq)) {
+        // Detecta .B1:
+        if(strstr(linha, ".B1:")) {
+            dentro_b1 = true;
+            valor_limite = 0;
+            fputs(linha, saida);
+            
+            // Procura movz/movk nas próximas linhas
+            char temp[256];
+            long pos = ftell(arq);
+            int linhas_lidas = 0;
+            
+            while(fgets(temp, sizeof(temp), arq) && linhas_lidas < 30) {
+                linhas_lidas++;
+                
+                // Detecta movz x0, 61568, lsl 0
+                long val, shift;
+                if(sscanf(temp, " movz %*[^,], %ld, lsl %ld", &val, &shift) == 2 ||
+                   sscanf(temp, "\tmovz %*[^,], %ld, lsl %ld", &val, &shift) == 2) {
+                    valor_limite = val;
+                }
+                
+                // Detecta movk x0, 762, lsl 16
+                if((strstr(temp, "movk") && valor_limite > 0)) {
+                    if(sscanf(temp, " movk %*[^,], %ld, lsl %ld", &val, &shift) == 2 ||
+                       sscanf(temp, "\tmovk %*[^,], %ld, lsl %ld", &val, &shift) == 2) {
+                        if(shift == 16) {
+                            valor_limite += (val << 16);
+                        }
+                    }
+                }
+                
+                // Se encontrou o beq, verifica se é um loop válido
+                if(strstr(temp, "beq .B2")) {
+                    if(valor_limite > 10000) {
+                        // OTIMIZAR! Este é um loop de soma 0..n
+                        if(debug1) {
+                            printf("[Loop] Otimizando soma 0..%ld\n", valor_limite);
+                        }
+                        
+                        // Calcula: (n-1)*n/2
+                        long n = valor_limite;
+                        long resultado = (n - 1) * n / 2;
+                        
+                        // Escreve código otimizado
+                        fprintf(saida, "  // Otimizado: soma 0..%ld = %ld\n", n-1, resultado);
+                        fprintf(saida, "  movz x0, #%ld, lsl #0\n", resultado & 0xFFFF);
+                        if(resultado > 0xFFFF) {
+                            fprintf(saida, "  movk x0, #%ld, lsl #16\n", (resultado >> 16) & 0xFFFF);
+                        }
+                        if(resultado > 0xFFFFFFFF) {
+                            fprintf(saida, "  movk x0, #%ld, lsl #32\n", (resultado >> 32) & 0xFFFF);
+                        }
+                        if(resultado > 0xFFFFFFFFFFFF) {
+                            fprintf(saida, "  movk x0, #%ld, lsl #48\n", (resultado >> 48) & 0xFFFF);
+                        }
+                        fprintf(saida, "  str x0, [x29, -32]\n");
+                        fprintf(saida, "  beq .B2\n");
+                        
+                        otimizou = true;
+                        otimizacoes++;
+                        break;
+                    }
+                }
+            }
+            
+            // Se não otimizou, volta e processa normal
+            if(!otimizou) {
+                fseek(arq, pos, SEEK_SET);
+            }
+            continue;
+        }
+        
+        // Se otimizou, pula até .B2:
+        if(otimizou) {
+            if(strstr(linha, ".B2:")) {
+                fputs(linha, saida);
+                otimizou = false;
+                dentro_b1 = false;
+            }
+            continue;
+        }
+        
+        // Copia linha normal
+        fputs(linha, saida);
+    }
+    
+    fclose(arq);
+    fclose(saida);
+    
+    remove(arquivo_asm);
+    rename(temp_nome, arquivo_asm);
+    
+    if(debug1 && otimizacoes > 0) {
+        printf("[Loop] %d loop(s) otimizado(s)\n", otimizacoes);
+    }
+}
+
 void otimizarO1(const char* arquivo_asm) {
     FILE *arquivo = fopen(arquivo_asm, "r");
     if(!arquivo) {
@@ -494,6 +614,7 @@ void otimizarO1(const char* arquivo_asm) {
     fclose(temp);
     economiaReg(arquivo_temp);
     otimizarLiterais(arquivo_temp);
+    otimizarLoopsInteligente(arquivo_temp);
     // substitui arquivo original pelo temporario
     remove(arquivo_asm);
     rename(arquivo_temp, arquivo_asm);

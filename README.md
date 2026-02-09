@@ -350,7 +350,7 @@ caso a biblioteca de impressao.asm não estiver no mesmo ambiente do compilador,
 1. reutilização de constantes.
 2. reutilização de texs.
 3. primeiros 8 parametros sendo passados por registradores.
-4. usando a marcação -O1, será ativado a eliminação de funções não usadas e labels, + reorganização de sintaxe. (beta)
+4. usando a marcação -O1, será ativado a eliminação de funções não usadas e labels, + reorganização de sintaxe. Além da otimização de loops com formúlas aritimetricas mais rapidas. (beta)
 5. a marcação -O2 otimiza ainda mais o código juntando textos chamados para serem imprimidos em sequencia, incluindo a eliminação de código morto da O1. (beta)
 6. alocação de registradores para operações temporarias. (beta)
 # requisitos:
@@ -369,7 +369,7 @@ o compilador é auto suficiente, sem a necessidade de libc.so para binários **g
 
 use *fpb -ajuda* para visualizar todos comandos.
 
-# META ATUAL:
+# META ATUAL (BATIDA!):
 
 ultrapassar a velocidade do C com otimização -O3.
 
@@ -387,25 +387,26 @@ vazio inicio() {
 }
 ~ $ cat perf_final.c
 #include <stdio.h>
-int main() {
- long long sum = 0;
- for(long long i=0; i<50000000L; i++) sum += i;
- printf("%lld\n", sum);
- return 0;
-}
-~ $ fpb perf_final.fpb -O2 -s perf_f
-~ $ clang perf_final.c -O3 -o perf_c
-~ $ time ./perf_f
-1249999975000000
 
-real    0m0.309s
-user    0m0.305s
-sys     0m0.004s
+int main() {
+    long soma = 0;
+    for(long i = 0; i < 50000000; i++) soma += i;
+    printf("%ld\n", soma);
+    return 0;
+}
+~ $ clang perf_final.c -o perf_c -O3
+~ $ fpb perf_final.fpb -s perf_f -O2
 ~ $ time ./perf_c
 1249999975000000
 
 real    0m0.009s
-user    0m0.004s
-sys     0m0.004s
+user    0m0.000s
+sys     0m0.009s
+~ $ time ./perf_f
+1249999975000000
+
+real    0m0.002s
+user    0m0.002s
+sys     0m0.001s
 ~ $
 ```

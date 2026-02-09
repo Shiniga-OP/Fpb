@@ -1,5 +1,8 @@
+#incluir "biblis/impressao.asm";
 #global inicio();
-#global byte cor = 0xFF00FF00;
+
 vazio inicio() {
-    byte corLocal = cor;
+    longo soma = 0;
+    por(longo i=0; i<50000000L; i++) soma = soma + i;
+    escrever(soma);
 }

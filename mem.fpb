@@ -1,7 +1,6 @@
 #incluir "biblis/impressao.asm";
-#incluir "biblis/mat.fpb";
 #global inicio();
 
 vazio inicio() {
-    escrever(fraiz(25), '\n');
+    
 }

@@ -688,13 +688,13 @@ int main(int argc, char** argv) {
     // variaveis de configuração
     char arquivoEntrada[256] = "";
     char arquivoSaida[256] = "";
-    int manter_asm = 0;
-    int semLinkar = 0;
-    int otimizar1 = 0;
-    int otimizar2 = 0;
-    int modoAjuda = 0;
-    int modoVersao = 0;
-    int modoConfig = 0;
+    bool manter_asm = false;
+    bool semLinkar = false;
+    bool otimizar1 = false;
+    bool otimizar2 = false;
+    bool modoAjuda = false;
+    bool modoVersao = false;
+    bool modoConfig = false;
 
     // processa argumentos
     for(int i = 1; i < argc; i++) {
@@ -838,7 +838,7 @@ int main(int argc, char** argv) {
     }
     // limpeza
     if(!manter_asm) remove(asm_s);
-    remove(asm_o);
+    if(!semLinkar) remove(asm_o);
     free(buf);
     liberar_buf();
     return 0;

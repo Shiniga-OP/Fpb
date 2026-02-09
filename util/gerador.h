@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 07/02/2026.
+* [ATUAL]: 09/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // carregar
@@ -427,7 +427,30 @@ void gerar_globais(FILE* s) {
                 int total_bytes = var->bytes;
                 if(var->tipo_base == T_pCAR && var->valor >= 0) {
                     const char* texto_valor = texs[var->valor].valor;
-                    fprintf(s, "  .asciz \"%s\"\n", texto_valor);
+                    fprintf(s, "  .asciz \"");
+                    for(int j = 0; texto_valor[j] != '\0'; j++) {
+                        unsigned char c = texto_valor[j];
+                        switch(c) {
+                            case '\n': fprintf(s, "\\n"); break;
+                            case '\t': fprintf(s, "\\t"); break;
+                            case '\r': fprintf(s, "\\r"); break;
+                            case '\0': fprintf(s, "\\0"); break;
+                            case '\\': fprintf(s, "\\\\"); break;
+                            case '\"': fprintf(s, "\\\""); break;
+                            case '\a': fprintf(s, "\\a"); break;
+                            case '\b': fprintf(s, "\\b"); break;
+                            case '\v': fprintf(s, "\\v"); break;
+                            case '\f': fprintf(s, "\\f"); break;
+                            default:
+                                if(c >= 32 && c <= 126) {
+                                    fputc(c, s);
+                                } else {
+                                    fprintf(s, "\\%03o", c);
+                                }
+                            break;
+                        }
+                    }
+                    fprintf(s, "\"\n");
                     int tam_texto = strlen(texto_valor) + 1;
                     if(tam_texto < total_bytes) {
                         fprintf(s, "  .space %d\n", total_bytes - tam_texto);

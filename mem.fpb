@@ -1,6 +1,15 @@
 #incluir "biblis/impressao.asm";
+#incluir "biblis/mem.fpb";
 #global inicio();
 
 vazio inicio() {
+    escrever("\n=== Teste de alocação ===\n");
+    int* pont = memalocar(4); // aloca 4 bytes memória RAM(1 inteiro)
+    escrever("4 bytes alocados: ", pont, '\n');
+    pont = 2;
     
+    escrever("número modificado: ", pont, '\n');
+    int liberado = memliberar(@pont, 4);
+    
+    escrever("4 bytes liberado?: ", liberado == 0 ? "liberado!" : "erro!", '\n');
 }

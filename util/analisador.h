@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 09/02/2026.
+* [ATUAL]: 19/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // buscar
@@ -114,6 +114,7 @@ const char* token_str(TipoToken t) {
         case T_INCLUIR: return "#incluir";
         case T_ESPACO: return "#espaco";
         case T_DEF: return "#def";
+        case T_ALINHAR: return "#alinhar";
         case T_FIM: return "fim";
         case T_MAIOR_MAIOR: return ">>";
         case T_MENOR_MENOR: return "<<";
@@ -226,6 +227,10 @@ void proximoToken() {
         }
         if(strcmp(L.tk.lex, "global") == 0) {
             L.tk.tipo = T_GLOBAL;
+            return;
+        }
+        if(strcmp(L.tk.lex, "alinhar") == 0) {
+            L.tk.tipo = T_ALINHAR;
             return;
         }
         fatal("diretiva desconhecida");
@@ -613,6 +618,14 @@ Espaco* buscar_espaco(const char* nome) {
 }
 
 // [VERIFICAÇÃO]:
+void verificar_alinhar() {
+    excessao(T_ALINHAR);
+    if(L.tk.tipo != T_INT) fatal("[verificar_alinhar] valor inteiro esperado");
+    proximo_alinhamento = L.tk.valor_l;
+    proximoToken();
+    if(L.tk.tipo == T_PONTO_VIRGULA) excessao(T_PONTO_VIRGULA);
+}
+
 void verificar_global(FILE* s) {
     excessao(T_GLOBAL);
     // verifica se é um tipo(variavel global) ou identificador(função global)
@@ -627,6 +640,9 @@ void verificar_global(FILE* s) {
         verificar_stmt(s, &pos, -1);
         // restaura escopo
         escopo_global = escopo_atual;
+        
+        globais[global_cnt - 1].alinhamento = proximo_alinhamento;
+        proximo_alinhamento = 0;
     } else {
         // se é uma função global
         if(L.tk.tipo != T_ID) fatal("[verificar_global] nome de função esperado");
@@ -648,6 +664,7 @@ void verificar_global(FILE* s) {
                 break;
             }
         }
+        proximo_alinhamento = 0;
     }
 }
 
@@ -869,8 +886,8 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
         excessao(T_IGUAL);
         TipoToken tipo_exp = expressao(s, escopo);
         
-        if(tipo_exp != T_pINT && tipo_exp != T_pLONGO) {
-            fatal("[verificar_atribuicao] endereço deve ser inteiro ou longo");
+        if(tipo_exp != T_pINT && tipo_exp != T_pLONGO && tipo_exp != T_PONTEIRO) {
+            fatal("[verificar_atribuicao] endereço deve ser inteiro ou longo ou ponteiro");
         }
         // atribui o endereço diretamente no ponteiro
         fprintf(s, "  str x0, [x29, %d]\n", var->pos);
@@ -955,7 +972,6 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
             fprintf(s, "  str d0, [x2]\n");
             else if(campo->tipo_base == T_pLONGO)
             fprintf(s, "  str x0, [x2]\n");
-                
             return;
         }
         // se não for array(ou se for array sem indice, tratado como erro ou ponteiro depois),
@@ -986,7 +1002,10 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
         }
         // armazena o valor
         if(campo->eh_ponteiro) {
-            fprintf(s, "  str x0, [x1]\n");
+            fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+            if(campo->tipo_base == T_pLONGO || campo->tipo_base == T_pDOBRO) fprintf(s, "  str x0, [x1]\n");
+            else if(campo->tipo_base == T_pINT) fprintf(s, "  str w0, [x1]\n");
+            else if(campo->tipo_base == T_pCAR) fprintf(s, "  strb w0, [x1]\n");
         } else {
             if(campo->tipo_base == T_pCAR || campo->tipo_base == T_pBOOL || campo->tipo_base == T_pBYTE)
             fprintf(s, "  strb w0, [x1]\n");
@@ -1015,9 +1034,8 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
     else if(op_atrib == T_VEZES_IGUAL) op_aritmetico = T_VEZES;
     else if(op_atrib == T_DIV_IGUAL) op_aritmetico = T_DIV;
     else if(op_atrib == T_PORCEN_IGUAL) op_aritmetico = T_PORCEN;
-    else if(op_atrib != T_IGUAL) {
-        fatal("[verificar_atribuicao] operador de atribuição esperado");
-    }
+    else if(op_atrib != T_IGUAL) fatal("[verificar_atribuicao] operador de atribuição esperado");
+    
     proximoToken(); // consome o operador
     
     if(op_aritmetico != T_FIM) {
@@ -1108,7 +1126,17 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
             }
             // armazena o valor
             if(var->eh_ponteiro) {
-                fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                fprintf(s, "  ldr x1, [x29, %d]\n", var->pos); // carrega o endereço
+                if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE)
+                fprintf(s, "  strb w0, [x1]\n");
+                else if(var->tipo_base == T_pINT)
+                fprintf(s, "  str w0, [x1]\n");
+                else if(var->tipo_base == T_pFLU)
+                fprintf(s, "  str s0, [x1]\n");
+                else if(var->tipo_base == T_pDOBRO)
+                fprintf(s, "  str d0, [x1]\n");
+                else
+                fprintf(s, "  str x0, [x1]\n");
             } else {
                 // restaura do registrador temporario antes de armazenar
                 if(reg_tipo == 's') {
@@ -1127,7 +1155,16 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
         } else {
             // sem registradores disponiveis, usa pilha
             if(var->eh_ponteiro) {
-                fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                fprintf(s, "  ldr x1, [x29, %d]\n", var->pos); // carrega o endereço
+                if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE)
+                fprintf(s, "  strb w0, [x1]\n");
+                else if(var->tipo_base == T_pINT)
+                fprintf(s, "  str w0, [x1]\n");
+                else if(var->tipo_base == T_pFLU)
+                fprintf(s, "  str s0, [x1]\n");
+                else if(var->tipo_base == T_pDOBRO)
+                fprintf(s, "  str d0, [x1]\n");
+                else fprintf(s, "  str x0, [x1]\n");
             } else {
                 armazenar_valor(s, var);
             }
@@ -1638,10 +1675,10 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         } else if(tipo_exp == T_pINT) {
             // int -> pnteiro: estende sem sinal pra 64 bits  
             fprintf(s, "  uxtw x0, w0\n"); // estende sem sinal para 64 bits
-        } else if(tipo_exp == T_pLONGO) {
+        } else if(tipo_exp == T_pLONGO || tipo_exp == T_PONTEIRO) {
             // longo -> ponteiro: ja é 64 bits, não precisa conversão
         } else {
-            fatal("[verificar_stmt] endereço deve ser byte, inteiro ou longo");
+            fatal("[verificar_stmt] endereço deve ser byte, inteiro ou longo ou ponteiro");
         }
         fprintf(s, "  str x0, [x29, %d]\n", var->pos);
         excessao(T_PONTO_VIRGULA);
@@ -2967,16 +3004,18 @@ TipoToken fator(FILE* s, int escopo) {
         return T_pBOOL;
     }
     if(L.tk.tipo == T_ARROBA) {
-        // operador de endereço @
         proximoToken();
-        
         if(L.tk.tipo != T_ID) fatal("[fator] @ espera identificador");
-        
         Variavel* var = buscar_var(L.tk.lex, escopo);
         if(!var) fatal("[fator] variável não encontrada");
-        // carrega endereço da variavel
-        if(var->eh_parametro && var->eh_array) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-        else fprintf(s, "  add x0, x29, %d\n", var->pos);
+        
+        if(var->eh_ponteiro)
+        fprintf(s, "  ldr x0, [x29, %d]\n", var->pos); // carrega o VALOR do ponteiro
+        else if(var->eh_parametro && var->eh_array)
+        fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+        else
+        fprintf(s, "  add x0, x29, %d\n", var->pos);   // endereço de variavel normal
+        
         proximoToken();
         return T_PONTEIRO;
     }
@@ -3361,6 +3400,7 @@ void iniciar(FILE* s) {
         } else if(L.tk.tipo == T_DEF) verificar_def();
         else if(L.tk.tipo == T_ESPACO) verificar_espaco(s);
         else if(L.tk.tipo == T_GLOBAL) verificar_global(s);
+        else if(L.tk.tipo == T_ALINHAR) verificar_alinhar();
         else verificar_fn(s);
     }
     gerar_consts(s);

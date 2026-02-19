@@ -68,152 +68,6 @@ _escrever_int:
 5: // buffer do inteiro
     .fill   32, 1, 0
 // fim: [_escrever_int]
-// fn: [_escrever_flu] (vars: 176, total: 320)
-.align 2
-_escrever_flu:
-  // prologo
-  stp x29, x30, [sp, -48]!
-  mov x29, sp
-  str d0, [sp, 16] // param valor
-  
-  // converte pra centavos/inteiro diretamente
-  adr x0, 1f
-  ldr s0, [x0]
-  ldr s1, [sp, 16]
-  fmul s0, s1, s0
-  fcvtzs w8, s0 // w8 = valor * 100 como inteiro
-  
-  // inicia indice do buffer
-  mov w9, 0 // w9 = indice no buffer
-  add x10, sp, 24 // x10 = buffer(48-24=24 bytes disponiveis)
-  // verifica se é negativo
-  cmp w8, 0
-  b.ge .positivo
-  mov w0, '-'
-  strb w0, [x10], 1 // armazena '-' e incrementar ponteiro
-  add w9, w9, 1
-  neg w8, w8 // tornar positivo
-.positivo:
-  // separa parte inteira e decimal
-  mov w0, 100
-  sdiv w11, w8, w0 // w11 = parte inteira
-  msub w12, w11, w0, w8 // w12 = parte decimal(0-99)
-  
-  // escreve parte inteira
-  cmp w11, 0
-  b.ne .tem_inteiro
-  
-  // caso especial: inteiro é zero
-  mov w0, '0'
-  strb w0, [x10], 1
-  add w9, w9, 1
-  b .decimal
-.tem_inteiro:
-  // converte inteiro pra texto(reverso)
-  add x13, sp, 40 // buffer temporario(8 bytes)
-  mov x14, x13
-.loop_inteiro:
-  mov w0, 10
-  sdiv w1, w11, w0
-  msub w0, w1, w0, w11
-  add w0, w0, '0'
-  strb w0, [x14], 1
-  mov w11, w1
-  cmp w11, 0
-  b.ne .loop_inteiro
-  
-  // copia na ordem correta
-  sub x14, x14, 1
-.loop_copiar:
-  ldrb w0, [x14], -1
-  strb w0, [x10], 1
-  add w9, w9, 1
-  cmp x14, x13
-  b.ge .loop_copiar
-.decimal:
-  // ponto decimal
-  mov w0, '.'
-  strb w0, [x10], 1
-  add w9, w9, 1
-  
-  // parte decimal(sempre 2 digitos)
-  mov w0, 10
-  sdiv w1, w12, w0 // dezenas
-  msub w2, w1, w0, w12 // unidades
-  
-  add w1, w1, '0'
-  add w2, w2, '0'
-  
-  strb w1, [x10], 1
-  strb w2, [x10], 1
-  add w9, w9, 2
-  
-  // termina com '\0'
-  mov w0, 0
-  strb w0, [x10]
-  
-  // imprime:
-  add x0, sp, 24
-  mov x1, x0
-  mov x0, 1
-  mov w2, w9
-  mov x8, 64
-  svc 0
-  
-  // epilogo
-  ldp x29, x30, [sp], 48
-  ret
-1:
-    .float 100.0
-// fim: [_escrever_flu]
-// fn: [_escrever_longo]
-.align 2
-_escrever_longo:
-    mov x1, x0 // x1 = numero(64 bits)
-    ldr x0, =5f // x0 = buffer
-    mov x19, 0 // x19 = contador de caracteres
-    
-    cmp x1, 0 // compara 64 bits
-    b.ge 1f
-    neg x1, x1 // torna positivo(64 bits)
-    mov w2, '-'
-    strb w2, [x0], 1 // escreve sinal(w2 é 32 bits)
-    mov x19, 1 // contador = 1
-1:
-    // escreve digitos em ordem reversa
-    mov x2, x0 // x2: aponta pra posição atual
-2:
-    mov x3, 10
-    udiv x4, x1, x3 // x4 = quociente(64 bits)
-    msub x5, x4, x3, x1 // x5 = resto(64 bits)
-    add w5, w5, '0' // converte resto pra caractere (w5)
-    strb w5, [x2], 1 // armazena o byte(w5)
-    add x19, x19, 1 // incrementa contador
-    mov x1, x4
-    cbnz x1, 2b // continua se x1 != 0
-    // inverte o texto de digitos
-    sub x2, x2, 1 // x2 aponta para o ultimo digito
-    mov x3, x0 // x3 aponta para o primeiro digito
-3:
-    cmp x3, x2
-    b.ge 4f
-    ldrb w4, [x3] // carrega byte(w4)
-    ldrb w5, [x2] // carrega byte(w5)
-    strb w5, [x3], 1 // armazena byte(w5)
-    strb w4, [x2], -1 // armazena byte(w4)
-    b 3b
-4:
-    ldr     x1, = 5f
-    mov     x0, 1
-    mov     x2, x19 // x19: o numero de caracteres
-    mov x8, 64
-    svc 0
-    ret
-.section .data
-  .align 2
-5: // buffer do inteiro
-    .fill   32, 1, 0
-// fim: [_escrever_longo]
 // fn: [_escrever_car]
 .align 2
 _escrever_car:
@@ -226,44 +80,157 @@ _escrever_car:
     add sp, sp, 1
     ret
 // fim: [_escrever_car]
-// fn: [_escrever_bool]
-.align 2
-_escrever_bool:
-    cmp w0, 0
-    b.eq 1f
-    adr x1, 3f
-    mov x2, 7
-    b 2f
-1:
-    adr x1, 4f
-    mov x2, 5
-2:
-    mov x0, 1
-    mov x8, 64
-    svc 0
-    ret
-// buffers do booleano
-3:
-    .asciz "verdade"
-4:
-    .asciz "falso"
-// fim: [_escrever_bool]
 // fim de biblis/impressao.asm
 
+
+// inicio de biblis/mem.fpb
+
+// inicio de biblis/mem.asm
+// fn: [memalocar]
+// x0 = tamanho
+// retorna ponteiro ou 0
+.align 2
+memalocar:
+    stp x29, x30, [sp, -16]!
+    mov x29, sp
+
+    mov x19, x0 // guarda tamanho
+
+    // prepara parametros do mmap
+    mov x0, 0 // endereço = 0
+    mov x1, x19 // tamanho
+    mov x2, 3 // PROT_READ | PROT_WRITE
+    mov x3, 34 // MAP_PRIVATE | MAP_ANONYMOUS
+    mov x4, -1 // fd = -1
+    mov x5, 0 // pos = 0
+    mov x8, 222 // chamada mmap
+    svc 0
+    // verifica erro: mmap retorna valores negativos entre -1 e -4095
+    // testa se x0 é negativo
+    // se x0 < 0 = erro
+    tbz x0, 63, 1f // bit 63 = sinal, se zero, é sucesso
+    // erro
+    mov x0, 0
+    b 2f
+1:  // sucesso
+    // x0 ja contem o ponteiro
+2:
+    ldp x29, x30, [sp], 16
+    ret
+// fim: [memalocar]
+// fn: [memliberar]
+// x0 = ponteiro
+// x1 = tamanho
+// retorna 0 ou -1
+.align 2
+memliberar:
+    stp x29, x30, [sp, -16]!
+    mov x29, sp
+
+    mov x8, 215 // munmap
+    svc 0
+
+    // se retorno != 0 = erro
+    cmp x0, 0
+    b.eq 1f
+    
+    mov x0, -1
+    b 2f
+1:
+    mov x0, 0
+2:
+    ldp x29, x30, [sp], 16
+    ret
+// fim: [memliberar]
+// fim de biblis/mem.asm
+
+
+// fim de biblis/mem.fpb
+
 .global inicio
-// fn: [inicio] (vars: 0, total: 128)
+// fn: [inicio] (vars: 32, total: 160)
 .align 2
 inicio:
-  sub sp, sp, 128
-  stp x29, x30, [sp, 112]
-  add x29, sp, 112
+  sub sp, sp, 160
+  stp x29, x30, [sp, 144]
+  add x29, sp, 144
+  ldr x0, = .tex_0
+  bl _escrever_tex
+  mov w0, 4
+  str w0, [sp, -16]!  // salva param 0 (int/bool/char/byte)
+  ldr w0, [sp, 0]  // carrega param 0 (int/bool) em w0
+  mov x0, x0  // estende pra 64 bits
+  add sp, sp, 16  // limpa temporarios
+  bl memalocar
+  mov x19, x0
+  str x0, [x29, -32]
+  ldr x0, = .tex_1
+  bl _escrever_tex
+  ldr x1, [x29, -32]
+  ldr w0, [x1]
+  bl _escrever_int
+  mov w0, 10
+  bl _escrever_car
+  mov w0, 2
+  mov w19, w0
+  ldr x1, [x29, -32]
+  str w0, [x1]
+  ldr x0, = .tex_2
+  bl _escrever_tex
+  ldr x1, [x29, -32]
+  ldr w0, [x1]
+  bl _escrever_int
+  mov w0, 10
+  bl _escrever_car
+  ldr x0, [x29, -32]
+  str x0, [sp, -16]!  // salva param 0 (ponteiro/longo)
+  mov w0, 4
+  str w0, [sp, -16]!  // salva param 1 (int/bool/char/byte)
+  ldr w1, [sp, 0]  // carrega param 1 (int/bool) em w1
+  mov x1, x1  // estende pra 64 bits
+  ldr x0, [sp, 16]  // carrega param 0 (ptr/longo) em x0
+  add sp, sp, 32  // limpa temporarios
+  bl memliberar
+  mov w19, w0
+  str w0, [x29, -48]
+  ldr x0, = .tex_3
+  bl _escrever_tex
+  ldr w0, [x29, -48]
+  mov w19, w0
+  mov w0, 0
+  mov w1, w19
+  cmp w1, w0
+  cset w0, eq
+  cmp w0, 0
+  beq .ternario_falso_0
+  ldr x0, = .tex_4
+  b .ternario_fim_0
+.ternario_falso_0:
+  ldr x0, = .tex_5
+.ternario_fim_0:
+  bl _escrever_tex
+  mov w0, 10
+  bl _escrever_car
   b 1f
 // epilogo
 1:
-  ldp x29, x30, [sp, 112]
-  add sp, sp, 128
+  ldp x29, x30, [sp, 144]
+  add sp, sp, 160
   mov x0, 0
   mov x8, 93
   svc 0
   ret
 // fim: [inicio]
+.section .rodata
+.align 2
+.tex_0: .asciz "\n=== Teste de aloca\303\247\303\243o ===\n"
+.tex_1: .asciz "4 bytes alocados: "
+.tex_2: .asciz "n\303\272mero modificado: "
+.tex_3: .asciz "4 bytes liberados liberado: "
+.tex_4: .asciz "liberado!"
+.tex_5: .asciz "erro!"
+.section .text
+
+
+.section .rodata
+.align 2

@@ -1,0 +1,4 @@
+#incluir "biblis/mem.asm";
+vazio memcp(car[] arr, car* p, int tam);
+int* memalocar(int bytes);
+vazio memliberar(int* p, int bytes);

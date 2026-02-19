@@ -1,7 +1,6 @@
 # FPB (Fácil Programação Baixo nivel)
 
-## estado:
-em desenvolvimento. 7 meses de existencia da FPB como meu primeiro projeto em C. :D
+meu primeiro projeto em C. :D
 
 ## sintaxe
 este é um código que testa maior parte dos recursos e margem de erros:
@@ -17,9 +16,10 @@ suportados
 */
 #incluir "biblis/impressao.asm";
 #incluir "biblis/texs.fpb";
-#incluir "biblis/mem.asm";
+#incluir "biblis/mem.fpb";
 #incluir "biblis/sistema.asm"; // .asm e .s são colados no intermediario
 #incluir "biblis/cvts.fpb"; // .fpb e .FPB são colados durante a compilação
+#incluir "biblis/mat.fpb"; // biblioteca de matematica
 
 // macro:
 #def TAM 14;
@@ -27,6 +27,9 @@ suportados
 // variaveis globais:
 #global inicio();
 #global int varGlobal = 10;
+
+#alinhar 12; // da pra alinhar como no assembly também :D
+#global byte[] desc_tabela;
 
 // estrutura de dados:
 #espaco Pessoa {
@@ -44,8 +47,8 @@ vazio testeMatrizes();
 vazio testeEspaco();
 vazio testeConversao();
 vazio testeAsm();
-
-vazio memcp(car[] array, car* p, int tam);
+vazio testeMat();
+vazio testePonteirosComplexos();
 
 longo obter_tempo_milis();
 
@@ -115,10 +118,12 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     testeEspaco();
     testeConversao();
     testeAsm();
+    testeMat();
+    testePonteirosComplexos();
 }
 
 vazio testeOperacoes() {
-    escrever("\n\nTeste de operações matematicas:\n\n");
+    escrever("\nTeste de operações matematicas:\n\n");
     // testando ordem de precedencia:
     escrever("operação 5 + 5 * 5, esperado: 30, veio: ", 5 + 5 * 5, '\n');
     escrever("operação (5 + 5) * 5, esperado: 50, veio: ", (5 + 5) * 5, '\n');
@@ -136,6 +141,24 @@ vazio testeOperacoes() {
     escrever("124 & 15, resultado: ", 124 & 15, "\n");
     escrever("124 & 0xF, resultado: ", 124 & 0xF, "\n");
     escrever("1 | 2, resultado: ", 1 | 2, '\n');
+    
+    escrever("\nTeste de atribuições compostas:\n\n");
+    x += 1.5f;
+    
+    escrever("x = 0.5f, x += 1.5f, x agora é ", x, '\n');
+    x *= 2;
+    
+    escrever("x = 2.0f, x *= 2, x agora é ", x, '\n');
+    x -= 2;
+    
+    escrever("x = 4.0f, x -= 2, x agora é ", x, '\n');
+    x /= 2;
+    
+    escrever("x = 2.0f, x /= 2, x agora é ", x, '\n');
+    int x2 = 10
+    x2 %= 5;
+    
+    escrever("x2 = 10, x2 %= 5, x2 agora é ", x2, '\n');
 }
 
 vazio testeComparacoes() {
@@ -169,10 +192,14 @@ vazio testeComparacoes() {
         escrever("texto 1 não é igual a texto 2\n");
     }
     se(texcmp(t1, t1)) {
-        escrever("o primeiro texto é texto 1");
+        escrever("o primeiro texto é texto 1\n");
     } senao {
-        escrever("o primeiro texto não é texto 1");
+        escrever("o primeiro texto não é texto 1\n");
     }
+    escrever("\nTeste de operador Ternário:\n\n");
+    
+    int x = 5 > 6 ? 10 : 20;
+    escrever("int x = 5 > 6 ? 10 : 20; x é igual a = ", x, '\n');
 }
 
 vazio testeMemoria() {
@@ -180,9 +207,9 @@ vazio testeMemoria() {
     car[] array = "texto";
     escrever("\nvalor do array: ", array);
     array[0] = 'X';
-    escrever("\narray mudado no indice 0: ", array);
+    escrever("\narray mudado no indice 0: ", array, '\n');
     
-    escrever("\n\nTeste de ponteiro:\n\n");
+    escrever("\nTeste de ponteiro:\n\n");
     int x1 = 10;
     escrever("int x1 = 10; int* p1 = @x1;\n");
     int* p1 = @x1;
@@ -199,21 +226,21 @@ vazio testeMemoria() {
     se(i >= 0) escrever("\no ponteiro tem t no indice: ", i);
     senao escrever("\no ponteiro não tem t\n");
     
-    escrever("\nTeste de manipulação da memoria:\n");
+    escrever("\nTeste de manipulação da memoria:\n\n");
     
     car* p = "XxXmplo maior";
     
     car[TAM] array2 = "exemplo"; // array com tamanho do macro
-    escrever("\nArray padrão: ", array2);
+    escrever("Array padrão: ", array2);
     
     memcp(array2, p, textam(p));
     escrever("\nArray copiado da memoria: ", array2);
     
     subscar(array2, 'X', 'e');
     
-    escrever("\nArray usando subscar(array2, 'X', 'e'): ", array2);
+    escrever("\nArray usando subscar(array2, 'X', 'e'): ", array2, '\n');
     
-    escrever("\nTeste de acesso a itens array:\n");
+    escrever("\nTeste de acesso a itens array:\n\n");
     car ca = array2[0];
     escrever("item do indice 0 do array: ", ca, '\n');
     
@@ -227,11 +254,20 @@ vazio testeMemoria() {
     por(int j = 0; j < 4; j++) {
         escrever("no indice: ", j, " valor: ", flutuante[j], '\n');
     }
+    escrever("\n=== Teste de alocação ===\n\n");
+    int* pont = memalocar(4); // aloca 4 bytes memória RAM(1 inteiro)
+    escrever("4 bytes alocados: ", pont, '\n');
+    pont = 2;
+    
+    escrever("número modificado: ", pont, '\n');
+    int liberado = memliberar(@pont, 4);
+    
+    escrever("4 bytes liberado?: ", liberado == 0 ? "liberado!" : "erro!", '\n');
 }
 
 vazio testeLoops() {
-    escrever("\n\nTeste de loops:");
-    escrever("\nEnquanto:");
+    escrever("\n=== Teste de loops ===\n");
+    escrever("\nLoop Enquanto:");
     int i = 0;
     enq(i < 10) {
         escrever("\nvalor de i: ", i);
@@ -254,7 +290,7 @@ vazio testeLoops() {
 }
 
 vazio testeMatrizes() {
-    escrever("\n\nTeste de matrizes:\n\n");
+    escrever("\n=== Teste de matrizes ===\n\n");
     int[][] m2 = { {0, 1, 4}, {4, 1, 0} };
     escrever("matriz 2D int m2[0][1]: ", m2[0][1], '\n');
     flu[][] m2f = { {3f, 5f, 7f}, {2f, 9f, 10f} };
@@ -262,7 +298,7 @@ vazio testeMatrizes() {
 }
 
 vazio testeEspaco() {
-    escrever("\nTeste de estrutura de dados (#espaco):\n\n");
+    escrever("\n=== Teste de estrutura de dados (#espaco) ===\n\n");
     Pessoa p;
     texcp(p.nome, "ronaldo");
     p.idade = 1991;
@@ -276,13 +312,13 @@ vazio testeEspaco() {
 }
 
 vazio testeConversao() {
-    escrever("\nTeste de conversão de texto:\n");
+    escrever("\n=== Teste de conversão de texto ===\n");
     escrever("123 + 1 = ", cvtint("123", 3) + 1, '\n');
     escrever("1.50 + 0.50 = ", cvtflu("1.50", 4) + 0.50f, '\n');
 }
 
 vazio testeAsm() {
-    escrever("\nTestando assembly manual:\n");
+    escrever("\n=== Testando assembly manual ===\n");
     car* msg = "assembly testado com sucesso\n";
     int* tam = textam(msg);
     _asm_(
@@ -292,6 +328,47 @@ vazio testeAsm() {
         "   mov x8, 64\n",
         "   svc 0\n"
     );
+}
+
+vazio testeMat() {
+    escrever("\n=== Teste da biblioteca de matematica ===\n\n")
+    escrever("ftanh(0.5f) = ", ftanh(0.5f), '\n');
+    escrever("fexp(0.8f) = ", fexp(0.8f), '\n');
+    escrever("fraiz(25f) = ", fraiz(25f), '\n');
+    escrever("PI = ", PI, '\n');
+    escrever("E = ", E, '\n');
+    escrever("RAIZ2 = ", RAIZ2, '\n');
+    escrever("LOG2E = ", LOG2E, '\n');
+    escrever("LOGE10 = ", LOGE10, '\n');
+}
+
+vazio testePonteirosComplexos() {
+    escrever("\n=== teste ponteiros complexos ===\n");
+    int x = 10;
+    int* p = @x;
+    p = 99;
+    escrever("int*: esperado 99, recebido: ", x, "\n");
+
+    car c = 'A';
+    car* p = @c;
+    p = 'Z';
+    escrever("car*: esperado Z, recebido: ", c, "\n");
+
+    longo n = 1000L;
+    longo* p = @n;
+    p = 9999L;
+    escrever("longo*: esperado 9999, recebido: ", n, "\n");
+
+    int a = 1;
+    int b = 2;
+    int* p = @a;
+    p = 100;
+    @p = @b;
+    p = 200;
+    escrever("troca: a esperado 100, recebido: ", a, "\n");
+    escrever("troca: b esperado 200, recebido: ", b, "\n");
+    
+    escrever("=== fim ===\n");
 }
 ```
 ## info extra:

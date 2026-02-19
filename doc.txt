@@ -72,6 +72,8 @@ longo numeroLongo = 999999999L;
 byte hexadecimal = 0x000000;
 [código]
 
+para valores byte acima de 1 byte, é melhor usar o tipo int, de 4 bytes, ou o tipo longo, de 8 bytes.
+
 e ponteiros:
 
 [código]
@@ -311,6 +313,7 @@ os matematicos são:
 "&" captura o resto da porcentagem pela potência de 2
 "|" se qualquer um dos dois bits for 1, adiciona o bit 1 ao resultado final.
 "()" altera a ordem de precêdencia.
+"+=, -=, *=, /=, %=" são operadores compostos.
 
 os condicionais são:
 
@@ -322,6 +325,7 @@ os condicionais são:
 "<" se for somente menor.
 "&&" somente se for também verdadeiro.
 "||" se algum dos dois for verdadeiro.
+"condição ? seForVerdade : seForFalso;" condição mais simples.
 
 os de memória são:
 
@@ -343,7 +347,7 @@ você pode importar bibliotecas FPB também, e usar seus códigos.
 
 que não dependem de chamadas do sistema:
 
-"biblis/texs.asm": contém:
+"biblis/texs.fpb": contém:
 
 // retorna 1 se os textos forem verdadeiros e 0 senão.
 int texcmp(car* p1, car* p2);
@@ -378,7 +382,7 @@ porém pode ser facilmente substituida por outra biblioteca que tenha os mesmos 
 // retorna o tempo em milissegundos
 longo obter_tempo_milis();
 
-"biblis/mem.asm": contém:
+"biblis/mem.fpb": contém:
 
 // copia os bytes do ponteiro para o array
 vazio memcp(car[] arr, car* p, int tam);
@@ -388,6 +392,22 @@ int* memalocar(int bytes);
 
 // libera memória RAM do heap nativo
 vazio memliberar(int* p);
+
+"biblis/mat.fpb": contém:
+
+// retorna a formúla de tanh em flutuante
+flu ftanh(flu x);
+// retorna a formúla de exp em flutuante
+flu fexp(flu x);
+// retorna a raiz quadrada em flutuante
+flu fraiz(flu x);
+
+// variaveis:
+PI = 3.14159265f;
+flu E = 2.71828182f;
+RAIZ2 = 1.41421356f;
+LOG2E = 1.44269504f;
+LOGE10 = 2.30258509f;
 
 ## ESPAÇOS ##
 
@@ -414,3 +434,9 @@ p2.nome = 'B';
 p2.idade = 34;
 p2.endereco = 0x000100; 
 [código]
+
+espaços não podem ser passados como parâmetros ou ser usados como ponteiros ainda.
+
+## ALINHAMENTO ##
+
+O #alinhar numero; é o equivalente a alinhar qualquer coisa em assembly.

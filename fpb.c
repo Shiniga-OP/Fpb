@@ -6,7 +6,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 07/02/2026.
+* [ATUAL]: 19/02/2026.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,7 +47,7 @@ typedef enum {
     T_pVAZIO,
     // definições:
     T_DEF, T_FIM, T_RETORNAR, T_INCLUIR, 
-    T_ESPACO, T_GLOBAL,
+    T_ESPACO, T_GLOBAL, T_ALINHAR,
     // bits:
     T_MAIOR_MAIOR, T_MENOR_MENOR, T_TAMBEM, T_OU
 } TipoToken;
@@ -83,6 +83,7 @@ typedef struct {
     long valor; // inteiros
     double valor_f; // flutuantes
     char reg[8];
+    int alinhamento; // 0 = padrão
 } Variavel;
 
 typedef struct {
@@ -166,6 +167,7 @@ static bool em_loop = false;
 static int nivel_loop = 0;
 static char* arquivoAtual;
 static Regs regs = {0};
+static int proximo_alinhamento = 0;
 static bool debug_o = false;
 
 // declaracao
@@ -466,7 +468,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
     var->eh_array = (num_dims > 0);
     var->num_dims = num_dims;
     var->eh_final = eh_final;
-    var->valor = 0;
+    var->valor = -1;
     var->dims = dims;
     if(eh_espaco) strcpy(var->espaco, nome_espaco);
     

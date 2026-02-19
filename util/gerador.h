@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 09/02/2026.
+* [ATUAL]: 19/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // carregar
@@ -197,7 +197,7 @@ void gerar_comparacao(FILE* s, TipoToken op, TipoToken tipo) {
         case T_MAIOR:
             if(tipo == T_pFLU) fprintf(s, "  fcmp s1, s0\n  cset w0, gt\n");
             else if(tipo == T_pDOBRO) fprintf(s, "  fcmp d1, d0\n  cset w0, gt\n");
-            else if(tipo == T_pLONGO) fprintf(s, "  fcmp x1, x0\n  cset x0, gt\n");
+            else if(tipo == T_pLONGO) fprintf(s, "  cmp x1, x0\n  cset x0, gt\n");
             else fprintf(s, "  cmp w1, w0\n  cset w0, gt\n");
         break;
         case T_MENOR:
@@ -360,11 +360,11 @@ void gerar_globais(FILE* s) {
     }
     if(tem_constantes) {
         fprintf(s, "\n.section .rodata\n");
-        fprintf(s, ".align 3\n");
         for(int i = 0; i < global_cnt; i++) {
             Variavel* var = &globais[i];
             if(!var->eh_final) continue;
             
+            fprintf(s, ".align %d\n", var->alinhamento > 0 ? var->alinhamento : 3);
             fprintf(s, "global_%s:\n", var->nome);
             
             if(var->eh_array) {
@@ -415,12 +415,12 @@ void gerar_globais(FILE* s) {
     }
     if(tem_vars) {
         fprintf(s, "\n.section .data\n");
-        fprintf(s, ".align 3\n");
         
         for(int i = 0; i < global_cnt; i++) {
             Variavel* var = &globais[i];
             if(var->eh_final) continue;
             
+            fprintf(s, ".align %d\n", var->alinhamento > 0 ? var->alinhamento : 3);
             fprintf(s, "global_%s:\n", var->nome);
             
             if(var->eh_array) {
@@ -460,7 +460,6 @@ void gerar_globais(FILE* s) {
                 if(var->valor >= 0) fprintf(s, "  .quad %s\n", texs[var->valor].nome);
                 else fprintf(s, "  .quad 0\n");
             } else {
-                // variaveis mutaveis
                 switch(var->tipo_base) {
                     case T_pBYTE:
                         fprintf(s, "  .word %d\n", (int)var->valor);

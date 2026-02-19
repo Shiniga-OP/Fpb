@@ -5,7 +5,7 @@ suportados
 */
 #incluir "biblis/impressao.asm";
 #incluir "biblis/texs.fpb";
-#incluir "biblis/mem.asm";
+#incluir "biblis/mem.fpb";
 #incluir "biblis/sistema.asm"; // .asm e .s são colados no intermediario
 #incluir "biblis/cvts.fpb"; // .fpb e .FPB são colados durante a compilação
 #incluir "biblis/mat.fpb"; // biblioteca de matematica
@@ -16,6 +16,9 @@ suportados
 // variaveis globais:
 #global inicio();
 #global int varGlobal = 10;
+
+#alinhar 12; // da pra alinhar como no assembly também :D
+#global byte[] desc_tabela;
 
 // estrutura de dados:
 #espaco Pessoa {
@@ -34,8 +37,7 @@ vazio testeEspaco();
 vazio testeConversao();
 vazio testeAsm();
 vazio testeMat();
-
-vazio memcp(car[] array, car* p, int tam);
+vazio testePonteirosComplexos();
 
 longo obter_tempo_milis();
 
@@ -106,6 +108,7 @@ vazio testeAlteracoes(int s, int numero, car letra, bool marca, longo numLongo) 
     testeConversao();
     testeAsm();
     testeMat();
+    testePonteirosComplexos();
 }
 
 vazio testeOperacoes() {
@@ -217,7 +220,7 @@ vazio testeMemoria() {
     car* p = "XxXmplo maior";
     
     car[TAM] array2 = "exemplo"; // array com tamanho do macro
-    escrever("\nArray padrão: ", array2);
+    escrever("Array padrão: ", array2);
     
     memcp(array2, p, textam(p));
     escrever("\nArray copiado da memoria: ", array2);
@@ -240,10 +243,19 @@ vazio testeMemoria() {
     por(int j = 0; j < 4; j++) {
         escrever("no indice: ", j, " valor: ", flutuante[j], '\n');
     }
+    escrever("\n=== Teste de alocação ===\n\n");
+    int* pont = memalocar(4); // aloca 4 bytes memória RAM(1 inteiro)
+    escrever("4 bytes alocados: ", pont, '\n');
+    pont = 2;
+    
+    escrever("número modificado: ", pont, '\n');
+    int liberado = memliberar(@pont, 4);
+    
+    escrever("4 bytes liberado?: ", liberado == 0 ? "liberado!" : "erro!", '\n');
 }
 
 vazio testeLoops() {
-    escrever("\nTeste de loops:");
+    escrever("\n=== Teste de loops ===\n");
     escrever("\nLoop Enquanto:");
     int i = 0;
     enq(i < 10) {
@@ -267,7 +279,7 @@ vazio testeLoops() {
 }
 
 vazio testeMatrizes() {
-    escrever("\nTeste de matrizes:\n\n");
+    escrever("\n=== Teste de matrizes ===\n\n");
     int[][] m2 = { {0, 1, 4}, {4, 1, 0} };
     escrever("matriz 2D int m2[0][1]: ", m2[0][1], '\n');
     flu[][] m2f = { {3f, 5f, 7f}, {2f, 9f, 10f} };
@@ -275,7 +287,7 @@ vazio testeMatrizes() {
 }
 
 vazio testeEspaco() {
-    escrever("\nTeste de estrutura de dados (#espaco):\n\n");
+    escrever("\n=== Teste de estrutura de dados (#espaco) ===\n\n");
     Pessoa p;
     texcp(p.nome, "ronaldo");
     p.idade = 1991;
@@ -289,13 +301,13 @@ vazio testeEspaco() {
 }
 
 vazio testeConversao() {
-    escrever("\nTeste de conversão de texto:\n");
+    escrever("\n=== Teste de conversão de texto ===\n");
     escrever("123 + 1 = ", cvtint("123", 3) + 1, '\n');
     escrever("1.50 + 0.50 = ", cvtflu("1.50", 4) + 0.50f, '\n');
 }
 
 vazio testeAsm() {
-    escrever("\nTestando assembly manual:\n");
+    escrever("\n=== Testando assembly manual ===\n");
     car* msg = "assembly testado com sucesso\n";
     int* tam = textam(msg);
     _asm_(
@@ -308,7 +320,7 @@ vazio testeAsm() {
 }
 
 vazio testeMat() {
-    escrever("\nTeste da biblioteca de matematica:\n\n")
+    escrever("\n=== Teste da biblioteca de matematica ===\n\n")
     escrever("ftanh(0.5f) = ", ftanh(0.5f), '\n');
     escrever("fexp(0.8f) = ", fexp(0.8f), '\n');
     escrever("fraiz(25f) = ", fraiz(25f), '\n');
@@ -317,4 +329,33 @@ vazio testeMat() {
     escrever("RAIZ2 = ", RAIZ2, '\n');
     escrever("LOG2E = ", LOG2E, '\n');
     escrever("LOGE10 = ", LOGE10, '\n');
+}
+
+vazio testePonteirosComplexos() {
+    escrever("\n=== teste ponteiros complexos ===\n");
+    int x = 10;
+    int* p = @x;
+    p = 99;
+    escrever("int*: esperado 99, recebido: ", x, "\n");
+
+    car c = 'A';
+    car* p = @c;
+    p = 'Z';
+    escrever("car*: esperado Z, recebido: ", c, "\n");
+
+    longo n = 1000L;
+    longo* p = @n;
+    p = 9999L;
+    escrever("longo*: esperado 9999, recebido: ", n, "\n");
+
+    int a = 1;
+    int b = 2;
+    int* p = @a;
+    p = 100;
+    @p = @b;
+    p = 200;
+    escrever("troca: a esperado 100, recebido: ", a, "\n");
+    escrever("troca: b esperado 200, recebido: ", b, "\n");
+    
+    escrever("=== fim ===\n");
 }

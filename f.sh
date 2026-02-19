@@ -5,11 +5,11 @@ M2=$4
 M3=$5
 clang /storage/emulated/0/pacotes/fpb/$COM.c -o $COM
 cp -r /storage/emulated/0/pacotes/fpb/biblis ./
-cp -r /storage/emulated/0/pacotes/fpb/tmp ./
 cp -r /storage/emulated/0/pacotes/fpb/util ./
 cp /storage/emulated/0/pacotes/fpb/$ARQ.fpb ./
 ./$COM  $ARQ $M1 $M2 $M3
-cp $ARQ.asm /storage/emulated/0/pacotes/fpb/
+mkdir /storage/emulated/0/pacotes/fpb/testes/tmp
+cp $ARQ.asm /storage/emulated/0/pacotes/fpb/testes/tmp
 cp f.sh /storage/emulated/0/pacotes/fpb/
 time ./$ARQ
 cp fpb /data/data/com.termux/files/usr/bin

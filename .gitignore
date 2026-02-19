@@ -1,0 +1,5 @@
+# ignore a pasta de testes:
+testes/
+
+# ignore o binário da linguagem:
+fpb

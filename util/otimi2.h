@@ -101,104 +101,111 @@ void otimizarO2(const char* arquivo_asm) {
             }
         }
     }
-    // combina chamadas sequenciais
+    // combina chamadas sequenciais(N de uma vez)
     int combinacoes_feitas = 0;
     
-    for(int i = 0; i < num_linhas - 3; i++) {
-        char *l1 = linhas[i];
-        char *t1 = l1;
+    for(int i = 0; i < num_linhas - 1; i++) {
+        char *t1 = linhas[i];
         while(isspace(*t1)) t1++;
-        char *l2 = linhas[i+1];
-        char *t2 = l2;
+        char *t2 = linhas[i+1];
         while(isspace(*t2)) t2++;
-        char *l3 = linhas[i+2];
-        char *t3 = l3;
-        while(isspace(*t3)) t3++;
-        char *l4 = linhas[i+3];
-        char *t4 = l4;
-        while(isspace(*t4)) t4++;
         
-        if(strstr(t1, "ldr x0, = .tex_") && 
-            strstr(t2, "bl _escrever_tex") &&
-            strstr(t3, "ldr x0, = .tex_") && 
-            strstr(t4, "bl _escrever_tex")) {
+        // verifica se começa um bloco ldr+bl
+        if(!strstr(t1, "ldr x0, = .tex_") || !strstr(t2, "bl _escrever_tex")) continue;
+        
+        // encontra quantas chamadas consecutivas existem a partir de i
+        int num_seq = 0;
+        int indices[500]; // indices das linhas ldr de cada chamada
+        int j = i;
+        while(j < num_linhas - 1) {
+            char *ta = linhas[j];
+            while(isspace(*ta)) ta++;
+            char *tb = linhas[j+1];
+            while(isspace(*tb)) tb++;
+            if(strstr(ta, "ldr x0, = .tex_") && strstr(tb, "bl _escrever_tex")) {
+                indices[num_seq++] = j;
+                j += 2;
+            } else {
+                break;
+            }
+        }
+        // so combina se houver 2 ou mais chamadas seguidas
+        if(num_seq < 2) continue;
+        
+        // coleta conteúdos de todos os textos da sequência
+        char novo_tex[8192] = "";
+        int ok = 1;
+        char nomes[500][50];
+        for(int k = 0; k < num_seq; k++) {
+            char tex[50];
+            char *ta = linhas[indices[k]];
+            while(isspace(*ta)) ta++;
+            sscanf(ta, "ldr x0, = %s", tex);
+            char *fim = strchr(tex, '\n'); if(fim) *fim = '\0';
+            strcpy(nomes[k], tex);
             
-            int pode_combinar = 1;
-            if(strstr(t2, "bl _escrever_tex") && strlen(t2) > 20) pode_combinar = 0;
-            if(strstr(t3, "ldr x0, = .tex_") && strlen(t3) > 20) pode_combinar = 0;
-            
-            if(pode_combinar) {
-                char tex1[50], tex2[50];
-                sscanf(t1, "ldr x0, = %s", tex1);
-                sscanf(t3, "ldr x0, = %s", tex2);
-                
-                char *fim1 = strchr(tex1, '\n'); if (fim1) *fim1 = '\0';
-                char *fim2 = strchr(tex2, '\n'); if (fim2) *fim2 = '\0';
-                
-                char conteudo1[1024] = "", conteudo2[1024] = "";
-                for(int s = 0; s < num_texs; s++) {
-                    if(strcmp(texs[s].nome, tex1) == 0) strcpy(conteudo1, texs[s].conteudo);
-                    if(strcmp(texs[s].nome, tex2) == 0) strcpy(conteudo2, texs[s].conteudo);
+            char conteudo[1024] = "";
+            for(int s = 0; s < num_texs; s++) {
+                if(strcmp(texs[s].nome, tex) == 0) {
+                    strcpy(conteudo, texs[s].conteudo);
+                    break;
                 }
-                if(conteudo1[0] && conteudo2[0]) {
-                    if(debug2) printf("Combinando texs consecutivas: %s + %s\n", tex1, tex2);
-                    
-                    char novo_tex[2048];
-                    snprintf(novo_tex, sizeof(novo_tex), "%s%s", conteudo1, conteudo2);
-                    // substitui as 4 linhas
-                    free(linhas[i]);
-                    free(linhas[i+1]);
-                    free(linhas[i+2]); 
-                    free(linhas[i+3]);
-                    
-                    linhas[i] = malloc(100);
-                    snprintf(linhas[i], 100, "  ldr x0, = .tex_comb_%d\n", combinacoes_feitas);
-                    
-                    linhas[i+1] = malloc(100);
-                    strcpy(linhas[i+1], "  bl _escrever_tex\n");
-                    
-                    linhas[i+2] = malloc(1); linhas[i+2][0] = '\0';
-                    linhas[i+3] = malloc(1); linhas[i+3][0] = '\0';
-                    
-                    // verifica se os textos ainda são referenciados em outras partes
-                    int tex1_usada = 0;
-                    int tex2_usada = 0;
-                    
-                    for(int j = 0; j < num_linhas; j++) {
-                        if(j != i && j != (i+2) && linhas[j][0] != '\0') {
-                            char *partes_j = linhas[j];
-                            while(isspace(*partes_j)) partes_j++;
-                            
-                            char ref1[100], ref2[100];
-                            snprintf(ref1, sizeof(ref1), "ldr x0, = %s", tex1);
-                            snprintf(ref2, sizeof(ref2), "ldr x0, = %s", tex2);
-                            
-                            if(strstr(partes_j, ref1)) tex1_usada = 1;
-                            if(strstr(partes_j, ref2)) tex2_usada = 1;
-                        }
+            }
+            if(!conteudo[0]) { ok = 0; break; }
+            if(strlen(novo_tex) + strlen(conteudo) >= sizeof(novo_tex) - 1) { ok = 0; break; }
+            strcat(novo_tex, conteudo);
+            if(debug2) printf("Combinando tex: %s\n", tex);
+        }
+        
+        if(!ok) continue;
+        
+        // substitui todas as linhas da sequência
+        // primeira chamada vira ldr+bl para o texto combinado
+        free(linhas[indices[0]]);
+        linhas[indices[0]] = malloc(100);
+        snprintf(linhas[indices[0]], 100, "  ldr x0, = .tex_comb_%d\n", combinacoes_feitas);
+        free(linhas[indices[0]+1]);
+        linhas[indices[0]+1] = malloc(100);
+        strcpy(linhas[indices[0]+1], "  bl _escrever_tex\n");
+        
+        // demais chamadas viram linhas vazias
+        for(int k = 1; k < num_seq; k++) {
+            free(linhas[indices[k]]);
+            linhas[indices[k]] = malloc(1);
+            linhas[indices[k]][0] = '\0';
+            free(linhas[indices[k]+1]);
+            linhas[indices[k]+1] = malloc(1);
+            linhas[indices[k]+1][0] = '\0';
+        }
+        // marca textos originais como não usados(se não referenciados em outro lugar)
+        for(int k = 0; k < num_seq; k++) {
+            int ainda_usada = 0;
+            for(int jj = 0; jj < num_linhas; jj++) {
+                if(linhas[jj][0] == '\0') continue;
+                char *partes_j = linhas[jj];
+                while(isspace(*partes_j)) partes_j++;
+                char ref[100];
+                snprintf(ref, sizeof(ref), "ldr x0, = %s", nomes[k]);
+                if(strstr(partes_j, ref)) { ainda_usada = 1; break; }
+            }
+            if(!ainda_usada) {
+                for(int s = 0; s < num_texs; s++) {
+                    if(strcmp(texs[s].nome, nomes[k]) == 0) {
+                        texs[s].usada = 0;
+                        if(debug2) printf("Marcando %s como não usada\n", nomes[k]);
                     }
-                    // so marca como não usado se não for referenciado em outro lugar
-                    for(int s = 0; s < num_texs; s++) {
-                        if(strcmp(texs[s].nome, tex1) == 0 && !tex1_usada) {
-                            texs[s].usada = 0;
-                            if(debug2) printf("Marcando %s como não usada\n", tex1);
-                        }
-                        if(strcmp(texs[s].nome, tex2) == 0 && !tex2_usada) {
-                            texs[s].usada = 0;
-                            if(debug2) printf("Marcando %s como não usada\n", tex2);
-                        }
-                    }
-                    // adiciona nova texto
-                    strcpy(texs[num_texs].nome, ".tex_comb_");
-                    sprintf(texs[num_texs].nome + 10, "%d", combinacoes_feitas);
-                    strcpy(texs[num_texs].conteudo, novo_tex);
-                    texs[num_texs].usada = 1;
-                    num_texs++;
-                    combinacoes_feitas++;
-                    i += 3;
                 }
             }
         }
+        
+        // adiciona novo texto combinado
+        strcpy(texs[num_texs].nome, ".tex_comb_");
+        sprintf(texs[num_texs].nome + 10, "%d", combinacoes_feitas);
+        strcpy(texs[num_texs].conteudo, novo_tex);
+        texs[num_texs].usada = 1;
+        num_texs++;
+        combinacoes_feitas++;
+        i = j - 1; // pula a sequência inteira
     }
     // escreve arquivo preservando todo o .rodata exceto textos .tex_X não usadas
     FILE *saida = fopen(arquivo_asm, "w");

@@ -391,7 +391,7 @@ vazio memcp(car[] arr, car* p, int tam);
 int* memalocar(int bytes);
 
 // libera memória RAM do heap nativo
-vazio memliberar(int* p);
+vazio memliberar(int* p, int bytes);
 
 "biblis/mat.fpb": contém:
 

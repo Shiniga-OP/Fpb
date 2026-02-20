@@ -50,6 +50,14 @@ vazio testeAsm();
 vazio testeMat();
 vazio testePonteirosComplexos();
 
+vazio escrever_pessoa(Pessoa p) {
+    escrever(
+        "nome da pessoa: ", p.nome, '\n',
+        "idade da pessoa: ", p.idade, '\n',
+        "bytes da pessoa: ", bytes(p), '\n'
+    );
+}
+
 longo obter_tempo_milis();
 
 int somar(int a, int b) {
@@ -307,8 +315,8 @@ vazio testeEspaco() {
     texcp(p2.nome, "el pepe");
     p2.idade = 1992;
     
-    escrever("Pessoa 1:\nNome: ", p.nome, "\nIdade: ", p.idade);
-    escrever("\nPessoa 2:\nNome: ", p2.nome, "\nIdade: ", p2.idade, '\n');
+    escrever_pessoa(p); // passa como ponteiro
+    escrever_pessoa(p2);
 }
 
 vazio testeConversao() {

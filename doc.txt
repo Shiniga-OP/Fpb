@@ -435,8 +435,6 @@ p2.idade = 34;
 p2.endereco = 0x000100; 
 [código]
 
-espaços não podem ser passados como parâmetros ainda.
-
 ## ALINHAMENTO & MEMÓRIA ##
 
 O #alinhar numero; é o equivalente a alinhar qualquer coisa em assembly.

@@ -2282,12 +2282,50 @@ void verificar_fn(FILE* s) {
         int param_pos = (tipo_real == T_pVAZIO) ? 16 : 48;
         for(int i = 0; i < funcs[fn_cnt - 1].var_conta; i++) {
             Variavel* var = &funcs[fn_cnt - 1].vars[i];
-            if(var->eh_parametro && var->reg[0] != '\0') {
-                fp_str(s, var->reg, -param_pos);
-                fprintf(s, "  // param %s\n", var->nome);
-                var->pos = -param_pos;
-                param_pos += 8;
+            if(!var->eh_parametro || var->reg[0] == '\0') continue;
+            
+            if(var->tipo_base == T_ESPACO_ID) {
+                /* recebemos ponteiro em var->reg (ex: x0).
+                * 1. aloca espaço no frame para a copia(tam_total bytes, alinhado 16)
+                * 2. copia os bytes
+                * 3. atualiza var->pos para o frame local */
+                Espaco* esp = buscar_espaco(var->espaco);
+                if(!esp) fatal("[verificar_fn] espaço do parâmetro não encontrado");
+                int tam = esp->tam_total;
+                
+                // reserva espaço abaixo dos params ja salvos
+                param_pos = (param_pos + tam + 15) & ~15; // avança e alinha
+                int pos_copia = -param_pos;
+                fprintf(s, "  // copia espaço param '%s'(%d bytes) de %s para frame\n",
+                var->nome, tam, var->reg);
+                
+                // guarda o ponteiro recebido em x9(salvado, não é param)
+                fprintf(s, "  mov x9, %s\n", var->reg);
+                // copia palavra a palavra(8 bytes por vez)
+                for(int b = 0; b < tam; b += 8) {
+                    int restante = tam - b;
+                    if(restante >= 8) {
+                        fprintf(s, "  ldr x10, [x9, %d]\n", b);
+                        fp_str(s, "x10", pos_copia + b);
+                    } else if(restante >= 4) {
+                        fprintf(s, "  ldr w10, [x9, %d]\n", b);
+                        fp_str(s, "w10", pos_copia + b);
+                    } else {
+                        fprintf(s, "  ldrb w10, [x9, %d]\n", b);
+                        fp_strb(s, "w10", pos_copia + b);
+                    }
+                }
+                var->pos = pos_copia; // agora aponta para a copia local
+                
+                // não salva o ponteiro original, não é necessario
+                // não incrementa param_pos de novo, ja foi incrementado acima
+                continue; // pula o fp_str normal abaixo
             }
+            // parâmetro normal
+            fp_str(s, var->reg, -param_pos);
+            fprintf(s, "  // param %s\n", var->nome);
+            var->pos = -param_pos;
+            param_pos += 8;
         }
         // define onde começam as variaveis locais(abaixo dos params)
         int inicio_vars = (param_pos + 15) & ~15;
@@ -2680,6 +2718,13 @@ TipoToken tratar_id(FILE* s, int escopo) {
         
         return var->tipo_base;
     } else {
+        if(var->tipo_base == T_ESPACO_ID) {
+            // passa endereço do espaço
+            if(var->escopo == -1)
+            fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+            else fp_add_fp(s, "x0", var->pos);
+            return T_PONTEIRO; // espaços são passadas por ponteiro
+        }
         carregar_valor(s, var);
         return var->tipo_base;
     }
@@ -2896,43 +2941,43 @@ TipoToken tratar_byte(FILE* s) {
 // [PROCESSAMENTO]:
 void processar_args(FILE* s, Funcao* f) {
     int int_reg_idc = 0;
-    int fp_reg_idc = 0;
-    int pilha_pos = 0;
+    int fp_reg_idc  = 0;
+    int pilha_pos   = 0;
     Token salvo;
     f->param_pos = 0;
 
     while(L.tk.tipo != T_PAREN_DIR) {
         Variavel* var = &f->vars[f->var_conta];
-        // arrays como parametros devem ser tratados como ponteiros(T_PONTEIRO)
-        // mesmo que seu tipo base seja flutuante
         TipoToken tipo_param = L.tk.tipo == T_TEX ? T_PONTEIRO : L.tk.tipo;
         if(debug_o) printf("[processar_args]: tipo do parâmetro é %s\n", token_str(tipo_param));
-        
-        int eh_array_param = 0;
-        // verifica se é um array
-        if(L.tk.tipo == T_pFLU || L.tk.tipo == T_pINT || L.tk.tipo == T_pCAR || 
+
+        int eh_array_param  = 0;
+        int eh_espaco_param = (tipo_param == T_ESPACO_ID);
+
+        // === detecta array de tipo primitivo ===
+        if(L.tk.tipo == T_pFLU || L.tk.tipo == T_pINT || L.tk.tipo == T_pCAR ||
            L.tk.tipo == T_pBOOL || L.tk.tipo == T_pDOBRO || L.tk.tipo == T_pLONGO) {
-            // salva estado atual
             salvo = L.tk;
             Lexer salvo_lexer = L;
-            
             proximoToken();
             if(L.tk.tipo == T_COL_ESQ) {
                 eh_array_param = 1;
-                tipo_param = T_PONTEIRO; // arrays são passados como ponteiros
+                tipo_param = T_PONTEIRO;
             }
-            // restaura estado
             L.tk = salvo;
             L = salvo_lexer;
         }
-        // arrays como parametros vão para registradores inteiros
-        if(int_reg_idc < 8 && (tipo_param == T_pINT || tipo_param == T_pLONGO || tipo_param == T_PONTEIRO ||
-        tipo_param == T_TEX || tipo_param == T_pCAR || tipo_param == T_pBOOL || eh_array_param)) {
+        // === atribui registrador / pilha ===
+        if(int_reg_idc < 8 && (tipo_param == T_pINT || tipo_param == T_pLONGO ||
+        tipo_param == T_PONTEIRO || tipo_param == T_TEX ||
+        tipo_param == T_pCAR || tipo_param == T_pBOOL ||
+        tipo_param == T_ESPACO_ID || eh_array_param)) {
             sprintf(var->reg, "x%d", int_reg_idc++);
             var->pos = -1;
-            var->eh_array = eh_array_param; // marca como array
-            if(eh_array_param) var->tipo_base = salvo.tipo; // mantem o tipo base
-        } else if(fp_reg_idc < 8 && (tipo_param == T_pFLU || tipo_param == T_pDOBRO) && !eh_array_param) {
+            var->eh_array = eh_array_param;
+            if(eh_array_param) var->tipo_base = salvo.tipo;
+        } else if(fp_reg_idc < 8 && (tipo_param == T_pFLU ||
+        tipo_param == T_pDOBRO) && !eh_array_param) {
             sprintf(var->reg, "d%d", fp_reg_idc++);
             var->pos = -1;
         } else {
@@ -2942,8 +2987,28 @@ void processar_args(FILE* s, Funcao* f) {
             var->eh_array = eh_array_param;
             if(eh_array_param) var->tipo_base = salvo.tipo;
         }
+        // salva reg/pos antes de declaracao_var sobrescrever
+        char reg_salvo[8];
+        int pos_salvo_var = var->pos;
+        strcpy(reg_salvo, var->reg);
+
         declaracao_var(s, &pilha_pos, 0, 1, 0, 0);
-        
+
+        // restaura: declaracao_var sobrescreve pos/reg para parametros
+        strcpy(var->reg, reg_salvo);
+        var->pos = pos_salvo_var;
+        /*
+         * pra espaços(T_ESPACO_ID) o chamador passa o endereço em xN
+         * Marcamos eh_ponteiro=0 e eh_parametro=1 para que o prologo de
+         * verificar_fn saiba que precisa copiar os bytes do ponteiro recebido
+         * pro frame local, isso é feito em verificar_fn com a marcação
+         * eh_espaco_param, que adicionamos ao Variavel via um campo auxiliar
+         * ou detectamos por(tipo_base==T_ESPACO_ID && eh_parametro)
+         */
+        if(eh_espaco_param) {
+            var->eh_ponteiro  = 0; // é copia, não ponteiro declarado
+            var->eh_parametro = 1;
+        }
         if(L.tk.tipo == T_VIRGULA) proximoToken();
         else break;
     }

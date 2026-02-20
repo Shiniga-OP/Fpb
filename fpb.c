@@ -6,7 +6,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 06/07/2025.
-* [ATUAL]: 19/02/2026.
+* [ATUAL]: 20/02/2026.
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -597,18 +597,18 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                     int pos_campo = var->pos + campo->pos;
                     // armazena o valor
                     if(campo->eh_ponteiro) {
-                        fprintf(s, "  str x0, [x29, %d]\n", pos_campo);
+                        fp_str(s, "x0", pos_campo);
                     } else {
                         if(campo->tipo_base == T_pCAR || campo->tipo_base == T_pBOOL || campo->tipo_base == T_pBYTE)
-                        fprintf(s, "  strb w0, [x29, %d]\n", pos_campo);
+                        fp_strb(s, "w0", pos_campo);
                         else if(campo->tipo_base == T_pINT)
-                        fprintf(s, "  str w0, [x29, %d]\n", pos_campo);
+                        fp_str(s, "w0", pos_campo);
                         else if(campo->tipo_base == T_pFLU)
-                        fprintf(s, "  str s0, [x29, %d]\n", pos_campo);
+                        fp_str(s, "s0", pos_campo);
                         else if(campo->tipo_base == T_pDOBRO)
-                        fprintf(s, "  str d0, [x29, %d]\n", pos_campo);
+                        fp_str(s, "d0", pos_campo);
                         else if(campo->tipo_base == T_pLONGO)
-                        fprintf(s, "  str x0, [x29, %d]\n", pos_campo);
+                        fp_str(s, "x0", pos_campo);
                         else if(campo->tipo_base == T_ESPACO_ID)
                         fatal("[declaracao_var] inicialização de espaço aninhado não suportada");
                     }
@@ -619,11 +619,11 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 }
                 excessao(T_CHAVE_DIR);
             } else if(eh_ponteiro && num_dims > 0 && L.tk.tipo == T_CHAVE_ESQ) {
-                // int[]* p = { 1, 2, 3 } — aloca elementos na pilha
+                // int[]* p = { 1, 2, 3 }, aloca elementos dentro do frame
                 excessao(T_CHAVE_ESQ);
                 int tam_elem = tam_tipo(tipo_base);
                 int elem_cnt = 0;
-                // conta elementos
+                // conta elementos(passagem de leitura)
                 size_t pos_fonte = L.pos;
                 int linha_salva = L.linha_atual, coluna_salva = L.coluna_atual;
                 Token tk_salvo = L.tk;
@@ -638,23 +638,27 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 L.pos = pos_fonte; L.linha_atual = linha_salva;
                 L.coluna_atual = coluna_salva; L.tk = tk_salvo;
                 int tam_dados = (elem_cnt * tam_elem + 15) & ~15;
-                fprintf(s, "  sub sp, sp, %d\n", tam_dados);
-                fprintf(s, "  mov x0, sp\n");
-                fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                // reserva espaço dentro do frame(pos ja foi decrementado pro ponteiro)
+                // precisa decrementar mais para os dados
+                *pos = *pos - tam_dados;
+                *pos = *pos & ~15;
+                int pos_dados = *pos;
+                // faz o ponteiro(ja em var->pos) apontar pros dados dentro do frame
+                fp_add_fp(s, "x0", pos_dados);
+                fp_str(s, "x0", var->pos);
                 for(int ei = 0; ei < elem_cnt; ei++) {
                     expressao(s, escopo);
-                    fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
                     int off = ei * tam_elem;
                     if(tipo_base == T_pCAR || tipo_base == T_pBOOL || tipo_base == T_pBYTE)
-                        fprintf(s, "  strb w0, [x1, %d]\n", off);
+                        fp_strb(s, "w0", pos_dados + off);
                     else if(tipo_base == T_pINT)
-                        fprintf(s, "  str w0, [x1, %d]\n", off);
+                        fp_str(s, "w0", pos_dados + off);
                     else if(tipo_base == T_pFLU)
-                        fprintf(s, "  str s0, [x1, %d]\n", off);
+                        fp_str(s, "s0", pos_dados + off);
                     else if(tipo_base == T_pDOBRO)
-                        fprintf(s, "  str d0, [x1, %d]\n", off);
+                        fp_str(s, "d0", pos_dados + off);
                     else if(tipo_base == T_pLONGO)
-                        fprintf(s, "  str x0, [x1, %d]\n", off);
+                        fp_str(s, "x0", pos_dados + off);
                     if(ei < elem_cnt - 1) {
                         if(L.tk.tipo == T_VIRGULA) proximoToken();
                         else fatal("[declaracao_var] vírgula esperada no array ponteiro");
@@ -669,7 +673,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 }
                 for(int i = 0; i <= tam; i++) {
                     fprintf(s, "  mov w1, %d\n", texto_valor[i]);
-                    fprintf(s, "  strb w1, [x29, %d]\n", var->pos + i);
+                    fp_strb(s, "w1", var->pos + i);
                 }
                 proximoToken();
             } else if(num_dims > 0) {
@@ -680,12 +684,12 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
             } else if(eh_ponteiro && L.tk.tipo == T_TEX) {
                 int id_tex = add_tex(L.tk.lex);
                 fprintf(s, "  ldr x0, = %s\n", texs[id_tex].nome);
-                fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                fp_str(s, "x0", var->pos);
                 proximoToken();
             } else {
                 TipoToken tipo_exp = expressao(s, escopo);
 
-                // tenta usar um registrador temporario para a expressão
+                // tenta usar um registrador temporario pra expressão
                 char reg_tipo;
                 int reg_temp = -1;
 
@@ -713,7 +717,7 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                 if(eh_ponteiro) {
                     if(tipo_exp == T_pINT) fprintf(s, "  sxtw x0, w0\n");
                     
-                    fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                    fp_str(s, "x0", var->pos);
                 } else armazenar_valor(s, var);
                 
                 // se usou registrador temporario, liberar
@@ -803,7 +807,7 @@ int main(int argc, char** argv) {
         printf("macros: %i\n", MAX_MACROS);
         return 0;
     }
-    // verificar se tem arquivo de entrada
+    // verifica se tem arquivo de entrada
     if(strlen(arquivoEntrada) == 0) {
         printf("FPB: [ERRO] nenhum arquivo de entrada especificado\n");
         return 2;

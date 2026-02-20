@@ -350,37 +350,67 @@ vazio testePonteirosComplexos() {
     escrever("int*: esperado 99, recebido: ", x, '\n');
 
     car c = 'A';
-    car* p = @c;
-    p = 'Z';
+    car* p2 = @c;
+    p2 = 'Z';
     escrever("car*: esperado Z, recebido: ", c, '\n');
 
     longo n = 1000L;
-    longo* p = @n;
-    p = 9999L;
+    longo* p3 = @n;
+    p3 = 9999L;
     escrever("longo*: esperado 9999, recebido: ", n, '\n');
 
     int a = 1;
     int b = 2;
-    int* p = @a;
-    p = 100;
-    @p = @b;
-    p = 200;
+    int* p4 = @a;
+    p4 = 100;
+    @p4 = @b;
+    p4 = 200;
     escrever("troca: a esperado 100, recebido: ", a, '\n');
     escrever("troca: b esperado 200, recebido: ", b, '\n');
     
     
     escrever("\n=== Alocação de estrutura de dados ===\n\n");
     
-    Pessoa* p2 = memalocar(bytes(p2));
+    Pessoa* pessoa = memalocar(bytes(pessoa));
     
-    texcp(p2.nome, "nome de pessoa");
-    p2.idade = 18;
+    texcp(pessoa.nome, "nome de pessoa");
+    pessoa.idade = 18;
     escrever(
-        "nome: ", p2.nome, '\n',
-        "idade: ", p2.idade, '\n',
-        "bytes: ", bytes(p2), '\n' // função nativa pra saber bytes
+        "nome: ", pessoa.nome, '\n',
+        "idade: ", pessoa.idade, '\n',
+        "bytes: ", bytes(pessoa), '\n' // função nativa pra saber bytes
     );
-    memliberar(p2, bytes(p2));
+    memliberar(pessoa, bytes(pessoa));
+    
+    escrever("\n=== Teste de ponteiros de arrays ===\n\n");
+    
+    int[]* p5 = { 1, 1, 1 };
+    
+    p5[0] = 5;
+    
+    escrever("ponteiro[0] = ", p5[0], '\n');
+    
+    int[] arr = { 1, 1, 1 };
+    
+    escrever("arr[0] antes: ", arr[0], '\n');
+    
+    int[]* p6;
+    @p6 = @arr;
+    
+    p6[0] = 45;
+    
+    escrever("alteração no arr[0] via ponteiro: ", arr[0], '\n');
+    
+    escrever("\nalterando ponteiro de texto: \n");
+    
+    car* p7 = "texto base\n";
+    
+    escrever(p7);
+    
+    car* ptmp = "texto novo\n";
+    @p7 = @ptmp;
+    
+    escrever(p7);
     
     escrever("=== fim dos ponteiros complexos ===\n");
 }

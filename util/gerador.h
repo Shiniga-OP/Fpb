@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 19/02/2026.
+* [ATUAL]: 20/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // carregar
@@ -22,8 +22,48 @@ void gerar_operacao(FILE* s, TipoToken op, TipoToken tipo);
 void gerar_prelude(FILE* s);
 // util
 void escrever_valor(FILE* s, TipoToken tipo);
+// emissão segura (posset x29 fora do range -256..255 usa x9 como temporário)
+void fp_str(FILE* s, const char* reg, int pos);
+void fp_ldr(FILE* s, const char* reg, int pos);
+void fp_strb(FILE* s, const char* reg, int pos);
+void fp_ldrb(FILE* s, const char* reg, int pos);
+void fp_add_fp(FILE* s, const char* dst, int pos);
 
 #include "analisador.h"
+
+// [EMISSÃO SEGURA]:
+// ARM64 unscaled (STUR/LDUR): posset 9-bit signed → -256..255
+// Para possets fora desse range usa x9 como scratch temporário.
+// x9 é caller-saved e não interfere com x0..x8 usados para retorno/args.
+static inline int _pos_ok(int pos) { return pos >= -256 && pos <= 255; }
+
+void fp_str(FILE* s, const char* reg, int pos) {
+    if(_pos_ok(pos)) fprintf(s, "  str %s, [x29, %d]\n", reg, pos);
+    else { fprintf(s, "  add x9, x29, %d\n", pos); fprintf(s, "  str %s, [x9]\n", reg); }
+}
+void fp_ldr(FILE* s, const char* reg, int pos) {
+    if(_pos_ok(pos)) fprintf(s, "  ldr %s, [x29, %d]\n", reg, pos);
+    else { fprintf(s, "  add x9, x29, %d\n", pos); fprintf(s, "  ldr %s, [x9]\n", reg); }
+}
+void fp_strb(FILE* s, const char* reg, int pos) {
+    if(_pos_ok(pos)) fprintf(s, "  strb %s, [x29, %d]\n", reg, pos);
+    else { fprintf(s, "  add x9, x29, %d\n", pos); fprintf(s, "  strb %s, [x9]\n", reg); }
+}
+void fp_ldrb(FILE* s, const char* reg, int pos) {
+    if(_pos_ok(pos)) fprintf(s, "  ldrb %s, [x29, %d]\n", reg, pos);
+    else { fprintf(s, "  add x9, x29, %d\n", pos); fprintf(s, "  ldrb %s, [x9]\n", reg); }
+}
+void fp_add_fp(FILE* s, const char* dst, int pos) {
+    // add dst, x29, pos — se pos cabe em 12 bits (0..4095 ou negativo via sub), ok
+    // add imm12 aceita 0..4095; para negativo usa sub
+    if(pos >= 0 && pos <= 4095) fprintf(s, "  add %s, x29, %d\n", dst, pos);
+    else if(pos < 0 && (-pos) <= 4095) fprintf(s, "  sub %s, x29, %d\n", dst, -pos);
+    else {
+        // posset grande: usa mov + add
+        fprintf(s, "  mov x9, %d\n", pos);
+        fprintf(s, "  add %s, x29, x9\n", dst);
+    }
+}
 
 // [GERAÇÃO]:
 void gerar_prelude(FILE* s) {
@@ -523,19 +563,19 @@ void carregar_valor(FILE* s, Variavel* var) {
         }
     } else {
         if(var->eh_ponteiro) fatal("[carregar_valor] erro interno: carregar_valor chamado para ponteiro");
-        else if(var->eh_array) fprintf(s, "  add x0, x29, %d\n", var->pos);
+        else if(var->eh_array) fp_add_fp(s, "x0", var->pos);
         else {
             switch(tam_tipo(var->tipo_base)) {
                 case 1: 
-                fprintf(s, "  ldrb w0, [x29, %d]\n", var->pos); 
+                fp_ldrb(s, "w0", var->pos);
                 break;
                 case 4: 
-                if(var->tipo_base == T_pFLU) fprintf(s, "  ldr s0, [x29, %d]\n", var->pos);
-                else fprintf(s, "  ldr w0, [x29, %d]\n", var->pos);
+                if(var->tipo_base == T_pFLU) fp_ldr(s, "s0", var->pos);
+                else fp_ldr(s, "w0", var->pos);
                 break;
                 case 8:
-                if(var->tipo_base == T_pDOBRO) fprintf(s, "  ldr d0, [x29, %d]\n", var->pos);
-                else fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+                if(var->tipo_base == T_pDOBRO) fp_ldr(s, "d0", var->pos);
+                else fp_ldr(s, "x0", var->pos);
                 break;
             }
         }
@@ -569,21 +609,21 @@ void armazenar_valor(FILE* s, Variavel* var) {
         }
     } else { // variavel local
         if(var->eh_ponteiro) {
-            fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+            fp_str(s, "x0", var->pos);
         } else if(var->eh_array) {
             fatal("[armazenar_valor] não é possível armazenar valor direto em array");
         } else {
             switch(tam_tipo(var->tipo_base)) {
                 case 1: 
-                    fprintf(s, "  strb w0, [x29, %d]\n", var->pos); 
+                    fp_strb(s, "w0", var->pos);
                 break;
                 case 4:
-                    if(var->tipo_base == T_pFLU) fprintf(s, "  str s0, [x29, %d]\n", var->pos);
-                    else fprintf(s, "  str w0, [x29, %d]\n", var->pos);
+                    if(var->tipo_base == T_pFLU) fp_str(s, "s0", var->pos);
+                    else fp_str(s, "w0", var->pos);
                 break;
                 case 8:
-                    if(var->tipo_base == T_pDOBRO) fprintf(s, "  str d0, [x29, %d]\n", var->pos);
-                    else fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                    if(var->tipo_base == T_pDOBRO) fp_str(s, "d0", var->pos);
+                    else fp_str(s, "x0", var->pos);
                 break;
             }
         }

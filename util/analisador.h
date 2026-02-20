@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 19/02/2026.
+* [ATUAL]: 20/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // buscar
@@ -890,7 +890,7 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
             fatal("[verificar_atribuicao] endereço deve ser inteiro ou longo ou ponteiro");
         }
         // atribui o endereço diretamente no ponteiro
-        fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+        fp_str(s, "x0", var->pos);
         return;
     }
     if(strchr(id, '.')) {
@@ -949,13 +949,13 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
             // calcula endereço base do campo
             if(via_ponteiro) {
                 if(var->escopo == -1) { fprintf(s, "  ldr x2, = global_%s\n", var->nome); fprintf(s, "  ldr x2, [x2]\n"); }
-                else fprintf(s, "  ldr x2, [x29, %d]\n", var->pos);
+                else fp_ldr(s, "x2", var->pos);
                 if(campo->pos != 0) fprintf(s, "  add x2, x2, %d\n", campo->pos);
             } else if(var->escopo == -1) {
                 fprintf(s, "  ldr x2, = global_%s\n", var->nome);
                 fprintf(s, "  add x2, x2, %d\n", campo->pos);
             } else {
-                fprintf(s, "  add x2, x29, %d\n", var->pos + campo->pos);
+                fp_add_fp(s, "x2", var->pos + campo->pos);
             }
             // calcula pos: indice * tamanho_do_elemento
             int tam_elem = tam_tipo(campo->tipo_base);
@@ -1001,17 +1001,17 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
         // calcula endereço do campo
         if(via_ponteiro) {
             if(var->escopo == -1) { fprintf(s, "  ldr x1, = global_%s\n", var->nome); fprintf(s, "  ldr x1, [x1]\n"); }
-            else fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+            else fp_ldr(s, "x1", var->pos);
             if(campo->pos != 0) fprintf(s, "  add x1, x1, %d\n", campo->pos);
         } else if(var->escopo == -1) {
             fprintf(s, "  ldr x1, = global_%s\n", var->nome);
             fprintf(s, "  add x1, x1, %d\n", campo->pos);
         } else {
-            fprintf(s, "  add x1, x29, %d\n", var->pos + campo->pos);
+            fp_add_fp(s, "x1", var->pos + campo->pos);
         }
         // armazena o valor
         if(campo->eh_ponteiro) {
-            fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+            fp_ldr(s, "x1", var->pos);
             if(campo->tipo_base == T_pLONGO || campo->tipo_base == T_pDOBRO) fprintf(s, "  str x0, [x1]\n");
             else if(campo->tipo_base == T_pINT) fprintf(s, "  str w0, [x1]\n");
             else if(campo->tipo_base == T_pCAR) fprintf(s, "  strb w0, [x1]\n");
@@ -1069,15 +1069,15 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
             }
         } else {
             if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE) {
-                fprintf(s, "  ldrb w0, [x29, %d]\n", var->pos);
+                fp_ldrb(s, "w0", var->pos);
             } else if(var->tipo_base == T_pINT) {
-                fprintf(s, "  ldr w0, [x29, %d]\n", var->pos);
+                fp_ldr(s, "w0", var->pos);
             } else if(var->tipo_base == T_pFLU) {
-                fprintf(s, "  ldr s0, [x29, %d]\n", var->pos);
+                fp_ldr(s, "s0", var->pos);
             } else if(var->tipo_base == T_pDOBRO) {
-                fprintf(s, "  ldr d0, [x29, %d]\n", var->pos);
+                fp_ldr(s, "d0", var->pos);
             } else if(var->tipo_base == T_pLONGO || var->eh_ponteiro) {
-                fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+                fp_ldr(s, "x0", var->pos);
             }
         }
         // salva o valor atual na pilha
@@ -1135,7 +1135,7 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
             }
             // armazena o valor
             if(var->eh_ponteiro) {
-                fprintf(s, "  ldr x1, [x29, %d]\n", var->pos); // carrega o endereço
+                fp_ldr(s, "x1", var->pos); // carrega o endereço
                 if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE)
                 fprintf(s, "  strb w0, [x1]\n");
                 else if(var->tipo_base == T_pINT)
@@ -1164,7 +1164,7 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
         } else {
             // sem registradores disponiveis, usa pilha
             if(var->eh_ponteiro) {
-                fprintf(s, "  ldr x1, [x29, %d]\n", var->pos); // carrega o endereço
+                fp_ldr(s, "x1", var->pos); // carrega o endereço
                 if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE)
                 fprintf(s, "  strb w0, [x1]\n");
                 else if(var->tipo_base == T_pINT)
@@ -1207,15 +1207,15 @@ void verificar_matriz(FILE* s, Variavel* var, int escopo, int indices[], int niv
             int pos_absoluta = var->pos + pos_bytes;
             // agora tudo é negativo
             if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE) {
-                fprintf(s, "  strb w0, [x29, %d]\n", pos_absoluta);
+                fp_strb(s, "w0", pos_absoluta);
             } else if(var->tipo_base == T_pINT) {
-                fprintf(s, "  str w0, [x29, %d]\n", pos_absoluta);
+                fp_str(s, "w0", pos_absoluta);
             } else if(var->tipo_base == T_pFLU) {
-                fprintf(s, "  str s0, [x29, %d]\n", pos_absoluta);
+                fp_str(s, "s0", pos_absoluta);
             } else if(var->tipo_base == T_pDOBRO) {
-                fprintf(s, "  str d0, [x29, %d]\n", pos_absoluta);
+                fp_str(s, "d0", pos_absoluta);
             } else if(var->tipo_base == T_pLONGO || var->tipo_base == T_PONTEIRO) {
-                fprintf(s, "  str x0, [x29, %d]\n", pos_absoluta);
+                fp_str(s, "x0", pos_absoluta);
             }
         }
         item_idc++;
@@ -1689,7 +1689,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         } else {
             fatal("[verificar_stmt] endereço deve ser byte, inteiro ou longo ou ponteiro");
         }
-        fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+        fp_str(s, "x0", var->pos);
         excessao(T_PONTO_VIRGULA);
         return;
     }
@@ -1920,7 +1920,7 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
         } else if(L.tk.tipo == T_COL_ESQ) {
             // === ACESSO A ELEMENTO DE ARRAY ===
             Variavel* var = buscar_var(idn, escopo);
-            if(!var || !var->eh_array) fatal("[verificar_stmt] não é um array");
+            if(!var || (!var->eh_array && !var->eh_ponteiro)) fatal("[verificar_stmt] não é um array ou ponteiro de array");
             excessao(T_COL_ESQ);
             expressao(s, escopo); // indice(resultado em w0)
             fprintf(s, "  mov w1, w0\n"); // salva o indice em w1
@@ -1940,17 +1940,25 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                     token_str(var->tipo_base), token_str(tipo_valor));
                     fatal(msg);
                 }
-                // se for parametro, carrega o endereço base da pilha(é um ponteiro)
+                // carrega o endereço base:
+                // ponteiro de array(int[]*): ldr x2, [x29, pos](valor do ponteiro = endereço do dado)
+                // array normal: add x2, x29, pos (endereço da variável local)
                 if(var->escopo == -1) {
                     fprintf(s, "  ldr x2, = global_%s\n", var->nome);
+                    if(var->eh_ponteiro) fprintf(s, "  ldr x2, [x2]\n");
                 } else {
-                    if(var->eh_parametro) fprintf(s, "  ldr x2, [x29, %d]\n", var->pos); // carrega o endereço base do array
-                    else fprintf(s, "  add x2, x29, %d\n", var->pos); // endereço base do array(local)
+                    if(var->eh_ponteiro) {
+                        fp_ldr(s, "x2", var->pos);
+                    } else if(var->eh_parametro) {
+                        fp_ldr(s, "x2", var->pos);
+                    } else {
+                        fp_add_fp(s, "x2", var->pos);
+                    }
                 }
                 // calcula o pos: indice * tam_elemento
                 int tam_elemento = tam_tipo(var->tipo_base);
                 if(tam_elemento == 1) {
-                    // Para bytes, soma direta
+                    // pra bytes, soma direta
                     fprintf(s, "  add x2, x2, x1\n");
                 } else if(tam_elemento == 4) {
                     // pra inteiros(4 bytes), indice * 4
@@ -2093,11 +2101,14 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                             L.coluna_atual = coluna_salvo;
                             L.tk = tk_salvo;
                             
-                            // processa como expressão normal (que vai lidar com o ponto)
+                            // processa como expressão normal(que vai lidar com o ponto)
                             TipoToken tipo_arg = expressao(s, escopo);
                             escrever_valor(s, tipo_arg);
                         } else {
-                            // não é acesso a campo, restaura e processa normalmente
+                            // guarda o token seguinte ao ID para decidir como tratar
+                            TipoToken proximo_tipo = L.tk.tipo;
+                            
+                            // restaura para o ID
                             L.pos = pos_salvo;
                             L.linha_atual = linha_salvo;
                             L.coluna_atual = coluna_salvo;
@@ -2106,17 +2117,21 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                             // processa normalmente
                             Variavel* var = buscar_var(primeiro_id, escopo);
                             if(var && var->eh_ponteiro) {
-                                if(var->tipo_base == T_pCAR) {
+                                // acesso indexado (p[i]): delega para expressão que trata em tratar_id
+                                if(proximo_tipo == T_COL_ESQ) {
+                                    TipoToken tipo_arg = expressao(s, escopo);
+                                    escrever_valor(s, tipo_arg);
+                                } else if(var->tipo_base == T_pCAR) {
                                     if(var->escopo == -1) { // global    
-                                    fprintf(s, "  ldr x0, = global_%s\n", var->nome);    
-                                    fprintf(s, "  ldr x0, [x0]\n"); // carrega o ponteiro    
-                                } else { // local    
-                                    fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-                                }    
-                                escrever_valor(s, T_TEX); // escrever como texto
-                                proximoToken();
+                                        fprintf(s, "  ldr x0, = global_%s\n", var->nome);    
+                                        fprintf(s, "  ldr x0, [x0]\n"); // carrega o ponteiro    
+                                    } else { // local    
+                                        fp_ldr(s, "x0", var->pos);
+                                    }    
+                                    escrever_valor(s, T_TEX); // escrever como texto
+                                    proximoToken();
                                 } else {
-                                    fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+                                    fp_ldr(s, "x1", var->pos);
                                     // carrega o valor apontado baseado no tipo base
                                     if(var->tipo_base == T_pBOOL)
                                     fprintf(s, "  ldrb w0, [x1]\n");
@@ -2135,8 +2150,8 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
                                 if(var->escopo == -1) {
                                     fprintf(s, "  ldr x0, = global_%s\n", var->nome);
                                 } else {
-                                    if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-                                    else fprintf(s, "  add x0, x29, %d\n", var->pos);
+                                    if(var->eh_parametro) fp_ldr(s, "x0", var->pos);
+                                    else fp_add_fp(s, "x0", var->pos);
                                 }
                                 escrever_valor(s, T_TEX);
                                 proximoToken();
@@ -2268,8 +2283,8 @@ void verificar_fn(FILE* s) {
         for(int i = 0; i < funcs[fn_cnt - 1].var_conta; i++) {
             Variavel* var = &funcs[fn_cnt - 1].vars[i];
             if(var->eh_parametro && var->reg[0] != '\0') {
-                fprintf(s, "  str %s, [x29, -%d]  // param %s\n", 
-                        var->reg, param_pos, var->nome);
+                fp_str(s, var->reg, -param_pos);
+                fprintf(s, "  // param %s\n", var->nome);
                 var->pos = -param_pos;
                 param_pos += 8;
             }
@@ -2322,10 +2337,10 @@ TipoToken tratar_id(FILE* s, int escopo) {
         if(!var) fatal("[tratar_id] variável não encontrada após @");
         // se for ponteiro, retorna o valor do ponteiro(endereço armazenado)
         if(var->eh_ponteiro) {
-            fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+            fp_ldr(s, "x0", var->pos);
         } else {
             // se for variável normal, retorna endereço onde ta armazenada
-            fprintf(s, "  add x0, x29, %d\n", var->pos);
+            fp_add_fp(s, "x0", var->pos);
         }
         proximoToken();
         return T_PONTEIRO;
@@ -2423,13 +2438,13 @@ TipoToken tratar_id(FILE* s, int escopo) {
             // calcula endereço base do array dentro do espaço
             if(via_ponteiro) {
                 if(var->escopo == -1) { fprintf(s, "  ldr x1, = global_%s\n", var->nome); fprintf(s, "  ldr x1, [x1]\n"); }
-                else fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+                else fp_ldr(s, "x1", var->pos);
                 if(campo->pos != 0) fprintf(s, "  add x1, x1, %d\n", campo->pos);
             } else if(var->escopo == -1) {
                 fprintf(s, "  ldr x1, = global_%s\n", var->nome);
                 fprintf(s, "  add x1, x1, %d\n", campo->pos);
             } else {
-                fprintf(s, "  add x1, x29, %d\n", var->pos + campo->pos);
+                fp_add_fp(s, "x1", var->pos + campo->pos);
             }
             // processa todos os indices do array
             int dim_atual = 0;
@@ -2448,13 +2463,13 @@ TipoToken tratar_id(FILE* s, int escopo) {
                 for(int i = 0; i < dim_atual; i++) {
                     fprintf(s, "  ldr w1, [sp], 16\n"); // w1 = indice atual
                     
-                    // calcula stride pra essa dimensão
-                    int stride = tam_tipo(campo->tipo_base);
+                    // calcula passo pra essa dimensão
+                    int passo = tam_tipo(campo->tipo_base);
                     for(int j = i + 1; j < campo->num_dims; j++) {
-                        if(campo->dims[j] > 0) stride *= campo->dims[j];
+                        if(campo->dims[j] > 0) passo *= campo->dims[j];
                     }
-                    // pos += indice * stride
-                    fprintf(s, "  mov w2, %d\n", stride);
+                    // pos += indice * passo
+                    fprintf(s, "  mov w2, %d\n", passo);
                     fprintf(s, "  mul w1, w1, w2\n");
                     fprintf(s, "  add w0, w0, w1\n");
                 }
@@ -2482,13 +2497,13 @@ TipoToken tratar_id(FILE* s, int escopo) {
         // calcula endereço do campo
         if(via_ponteiro) {
             if(var->escopo == -1) { fprintf(s, "  ldr x0, = global_%s\n", var->nome); fprintf(s, "  ldr x0, [x0]\n"); }
-            else fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+            else fp_ldr(s, "x0", var->pos);
             if(campo->pos != 0) fprintf(s, "  add x0, x0, %d\n", campo->pos);
         } else if(var->escopo == -1) {
             fprintf(s, "  ldr x0, = global_%s\n", var->nome);
             fprintf(s, "  add x0, x0, %d\n", campo->pos);
         } else {
-            fprintf(s, "  add x0, x29, %d\n", var->pos + campo->pos);
+            fp_add_fp(s, "x0", var->pos + campo->pos);
         }
         // se for um campo que também é espaço, precisa de tratamento especial
         if(campo->tipo_base == T_ESPACO_ID) {
@@ -2574,15 +2589,16 @@ TipoToken tratar_id(FILE* s, int escopo) {
     }
     if(var->eh_ponteiro && var->tipo_base == T_pCAR) {
         // ponteiro pra caractere, carrega o endereço do texto
-        fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+        fp_ldr(s, "x0", var->pos);
         return T_PONTEIRO;
     }
-    // acesso a matriz/array
-    if(L.tk.tipo == T_COL_ESQ) {
+    // acesso a matriz/array (incluindo ponteiro de array: int[]* p)
+    if(L.tk.tipo == T_COL_ESQ && (var->eh_array || var->eh_ponteiro)) {
         int* indices = malloc(MAX_DIMS * sizeof(int));
         int dim_atual = 0;
+        int max_dims = var->num_dims > 0 ? var->num_dims : 1;
         // coleta todos os indices
-        while(L.tk.tipo == T_COL_ESQ && dim_atual < var->num_dims) {
+        while(L.tk.tipo == T_COL_ESQ && dim_atual < max_dims) {
             excessao(T_COL_ESQ);
             expressao(s, escopo); // resultado em w0
             fprintf(s, "  str w0, [sp, -16]!\n"); // salva indice na pilha
@@ -2598,24 +2614,32 @@ TipoToken tratar_id(FILE* s, int escopo) {
             // pra cada dimensão, calcula o pos parcial
             for(int i = 0; i < dim_atual; i++) {
                 fprintf(s, "  ldr w1, [sp], 16\n"); // w1 = indice atual
-                // calcula stride pra essa dimensão
-                int stride = tam_tipo(var->tipo_base);
+                // calcula passo pra essa dimensão
+                int passo = tam_tipo(var->tipo_base);
                 for(int j = i + 1; j < var->num_dims; j++) {
                     if(var->dims[j] > 0) {
-                        stride *= var->dims[j];
+                        passo *= var->dims[j];
                     }
                 }
-                // pos += indice * stride
-                fprintf(s, "  mov w2, %d\n", stride);
+                // pos += indice * passo
+                fprintf(s, "  mov w2, %d\n", passo);
                 fprintf(s, "  mul w1, w1, w2\n");
                 fprintf(s, "  add w0, w0, w1\n");
             }
-            // carrega o valor
+            // carrega o endereço base:
+            // ponteiro de array(int[]*): ldr x2, [x29, pos](carrega o endereço armazenado no ponteiro)
+            // array normal: add x2, x29, pos(endereço da variável local)
             if(var->escopo == -1) {
                 fprintf(s, "  ldr x2, = global_%s\n", var->nome);
+                if(var->eh_ponteiro) fprintf(s, "  ldr x2, [x2]\n");
             } else {
-                if(var->eh_parametro) fprintf(s, "  ldr x2, [x29, %d]\n", var->pos);
-                else fprintf(s, "  add x2, x29, %d\n", var->pos);
+                if(var->eh_ponteiro) {
+                    fp_ldr(s, "x2", var->pos);
+                } else if(var->eh_parametro) {
+                    fp_ldr(s, "x2", var->pos);
+                } else {
+                    fp_add_fp(s, "x2", var->pos);
+                }
             }
             fprintf(s, "  add x2, x2, x0\n"); // adiciona pos calculado
             
@@ -2631,14 +2655,16 @@ TipoToken tratar_id(FILE* s, int escopo) {
             else if(var->tipo_base == T_pLONGO)
             fprintf(s, "  ldr x0, [x2]\n");
             
+            free(indices);
             return var->tipo_base;
         }
+        free(indices);
     } else if(var->eh_array) {
-        if(var->eh_parametro) fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
-        else fprintf(s, "  add x0, x29, %d\n", var->pos);
+        if(var->eh_parametro) fp_ldr(s, "x0", var->pos);
+        else fp_add_fp(s, "x0", var->pos);
         return T_PONTEIRO;
     } else if(var->eh_ponteiro) {
-        fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+        fp_ldr(s, "x1", var->pos);
         // carrega endereço do ponteiro
         // agora dereferencia baseado no tipo base
         if(var->tipo_base == T_pCAR || var->tipo_base == T_pBOOL || var->tipo_base == T_pBYTE)
@@ -3007,22 +3033,57 @@ int processar_var_tam(int escopo) {
                 }
                 if(L.tk.tipo == T_COL_DIR) proximoToken();
             }
+            // int[]* p, ponteiro após as dimensões
+            if(L.tk.tipo == T_VEZES) {
+                eh_ponteiro = 1;
+                proximoToken();
+            }
             if(L.tk.tipo == T_ID) {
                 int tam_base = eh_ponteiro ? 8 : tam_tipo(tipo_base);
                 int tam_bytes = total_elementos * tam_base;
                 // alinhamento
                 tam_total += (tam_bytes + 15) & ~15;
-                // pula resto da declaração até ; ou }
-                while(L.tk.tipo != T_PONTO_VIRGULA && L.tk.tipo != T_FIM && L.tk.tipo != T_CHAVE_DIR) {
-                     if(L.tk.tipo == T_CHAVE_ESQ) {
-                        int sub_nivel = 1;
+                
+                // se é int[]* p = { ... }, pula até o { para contar elementos inline
+                // e reserva espaço para os dados também
+                if(eh_ponteiro && total_elementos == 1) {
+                    // avança até o '=' ou ';'
+                    while(L.tk.tipo != T_IGUAL && L.tk.tipo != T_PONTO_VIRGULA && 
+                          L.tk.tipo != T_FIM && L.tk.tipo != T_CHAVE_DIR) {
                         proximoToken();
-                        while (sub_nivel > 0 && L.tk.tipo != T_FIM) {
-                            if(L.tk.tipo == T_CHAVE_ESQ) sub_nivel++;
-                            else if(L.tk.tipo == T_CHAVE_DIR) sub_nivel--;
+                    }
+                    if(L.tk.tipo == T_IGUAL) {
+                        proximoToken();
+                        if(L.tk.tipo == T_CHAVE_ESQ) {
+                            // conta elementos
+                            int elem_cnt = 0;
+                            int sub_nivel = 1;
                             proximoToken();
+                            while(L.tk.tipo != T_FIM && sub_nivel > 0) {
+                                if(L.tk.tipo == T_CHAVE_ESQ) sub_nivel++;
+                                else if(L.tk.tipo == T_CHAVE_DIR) { sub_nivel--; if(sub_nivel == 0) break; }
+                                else if(L.tk.tipo == T_VIRGULA && sub_nivel == 1) elem_cnt++;
+                                proximoToken();
+                            }
+                            elem_cnt++;
+                            // reserva espaço para os dados do array inline
+                            int tam_dados = (elem_cnt * tam_tipo(tipo_base) + 15) & ~15;
+                            tam_total += tam_dados;
                         }
-                     } else proximoToken();
+                    }
+                } else {
+                    // pula resto da declaração até ; ou }
+                    while(L.tk.tipo != T_PONTO_VIRGULA && L.tk.tipo != T_FIM && L.tk.tipo != T_CHAVE_DIR) {
+                         if(L.tk.tipo == T_CHAVE_ESQ) {
+                            int sub_nivel = 1;
+                            proximoToken();
+                            while (sub_nivel > 0 && L.tk.tipo != T_FIM) {
+                                if(L.tk.tipo == T_CHAVE_ESQ) sub_nivel++;
+                                else if(L.tk.tipo == T_CHAVE_DIR) sub_nivel--;
+                                proximoToken();
+                            }
+                         } else proximoToken();
+                    }
                 }
             }
         } else proximoToken();
@@ -3084,11 +3145,11 @@ TipoToken fator(FILE* s, int escopo) {
         if(!var) fatal("[fator] variável não encontrada");
         
         if(var->eh_ponteiro)
-        fprintf(s, "  ldr x0, [x29, %d]\n", var->pos); // carrega o VALOR do ponteiro
+        fp_ldr(s, "x0", var->pos); // carrega o VALOR do ponteiro
         else if(var->eh_parametro && var->eh_array)
-        fprintf(s, "  ldr x0, [x29, %d]\n", var->pos);
+        fp_ldr(s, "x0", var->pos);
         else
-        fprintf(s, "  add x0, x29, %d\n", var->pos);   // endereço de variavel normal
+        fp_add_fp(s, "x0", var->pos);   // endereço de variavel normal
         
         proximoToken();
         return T_PONTEIRO;

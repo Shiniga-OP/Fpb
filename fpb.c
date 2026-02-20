@@ -418,6 +418,11 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
             excessao(T_COL_DIR);
             num_dims++;
         }
+        // int[]* ou int[N]* = ponteiro de array
+        if(num_dims > 0 && L.tk.tipo == T_VEZES) {
+            eh_ponteiro = 1;
+            proximoToken();
+        }
     }
     if(L.tk.tipo != T_ID) fatal("[declaracao_var] nome de variável esperado");
     
@@ -610,6 +615,49 @@ void declaracao_var(FILE* s, int* pos, int escopo, int eh_parametro, int eh_fina
                     if(i < esp->campo_cnt - 1) {
                         if(L.tk.tipo == T_VIRGULA) proximoToken();
                         else fatal("[declaracao_var] vírgula esperada entre campos do espaço");
+                    }
+                }
+                excessao(T_CHAVE_DIR);
+            } else if(eh_ponteiro && num_dims > 0 && L.tk.tipo == T_CHAVE_ESQ) {
+                // int[]* p = { 1, 2, 3 } — aloca elementos na pilha
+                excessao(T_CHAVE_ESQ);
+                int tam_elem = tam_tipo(tipo_base);
+                int elem_cnt = 0;
+                // conta elementos
+                size_t pos_fonte = L.pos;
+                int linha_salva = L.linha_atual, coluna_salva = L.coluna_atual;
+                Token tk_salvo = L.tk;
+                int nivel_chave = 1;
+                while(L.tk.tipo != T_FINAL && nivel_chave > 0) {
+                    if(L.tk.tipo == T_CHAVE_ESQ) nivel_chave++;
+                    else if(L.tk.tipo == T_CHAVE_DIR) { nivel_chave--; if(nivel_chave == 0) break; }
+                    else if(L.tk.tipo == T_VIRGULA && nivel_chave == 1) elem_cnt++;
+                    proximoToken();
+                }
+                elem_cnt++;
+                L.pos = pos_fonte; L.linha_atual = linha_salva;
+                L.coluna_atual = coluna_salva; L.tk = tk_salvo;
+                int tam_dados = (elem_cnt * tam_elem + 15) & ~15;
+                fprintf(s, "  sub sp, sp, %d\n", tam_dados);
+                fprintf(s, "  mov x0, sp\n");
+                fprintf(s, "  str x0, [x29, %d]\n", var->pos);
+                for(int ei = 0; ei < elem_cnt; ei++) {
+                    expressao(s, escopo);
+                    fprintf(s, "  ldr x1, [x29, %d]\n", var->pos);
+                    int off = ei * tam_elem;
+                    if(tipo_base == T_pCAR || tipo_base == T_pBOOL || tipo_base == T_pBYTE)
+                        fprintf(s, "  strb w0, [x1, %d]\n", off);
+                    else if(tipo_base == T_pINT)
+                        fprintf(s, "  str w0, [x1, %d]\n", off);
+                    else if(tipo_base == T_pFLU)
+                        fprintf(s, "  str s0, [x1, %d]\n", off);
+                    else if(tipo_base == T_pDOBRO)
+                        fprintf(s, "  str d0, [x1, %d]\n", off);
+                    else if(tipo_base == T_pLONGO)
+                        fprintf(s, "  str x0, [x1, %d]\n", off);
+                    if(ei < elem_cnt - 1) {
+                        if(L.tk.tipo == T_VIRGULA) proximoToken();
+                        else fatal("[declaracao_var] vírgula esperada no array ponteiro");
                     }
                 }
                 excessao(T_CHAVE_DIR);

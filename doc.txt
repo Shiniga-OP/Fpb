@@ -435,8 +435,30 @@ p2.idade = 34;
 p2.endereco = 0x000100; 
 [código]
 
-espaços não podem ser passados como parâmetros ou ser usados como ponteiros ainda.
+espaços não podem ser passados como parâmetros ainda.
 
-## ALINHAMENTO ##
+## ALINHAMENTO & MEMÓRIA ##
 
 O #alinhar numero; é o equivalente a alinhar qualquer coisa em assembly.
+
+Usando bytes(alguma_variavel_ou_ponteiro), você pode receber os bytes daquilo.
+
+Isso também serve com textam(var), da biblioteca "texs.fpb", mas caso não tenha acesso a ela ou você so seja fresco mesmo, pode usar a de nome bonito e nativa do compilador.
+
+Essa função so retorna o tamanho em bytes de variaveis/ponteiros, NÃO de TIPOS, como IDs de estruturas ou tipos primitivos de variaveis.
+
+Exemplo:
+
+ERRADO:
+
+[código]
+Pessoa* p = memalocar(bytes(Pessoa));
+memliberar(p, bytes(Pessoa));
+[código]
+
+CERTO:
+
+[código]
+Pessoa* p = memalocar(bytes(p));
+memliberar(p, bytes(p));
+[código]

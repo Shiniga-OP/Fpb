@@ -347,17 +347,17 @@ vazio testePonteirosComplexos() {
     int x = 10;
     int* p = @x;
     p = 99;
-    escrever("int*: esperado 99, recebido: ", x, "\n");
+    escrever("int*: esperado 99, recebido: ", x, '\n');
 
     car c = 'A';
     car* p = @c;
     p = 'Z';
-    escrever("car*: esperado Z, recebido: ", c, "\n");
+    escrever("car*: esperado Z, recebido: ", c, '\n');
 
     longo n = 1000L;
     longo* p = @n;
     p = 9999L;
-    escrever("longo*: esperado 9999, recebido: ", n, "\n");
+    escrever("longo*: esperado 9999, recebido: ", n, '\n');
 
     int a = 1;
     int b = 2;
@@ -365,10 +365,24 @@ vazio testePonteirosComplexos() {
     p = 100;
     @p = @b;
     p = 200;
-    escrever("troca: a esperado 100, recebido: ", a, "\n");
-    escrever("troca: b esperado 200, recebido: ", b, "\n");
+    escrever("troca: a esperado 100, recebido: ", a, '\n');
+    escrever("troca: b esperado 200, recebido: ", b, '\n');
     
-    escrever("=== fim ===\n");
+    
+    escrever("\n=== Alocação de estrutura de dados ===\n\n");
+    
+    Pessoa* p2 = memalocar(bytes(p2));
+    
+    texcp(p2.nome, "nome de pessoa");
+    p2.idade = 18;
+    escrever(
+        "nome: ", p2.nome, '\n',
+        "idade: ", p2.idade, '\n',
+        "bytes: ", bytes(p2), '\n' // função nativa pra saber bytes
+    );
+    memliberar(p2, bytes(p2));
+    
+    escrever("=== fim dos ponteiros complexos ===\n");
 }
 ```
 ## info extra:

@@ -1659,28 +1659,80 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
     // na parte que trata @id = expressão:
     if(L.tk.tipo == T_ARROBA) {
         proximoToken(); // consome @
-        
+
         if(L.tk.tipo != T_ID) fatal("[verificar_stmt] identificador esperado após @");
         char id[32];
         strcpy(id, L.tk.lex);
         proximoToken(); // consome o id
+
+        // @var.campo = expr: atribuição de ponteiro em campo de espaço
+        if(L.tk.tipo == T_PONTO) {
+            Variavel* var = buscar_var(id, escopo);
+            if(!var || var->tipo_base != T_ESPACO_ID)
+                fatal("[verificar_stmt] @ com '.' só pode ser usado em variáveis de espaço");
+            proximoToken(); // consome o '.'
+            if(L.tk.tipo != T_ID)
+                fatal("[verificar_stmt] nome do campo esperado após '.'");
+            char nome_campo[32];
+            strcpy(nome_campo, L.tk.lex);
+            proximoToken(); // consome o nome do campo
+
+            Espaco* esp = NULL;
+            for(int i = 0; i < espaco_cnt; i++) {
+                if(strcmp(espacos[i].nome, var->espaco) == 0) {
+                    esp = &espacos[i];
+                    break;
+                }
+            }
+            if(!esp) fatal("[verificar_stmt] espaço não encontrado");
+
+            Variavel* campo = NULL;
+            for(int i = 0; i < esp->campo_cnt; i++) {
+                if(strcmp(esp->campos[i].nome, nome_campo) == 0) {
+                    campo = &esp->campos[i];
+                    break;
+                }
+            }
+            if(!campo) fatal("[verificar_stmt] campo não encontrado no espaço");
+            if(!campo->eh_ponteiro)
+                fatal("[verificar_stmt] campo não é um ponteiro");
+
+            excessao(T_IGUAL);
+            TipoToken tipo_exp = expressao(s, escopo);
+
+            if(tipo_exp != T_pLONGO && tipo_exp != T_PONTEIRO && tipo_exp != T_TEX && tipo_exp != T_pINT)
+                fatal("[verificar_stmt] endereço deve ser ponteiro, longo ou inteiro");
+
+            // calcula endereço do campo e armazena x0 nele
+            if(var->eh_ponteiro) {
+                if(var->escopo == -1) { fprintf(s, "  ldr x1, = global_%s\n", var->nome); fprintf(s, "  ldr x1, [x1]\n"); }
+                else fp_ldr(s, "x1", var->pos);
+                if(campo->pos != 0) fprintf(s, "  add x1, x1, %d\n", campo->pos);
+            } else if(var->escopo == -1) {
+                fprintf(s, "  ldr x1, = global_%s\n", var->nome);
+                if(campo->pos != 0) fprintf(s, "  add x1, x1, %d\n", campo->pos);
+            } else {
+                fp_add_fp(s, "x1", var->pos + campo->pos);
+            }
+            fprintf(s, "  str x0, [x1]\n");
+            excessao(T_PONTO_VIRGULA);
+            return;
+        }
+        // @var = expr: atribuição de endereço em ponteiro simples
         excessao(T_IGUAL);
         Variavel* var = buscar_var(id, escopo);
-        
+
         if(!var || !var->eh_ponteiro) {
             fatal("[verificar_stmt] @ só pode ser usado com ponteiros");
         }
         TipoToken tipo_exp = expressao(s, escopo);
-        // conversão baseada no tipo
         if(tipo_exp == T_pBYTE) {
-            // byte -> ponteiro: estende sem sinal paa 64 bits
-            fprintf(s, "  and w0, w0, 0xFF\n"); // garante que é byte
-            fprintf(s, "  uxtw x0, w0\n"); // estende sem sinal pra 64 bits
+            fprintf(s, "  and w0, w0, 0xFF\n");
+            fprintf(s, "  uxtw x0, w0\n");
         } else if(tipo_exp == T_pINT) {
-            // int -> pnteiro: estende sem sinal pra 64 bits  
-            fprintf(s, "  uxtw x0, w0\n"); // estende sem sinal para 64 bits
+            fprintf(s, "  uxtw x0, w0\n");
         } else if(tipo_exp == T_pLONGO || tipo_exp == T_PONTEIRO) {
-            // longo -> ponteiro: ja é 64 bits, não precisa conversão
+            // ja é 64 bits
         } else {
             fatal("[verificar_stmt] endereço deve ser byte, inteiro ou longo ou ponteiro");
         }
@@ -3225,15 +3277,55 @@ TipoToken fator(FILE* s, int escopo) {
         if(L.tk.tipo != T_ID) fatal("[fator] @ espera identificador");
         Variavel* var = buscar_var(L.tk.lex, escopo);
         if(!var) fatal("[fator] variável não encontrada");
-        
+        proximoToken();
+
+        if(L.tk.tipo == T_PONTO) {
+            if(var->tipo_base != T_ESPACO_ID)
+                fatal("[fator] @ com '.' só pode ser usado em variáveis de espaço");
+            proximoToken();
+            if(L.tk.tipo != T_ID)
+                fatal("[fator] nome do campo esperado após '.'");
+            char nome_campo[32];
+            strcpy(nome_campo, L.tk.lex);
+            proximoToken();
+
+            Espaco* esp = NULL;
+            for(int i = 0; i < espaco_cnt; i++) {
+                if(strcmp(espacos[i].nome, var->espaco) == 0) {
+                    esp = &espacos[i];
+                    break;
+                }
+            }
+            if(!esp) fatal("[fator] espaço não encontrado");
+
+            Variavel* campo = NULL;
+            for(int i = 0; i < esp->campo_cnt; i++) {
+                if(strcmp(esp->campos[i].nome, nome_campo) == 0) {
+                    campo = &esp->campos[i];
+                    break;
+                }
+            }
+            if(!campo) fatal("[fator] campo não encontrado no espaço");
+
+            if(var->eh_ponteiro) {
+                if(var->escopo == -1) { fprintf(s, "  ldr x0, = global_%s\n", var->nome); fprintf(s, "  ldr x0, [x0]\n"); }
+                else fp_ldr(s, "x0", var->pos);
+                if(campo->pos != 0) fprintf(s, "  add x0, x0, %d\n", campo->pos);
+            } else if(var->escopo == -1) {
+                fprintf(s, "  ldr x0, = global_%s\n", var->nome);
+                if(campo->pos != 0) fprintf(s, "  add x0, x0, %d\n", campo->pos);
+            } else {
+                fp_add_fp(s, "x0", var->pos + campo->pos);
+            }
+            return T_PONTEIRO;
+        }
         if(var->eh_ponteiro)
-        fp_ldr(s, "x0", var->pos); // carrega o VALOR do ponteiro
+        fp_ldr(s, "x0", var->pos);
         else if(var->eh_parametro && var->eh_array)
         fp_ldr(s, "x0", var->pos);
         else
-        fp_add_fp(s, "x0", var->pos); // endereço de variavel normal
-        
-        proximoToken();
+        fp_add_fp(s, "x0", var->pos);
+
         return T_PONTEIRO;
     }
     if(L.tk.tipo == T_MAIS_MAIS || L.tk.tipo == T_MENOS_MENOS) {

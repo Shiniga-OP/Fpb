@@ -3,6 +3,7 @@ int textam(car[] p);
 bool texcar(car[] texto, car alvo);
 bool texcmp(car[] x, car[] y);
 vazio subscar(car[] array, car alvo, car novo);
+car* inttex(int num);
 
 vazio texcp(car[] arr, car[] p) {
     int i = 0;
@@ -11,4 +12,64 @@ vazio texcp(car[] arr, car[] p) {
         se(p[i] == '\0') pare;
         i++;
     }
+}
+
+car* inttex(int num) {
+    car[12] buffer; // buffer suficiente pra int 32 bits + sinal + nulo
+    car* ptr = @buffer + 10; // começa do final
+    int temp = num;
+    
+    // trata negativo de uma vez
+    se(temp < 0) temp = -temp;
+    
+    // coloca terminador
+    ptr[0] = 0;
+    
+    // converte digitos(do menor pro maior)
+    enq(temp > 0) {
+        ptr--;
+        ptr[0] = (car)((temp % 10) + 48); // 48 = '0' em ASCII
+        temp = temp / 10;
+    }
+    // caso especial pro número 0
+    se(ptr[0] == 0 && num == 0) {
+        ptr--;
+        ptr[0] = '0';
+    }
+    // adiciona sinal se necessario
+    senao se(num < 0) {
+        ptr--;
+        ptr[0] = '-';
+    }
+    retorne ptr;
+}
+
+car* longotex(longo num) {
+    car[22] buffer; // buffer suficiente pra long 64 bits + sinal + nulo(~20 dígitos + sinal + nulo)
+    car* ptr = @buffer + 20; // começa do final(espaço pra 20 digitos)
+    longo temp = num;
+    
+    // trata negativo de uma vez
+    se(temp < 0) temp = -temp;
+    
+    // coloca terminador
+    ptr[0] = 0;
+    
+    // converte digitos(do menor pro maior)
+    enq(temp > 0) {
+        ptr--;
+        ptr[0] = (car)((temp % 10) + 48); // 48 = '0' em ASCII
+        temp = temp / 10;
+    }
+    // caso especial pro número 0
+    se(ptr[0] == 0 && num == 0) {
+        ptr--;
+        ptr[0] = '0';
+    }
+    // adiciona sinal se necessario
+    senao se(num < 0) {
+        ptr--;
+        ptr[0] = '-';
+    }
+    retorne ptr;
 }

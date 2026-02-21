@@ -42,20 +42,21 @@ também existe o _asm_(...); que é o assembly manual, onde você pode utilizar 
 #global inicio();
 
 vazio inicio() {
-    car* p = "texto";
+    car* ponteiro = "texto";
+    int tamanho = 5;
     _asm_(
-        "   mov x0, ", 1, '\n',
-        "   ldr x1, ", p, '\n',
-        "   mov x2, ", 5, '\n',
-        "   mov x8, ", 64, '\n',
-        "   svc ", 0
+        "   mov x0, 1\n",
+        "   ldr x1, ", ponteiro, '\n',
+        "   mov x2, ", tamanho, '\n',
+        "   mov x8, 64\n",
+        "   svc 0"
     );
 }
 [código]
 
 no assembly manual, ponteiros e variaveis sempre dão seus endereços, mesmo sem o operador "@", a unica excessão são números literais.
 
-toda e qualquer operação externa que interaja com o assembly manual precisa ser via ponteiro, variavel global, macro, ou literal, nunca variaveis locais mesmo que sejam finais.
+toda e qualquer operação externa que interaja com o assembly manual precisa ser via ponteiro, variavel global, macro, ou literal.
 
 "biblis/impressao.asm" é a biblioteca de impressão que contém as funções de impressão padrão, como as anteriores e "_escrever_car();", "_escrever_longo();", a mais.
 
@@ -72,7 +73,7 @@ longo numeroLongo = 999999999L;
 byte hexadecimal = 0x000000;
 [código]
 
-para valores byte acima de 1 byte, é melhor usar o tipo int, de 4 bytes, ou o tipo longo, de 8 bytes.
+para valores byte acima de 1 byte, é melhor usar o tipo int, de 4 bytes, ou o tipo longo, de 8 bytes, mas NUNCA coloque préfixos como "L" no final.
 
 e ponteiros:
 
@@ -83,6 +84,8 @@ flu* flutuante = 1.5f;
 bool* booleano = verdade;
 longo* numeroLongo = 999999999999L;
 byte* hexadecimal = 0x000000;
+int* hexadecimal = 0x000000;
+longo* hexadecimal = 0x000000;
 [código]
 
 arrays:
@@ -333,7 +336,7 @@ os de memória são:
 
 ## MACROS ##
 
-você pode usar #def para definir macros númericos de inteiro ou longo.
+você pode usar #def para definir macros númericos de inteiro ou longo. Não se pode definir outros tipos com "#def".
 
 [código]
 #def INTEIRO 172834;
@@ -360,6 +363,12 @@ int textam(car* p);
 
 // retorna 1 se o texto tem o caractere e 0 senão
 int texcar(car* p, car c);
+
+// transforma números inteiros em texto e retorna o ponteiro:
+car* inttex(int num);
+
+// faz a mesma coisa, só que com números longos
+car* longotex(longo num);
 
 "biblis/cvts.fpb": contém:
 

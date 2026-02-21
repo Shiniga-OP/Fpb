@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 20/02/2026.
+* [ATUAL]: 21/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // carregar
@@ -562,7 +562,7 @@ void carregar_valor(FILE* s, Variavel* var) {
             }
         }
     } else {
-        if(var->eh_ponteiro) fatal("[carregar_valor] erro interno: carregar_valor chamado para ponteiro");
+        if(var->eh_ponteiro) fp_ldr(s, "x0", var->pos);
         else if(var->eh_array) fp_add_fp(s, "x0", var->pos);
         else {
             switch(tam_tipo(var->tipo_base)) {
@@ -619,7 +619,7 @@ void armazenar_valor(FILE* s, Variavel* var) {
                 break;
                 case 4:
                     if(var->tipo_base == T_pFLU) fp_str(s, "s0", var->pos);
-                    else fp_str(s, "w0", var->pos);
+                    else fp_str(s, "x0", var->pos);  // x0 tem w0 zero extendido
                 break;
                 case 8:
                     if(var->tipo_base == T_pDOBRO) fp_str(s, "d0", var->pos);

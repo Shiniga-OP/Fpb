@@ -7,7 +7,7 @@
 * [ARQUITETURA]: ARM64-LINUX-ANDROID(ARM64).
 * [LINGUAGEM]: Português Brasil(PT-BR).
 * [DATA]: 07/02/2026.
-* [ATUAL]: 20/02/2026.
+* [ATUAL]: 21/02/2026.
 * [PONTEIRO]: dereferencia automatica, acesso a endereços apenas com "@ponteiro".
 */
 // buscar
@@ -986,10 +986,6 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
         // atribuição direta ao campo
         TipoToken tipo_exp = expressao(s, escopo);
         
-        // pra ponteiros pra caractere, aceita texto literal
-        if(campo->eh_ponteiro && campo->tipo_base == T_pCAR && tipo_exp == T_TEX) {
-            fprintf(s, "  ldr x0, = %s\n", texs[tex_cnt - 1].nome);
-        }
         // verifica compatibilidade de tipos
         if(!tipos_compativeis(campo->tipo_base, tipo_exp) && 
            !(campo->eh_ponteiro && campo->tipo_base == T_pCAR && tipo_exp == T_TEX)) {
@@ -1011,10 +1007,9 @@ void verificar_atribuicao(FILE* s, const char* id, int escopo) {
         }
         // armazena o valor
         if(campo->eh_ponteiro) {
-            fp_ldr(s, "x1", var->pos);
-            if(campo->tipo_base == T_pLONGO || campo->tipo_base == T_pDOBRO) fprintf(s, "  str x0, [x1]\n");
-            else if(campo->tipo_base == T_pINT) fprintf(s, "  str w0, [x1]\n");
-            else if(campo->tipo_base == T_pCAR) fprintf(s, "  strb w0, [x1]\n");
+            // x0 tem o valor a atribuir(endereço dp texto, ou outro ponteiro)
+            // x1 tem o endereço do campo dentro do espaço, faz str x0, [x1]
+            fprintf(s, "  str x0, [x1]\n");
         } else {
             if(campo->tipo_base == T_pCAR || campo->tipo_base == T_pBOOL || campo->tipo_base == T_pBYTE)
             fprintf(s, "  strb w0, [x1]\n");
@@ -1887,7 +1882,13 @@ void verificar_stmt(FILE* s, int* pos, int escopo) {
             // carrega valor atual
             carregar_valor(s, var);
             // incrementa ou decrementa
-            if(op == T_MAIS_MAIS) {
+            if(var->eh_ponteiro) {
+                // aritmética de ponteiro: passo = tamanho do tipo apontado
+                int passo = tam_tipo(var->tipo_base);
+                if(passo < 1) passo = 1;
+                if(op == T_MAIS_MAIS) fprintf(s, "  add x0, x0, %d\n", passo);
+                else                  fprintf(s, "  sub x0, x0, %d\n", passo);
+            } else if(op == T_MAIS_MAIS) {
                 if(var->tipo_base == T_pFLU) {
                     fprintf(s, "  fmov s1, 1.0\n");
                     fprintf(s, "  fadd s0, s0, s1\n");
@@ -2428,6 +2429,18 @@ TipoToken tratar_id(FILE* s, int escopo) {
     }
     proximoToken();
     
+    // ++/-- pra ponteiros(antes dos desvios especificos de ponteiro)
+    if(var->eh_ponteiro && (L.tk.tipo == T_MAIS_MAIS || L.tk.tipo == T_MENOS_MENOS)) {
+        TipoToken op = L.tk.tipo;
+        proximoToken();
+        fp_ldr(s, "x0", var->pos);
+        int passo = tam_tipo(var->tipo_base);
+        if(passo < 1) passo = 1;
+        if(op == T_MAIS_MAIS) fprintf(s, "  add x0, x0, %d\n", passo);
+        else                  fprintf(s, "  sub x0, x0, %d\n", passo);
+        fp_str(s, "x0", var->pos);
+        return T_PONTEIRO;
+    }
     if(L.tk.tipo == T_PONTO) {
         if(var->tipo_base != T_ESPACO_ID) {
             fatal("[tratar_id] tentativa de acessar campo em tipo não-estrutura");
@@ -2626,11 +2639,15 @@ TipoToken tratar_id(FILE* s, int escopo) {
         return var->tipo_base;
     }
     if(var->eh_ponteiro && var->tipo_base == T_pCAR) {
-        // ponteiro pra caractere, carrega o endereço do texto
-        fp_ldr(s, "x0", var->pos);
-        return T_PONTEIRO;
+        if(L.tk.tipo == T_COL_ESQ) {
+            // cai no tratamento generico de ponteiro[indice] abaixo
+        } else {
+            // ponteiro pra caractere sem indice: carrega o endereço
+            fp_ldr(s, "x0", var->pos);
+            return T_PONTEIRO;
+        }
     }
-    // acesso a matriz/array (incluindo ponteiro de array: int[]* p)
+    // acesso a matriz/array(incluindo ponteiro de array: int[]* p)
     if(L.tk.tipo == T_COL_ESQ && (var->eh_array || var->eh_ponteiro)) {
         int* indices = malloc(MAX_DIMS * sizeof(int));
         int dim_atual = 0;
@@ -3214,7 +3231,7 @@ TipoToken fator(FILE* s, int escopo) {
         else if(var->eh_parametro && var->eh_array)
         fp_ldr(s, "x0", var->pos);
         else
-        fp_add_fp(s, "x0", var->pos);   // endereço de variavel normal
+        fp_add_fp(s, "x0", var->pos); // endereço de variavel normal
         
         proximoToken();
         return T_PONTEIRO;
@@ -3234,7 +3251,12 @@ TipoToken fator(FILE* s, int escopo) {
         carregar_valor(s, var);
         
         // incrementa ou decrementa
-        if(op == T_MAIS_MAIS) {
+        if(var->eh_ponteiro) {
+            int passo = tam_tipo(var->tipo_base);
+            if(passo < 1) passo = 1;
+            if(op == T_MAIS_MAIS) fprintf(s, "  add x0, x0, %d\n", passo);
+            else                  fprintf(s, "  sub x0, x0, %d\n", passo);
+        } else if(op == T_MAIS_MAIS) {
             if(var->tipo_base == T_pFLU) {
                 fprintf(s, "  fmov s1, 1.0\n");
                 fprintf(s, "  fadd s0, s0, s1\n");
@@ -3261,10 +3283,10 @@ TipoToken fator(FILE* s, int escopo) {
         }
         // armazena o novo valor
         armazenar_valor(s, var);
-        // carrega denovo pra retornar o valor(pre fixado retorna o novo valor)
+        // carrega denovo pra retornar o valor(pre-fixado retorna o novo valor)
         carregar_valor(s, var);
         
-        return var->tipo_base;
+        return var->eh_ponteiro ? T_PONTEIRO : var->tipo_base;
     }
     if(L.tk.tipo == T_MENOS) {
         proximoToken();
@@ -3393,7 +3415,6 @@ TipoToken expressao(FILE* s, int escopo) {
             L.tk = tk_salvo;
         }
     }
-    
     // processa primeiro nível: comparações e operadores aritmeticos
     TipoToken tipo = termo(s, escopo);
     

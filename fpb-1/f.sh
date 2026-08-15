@@ -7,6 +7,7 @@ clang /storage/emulated/0/pacotes/fpb/$COM.c -o $COM
 cp -r /storage/emulated/0/pacotes/fpb/biblis ./
 cp -r /storage/emulated/0/pacotes/fpb/testes ./
 cp -r /storage/emulated/0/pacotes/fpb/util ./
+cp -r /storage/emulated/0/pacotes/fpb/arq ./
 cp /storage/emulated/0/pacotes/fpb/$ARQ.fpb ./
 ./$COM  $ARQ $M1 $M2 $M3
 cp $ARQ.asm /storage/emulated/0/pacotes/fpb/testes/tmp/

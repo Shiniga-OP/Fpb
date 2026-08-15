@@ -1,0 +1,44 @@
+vazio _escrever_int(int num) {
+    car[12] buffer; // buffer suficiente pra int 32 bits + sinal + nulo
+    car* ptr = @buffer + 10; // começa do final
+    int temp = num;
+    
+    // trata negativo de uma vez
+    se(temp < 0) temp = -temp;
+    
+    // coloca terminador
+    ptr[0] = 0;
+    
+    // converte digitos(do menor pro maior)
+    enq(temp > 0) {
+        ptr--;
+        ptr[0] = (car)((temp % 10) + 48); // 48 = '0' em ASCII
+        temp = temp / 10;
+    }
+    // caso especial pro número 0
+    se(ptr[0] == 0 && num == 0) {
+        ptr--;
+        ptr[0] = '0';
+    }
+    // adiciona sinal se necessario
+    senao se(num < 0) {
+        ptr--;
+        ptr[0] = '-';
+    }
+    // imprime
+    int tam = 0;
+    enq(verdade) {
+        se(ptr[tam] == '\0') {
+            tam++;
+            pare;
+        }
+        tam++;
+    }
+    _asm_(
+        "   mov x0, 1\n",
+        "   ldr x1, ", ptr, '\n',
+        "   ldr x2, ", tam, '\n',
+        "   mov x8, 64\n",
+        "   svc 0\n"
+    );
+}

@@ -1,0 +1,24 @@
+#incluir "biblis/impressao.asm";
+#global inicio();
+
+#espaco Percep {
+    flu[2] pesos;
+    flu bias;
+}
+
+int prever(Percep* p) {
+    flu soma = p.bias;
+    por(int i = 0; i < 2; i++) {
+        soma = soma + 1 * p.pesos[i];
+    }
+    retorne 1;
+}
+
+vazio inicio() {
+    Percep p2;
+    Percep* p = @p2;
+    p.pesos[0] = 0.4f;
+    p.pesos[1] = 0.5f;
+    p.bias = 0.8f;
+    escrever(prever(@p));
+}

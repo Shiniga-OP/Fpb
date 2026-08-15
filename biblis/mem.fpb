@@ -1,4 +1,17 @@
-#incluir "biblis/mem.asm";
-vazio memcp(car[] arr, car* p, int tam);
-int* memalocar(int bytes);
-vazio memliberar(int* p, int bytes);
+nulo* malocar(int bytes) {
+    int tam = bytes + 4;
+    int* bruto = #chamada_sistema 3, nulo, tam, 3, 34, -1, 0;
+    bruto[0] = bytes;
+
+    car* baseCar = (car*)bruto;
+    car* usuario = baseCar + 4;
+    retorne (nulo*)usuario;
+}
+
+int mliberar(nulo* ptr) {
+    car* usuario = (car*)ptr;
+    car* baseCar = usuario + (-4);
+    int* bruto = (int*)baseCar;
+    int tam = bruto[0] + 4;
+    retorne #chamada_sistema 4, bruto, tam;
+}

@@ -32,9 +32,8 @@ void fp_add_fp(FILE* s, const char* dst, int pos);
 #include "analisador.h"
 
 // [EMISSÃO SEGURA]:
-// ARM64 unscaled (STUR/LDUR): posset 9-bit signed → -256..255
-// Para possets fora desse range usa x9 como scratch temporário.
-// x9 é caller-saved e não interfere com x0..x8 usados para retorno/args.
+// ARM64(STUR/LDUR): 9-bit sinal -> -256..255
+// x9 é salvo e não interfere com x0..x8 usados para retorno/args
 static inline int _pos_ok(int pos) { return pos >= -256 && pos <= 255; }
 
 void fp_str(FILE* s, const char* reg, int pos) {

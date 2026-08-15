@@ -107,6 +107,22 @@ void otimizarLiterais(const char* arquivo_asm) {
                                     if(sscanf(prox_prox_linha, " ldr %[^,], [sp], 16", reg_load) == 1 ||
                                         sscanf(prox_prox_linha, "\tldr %[^,], [sp], 16", reg_load) == 1) {
                                         
+                                        // segurança: se reg_load começa com 'w', emitir
+                                        // "mov wN, wM" zero-extende e destrói xN.
+                                        // se xN for lido depois antes de ser redefinido,
+                                        // a otimização é incorreta — não aplicar.
+                                        // caso cross-reg (reg_prox != reg_load): emitir
+                                        // "mov reg_load, reg_prox" destrói o valor anterior
+                                        // de reg_load sem garantia de que foi redefinido
+                                        // no bloco atual. lookbehind não disponível neste
+                                        // passe linear — desabilitar este caso.
+                                        int seguro = (strcmp(reg_prox, reg_load) == 0) ? 1 : 0;
+
+                                        if(!seguro) {
+                                            // não otimiza: restaura posição e emite as linhas normalmente
+                                            fseek(arq, posicao_atual, SEEK_SET);
+                                            if(debug1) printf("  literal redundante ignorado: xreg em uso apos ldr\n");
+                                        } else {
                                         if(debug1) {
                                             printf("  otimizando literal redundante: ");
                                             printf("mov %s, %ld -> str -> mov %s, %ld -> ldr\n", 
@@ -134,6 +150,7 @@ void otimizarLiterais(const char* arquivo_asm) {
                                         // limpa linha anterior e pula as linhas processadas
                                         linha_anterior[0] = '\0';
                                         continue;
+                                        } // fim if(seguro)
                                     } else {
                                         // não é o padrão esperado, volta
                                         fseek(arq, posicao_atual, SEEK_SET);

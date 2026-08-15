@@ -1,0 +1,64 @@
+#incluir "mem.fpb";
+
+int textam(car* txt) {
+    int i = 0;
+    enq(txt[i] != 0) {
+        i = i + 1;
+    }
+    retorne i;
+}
+
+car* inttex(int numero) {
+    car* buffer = malocar(21);
+    int valor = numero;
+
+    int negativo = 0;
+    se(numero < 0) {
+        negativo = 1;
+        valor = 0 - numero;
+    }
+    int ehZero = 0;
+    se(valor == 0) {
+        ehZero = 1;
+    }
+    se(ehZero == 1) {
+        buffer[0] = 48;
+        buffer[1] = 0;
+        retorne buffer;
+    }
+    int indice = 20;
+    buffer[indice] = 0;
+    indice = indice - 1;
+
+    int continuar = 1;
+    enq(continuar == 1) {
+        int quociente = valor / 10;
+        int resto = valor - (quociente * 10);
+        
+        buffer[indice] = resto + 48;
+        indice = indice - 1;
+        valor = quociente;
+
+        se(valor == 0) {
+            continuar = 0;
+        }
+    }
+    se(negativo == 1) {
+        buffer[indice] = 45;
+        indice = indice - 1;
+    }
+    int inicio = 0;
+    indice = indice + 1;
+
+    int deslocando = 1;
+    enq(deslocando == 1) {
+        buffer[inicio] = buffer[indice];
+        
+        se(buffer[indice] == 0) {
+            deslocando = 0;
+        }
+        inicio = inicio + 1;
+        indice = indice + 1;
+    }
+    retorne buffer;
+}

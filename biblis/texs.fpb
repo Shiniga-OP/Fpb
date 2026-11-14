@@ -6,14 +6,14 @@ int textam(car* txt) {
     retorne i;
 }
 
-int texcomp(car* txt1, car* txt2) {
+bool texcomp(car* txt1, car* txt2) {
     int i = 0;
     por(; txt1[i] != 0; i++) {
-        se(txt1[i] != txt2[i]) retorne 0;
+        se(txt1[i] != txt2[i]) retorne falso;
     }
-    se(txt2[i] != 0) retorne 0;
+    se(txt2[i] != 0) retorne falso;
     
-    retorne 1;
+    retorne verdade;
 }
 
 nulo inttex(int numero, car* buffer) {

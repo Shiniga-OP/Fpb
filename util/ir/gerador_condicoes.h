@@ -7,11 +7,12 @@ inline void GeradorIR::atribuirMarcacao(int slot, long valor, Vetor<ComandoIR>& 
     comandoIR.tipo = ComandoIR::Tipo::REATRIBUICAO;
     comandoIR.instrucaoReatribuicao.slotDestino = slot;
     comandoIR.instrucaoReatribuicao.valor = imediatoInt(valor);
+    comandoIR.instrucaoReatribuicao.larguraDestino = 4;
     saida.empurrar(comandoIR);
 }
 
-// invariante: o flag "slot" vale 0 na entrada. Na saída vale 1 se "cond" é verdadeira, 0 senão.
-// operandos com efeito colateral (chamadas) vão pro bloco onde só executam quando necessário (curto-circuito).
+// invariante: a marcação "slot" vale 0 na entrada. Na saída vale 1 se "cond" é verdadeira, 0 senão.
+// operandos com efeito colateral(chamadas) vão pro bloco onde só executam quando necessário(curto-circuito).
 inline void GeradorIR::marcarSeVerdadeira(const Condicao& cond, int slot, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     ComandoIR comandoIR;
     comandoIR.tipo = ComandoIR::Tipo::SE;
@@ -40,7 +41,7 @@ inline void GeradorIR::marcarSeVerdadeira(const Condicao& cond, int slot, Vetor<
     saida.empurrar(comandoIR);
 }
 
-// comparação simples continua igual a antes (sem custo extra). && / || viram um flag temporário comparado com 0.
+// comparação simples continua igual a antes(sem custo extra). && / || viram uma marcação temporária comparada com 0.
 inline void GeradorIR::resolverCondicao(const Condicao& cond, Vetor<ComandoIR>& saida, ContextoFuncao& ctx, ArgumentoIR& esquerda, OperadorComparacaoIR& operador, ArgumentoIR& direita) {
     if(cond.tipo == Condicao::Tipo::COMPARACAO) {
         esquerda = resolverExpressao(cond.esquerda, saida, ctx);

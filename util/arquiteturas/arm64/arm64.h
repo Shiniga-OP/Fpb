@@ -36,7 +36,7 @@ public:
     void emitirPuxarPegarSalvo(std::ostringstream& saida, const int* registradoresUsados, int totalRegistradoresUsados, int basePos, bool salvar);
     void emitirCarregarParametro(std::ostringstream& saida, const char* registradorDestino, int indiceParametro);
     std::string paraRegistrador32(const char* registradorX);
-    void emitirCarregarSlot(std::ostringstream& saida, const char* registradorDestino, int slot, int larguraBytes);
+    void emitirCarregarSlot(std::ostringstream& saida, const char* registradorDestino, int slot, int larguraBytes, bool sinalizado = true);
     void emitirGravarSlot(std::ostringstream& saida, const char* registradorOrigem, int slot, int larguraBytes);
     void emitirMovImediato(std::ostringstream& saida, const char* registradorDestino, long valor, bool usaW);
     void emitirCarregarValorEm(std::ostringstream& saida, const char* registradorDestino, const ArgumentoIR& arg);

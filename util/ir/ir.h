@@ -20,6 +20,8 @@ struct ArgumentoIR {
     long imediato = 0; // usado quando tipo == IMEDIATO
     int registrador = -1; // usado quando tipo == REGISTRADOR: indice x0..x5 (posição do parâmetro)
     int larguraBytes = 8; // largura em bytes do VALOR em si(não confundir com larguraElemento, que e' a largura do que um PONTEIRO aponta): 1 pra car, 4 pra int(32 bits), 8 pra longo/ponteiro(64 bits). Decide o registrador usado pela arquitetura(w de 32 bits pra 1 e 4, x de 64 bits pra 8) e a instrucao de memoria(strb/ldrb pra 1, str/ldr de 32 bits pra 4, str/ldr de 64 bits pra 8) na hora de materializar/gravar o valor
+    bool sinalizado = true; // so importa pra larguraBytes 1 e 2: decide entre ldrsb/ldrsh/sxtb/sxth(true) e ldrb/ldrh/uxtb/uxth(false) ao carregar o valor. car e bool são sem sinal, byte e curto com sinal
+    bool elementoSinalizado = false; // so quando este ArgumentoIR e um PONTEIRO: sinal do elemento apontado, aplicado ao resultado de "nome[indice]"
     int larguraElemento = 1; // usado so quando este ArgumentoIR representa um PONTEIRO sendo indexado(nome[indice]): tamanho em bytes de CADA elemento apontado(1 pra car*, 8 pra int*, ou qualquer outro valor se novos tipos forem adicionados no futuro). indice sempre conta em ELEMENTOS(igual C): endereco = ponteiro + indice*larguraElemento
 
     void liberar() {
@@ -159,7 +161,8 @@ struct InstrucaoEnquanto {
 // e so mais um slot de 16 bytes no frame da função.
 struct InstrucaoReatribuicao {
     int slotDestino;
-    ArgumentoIR valor;
+    ArgumentoIR valor; // largura e sinal de ORIGEM: o valor e carregado com eles(extensão correta) e depois gravado com larguraDestino
+    int larguraDestino = 8; // largura em bytes da gravação no slot(tipo da variável de destino)
 
     void liberar() {
         valor.liberar();

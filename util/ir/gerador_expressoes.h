@@ -77,7 +77,9 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
     referenciaSlot.simbolo = nullptr;
     referenciaSlot.imediato = 0;
     referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = (esquerda.larguraBytes > direita.larguraBytes) ? esquerda.larguraBytes : direita.larguraBytes;
+    int larguraResultado = (esquerda.larguraBytes > direita.larguraBytes) ? esquerda.larguraBytes : direita.larguraBytes;
+    if(larguraResultado < 4) larguraResultado = 4; // promoção pra int, como em Java: byte/curto/car/bool operados viram int
+    referenciaSlot.larguraBytes = larguraResultado;
     return referenciaSlot;
 }
 
@@ -133,6 +135,7 @@ inline ArgumentoIR GeradorIR::resolverIndexacao(const Expressao& expressao, Veto
     referenciaSlot.imediato = 0;
     referenciaSlot.registrador = slot;
     referenciaSlot.larguraBytes = ponteiro.larguraElemento; // largura do valor lido segue a largura do elemento apontado pelo ponteiro
+    referenciaSlot.sinalizado = ponteiro.elementoSinalizado;
     return referenciaSlot;
 }
 
@@ -146,12 +149,52 @@ inline ArgumentoIR GeradorIR::resolverConversao(const Expressao& expressao, Veto
     if(valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
         throw std::runtime_error("Erro: nao e possivel converter um texto literal para outro tipo");
     }
-    valor.larguraBytes = larguraDoTipo(expressao.tipoConversao);
+    if(expressao.tipoConversao == TipoVariavel::BOOL) {
+        // (bool)x normaliza pra 0 ou 1(x != 0). Imediato resolve em tempo de compilação; o resto vira "slot = 0; se(x != 0) { slot = 1; }".
+        if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) {
+            valor.imediato = (valor.imediato != 0) ? 1 : 0;
+            valor.larguraBytes = 1;
+            return valor;
+        }
+        int slot = ctx.variaveisLocais.proximoSlot++;
+        atribuirMarcacao(slot, 0, saida);
+        ComandoIR comandoSe;
+        comandoSe.tipo = ComandoIR::Tipo::SE;
+        comandoSe.instrucaoSe.iniciar();
+        comandoSe.instrucaoSe.esquerda = valor;
+        comandoSe.instrucaoSe.operador = OperadorComparacaoIR::DIFERENTE;
+        comandoSe.instrucaoSe.direita = imediatoInt(0);
+        atribuirMarcacao(slot, 1, *comandoSe.instrucaoSe.entao);
+        saida.empurrar(comandoSe);
+        ArgumentoIR referenciaSlot;
+        referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
+        referenciaSlot.simbolo = nullptr;
+        referenciaSlot.imediato = 0;
+        referenciaSlot.registrador = slot;
+        referenciaSlot.larguraBytes = 1;
+        return referenciaSlot;
+    }
+    int larguraNova = larguraDoTipo(expressao.tipoConversao);
+    bool sinalNovo = tipoEhSinalizado(expressao.tipoConversao);
+    if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && larguraNova > valor.larguraBytes) {
+        // alargar: relabelar so a largura leria bytes que nunca foram gravados no slot de origem. Copia pra um slot novo(a arquitetura carrega com a largura e o sinal de origem, estendendo certo, e grava na largura nova).
+        int slot = ctx.variaveisLocais.proximoSlot++;
+        ComandoIR comandoCopia;
+        comandoCopia.tipo = ComandoIR::Tipo::REATRIBUICAO;
+        comandoCopia.instrucaoReatribuicao.slotDestino = slot;
+        comandoCopia.instrucaoReatribuicao.valor = valor;
+        comandoCopia.instrucaoReatribuicao.larguraDestino = larguraNova;
+        saida.empurrar(comandoCopia);
+        valor.registrador = slot;
+    }
+    valor.larguraBytes = larguraNova;
+    valor.sinalizado = sinalNovo;
+    valor.elementoSinalizado = elementoEhSinalizado(expressao.tipoConversao);
     valor.larguraElemento = larguraElementoApontado(expressao.tipoConversao); // a conversão muda o tipo do ponteiro: "nome[indice]" após a conversão precisa usar o passo do tipo NOVO, nao do tipo antigo(ex: (int*)baseCar precisa indexar de 4 em 4, mesmo que baseCar fosse car*)
     if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) {
-        // trunca em tempo de compilação quando o valor ja e conhecido,
-        // mesma semântica do truncamento em tempo de execucao(w/strb/str32) usado pra registradores. longo/ponteiro(8 bytes) nao trunca.
-        if(valor.larguraBytes == 1) valor.imediato = valor.imediato & 0xFF;
+        // trunca em tempo de compilação, estendendo o sinal quando o tipo é com sinal(ex: (byte)200 vale -56).
+        if(valor.larguraBytes == 1) valor.imediato = sinalNovo ? (long)(signed char)valor.imediato : (valor.imediato & 0xFF);
+        else if(valor.larguraBytes == 2) valor.imediato = sinalNovo ? (long)(short)valor.imediato : (valor.imediato & 0xFFFF);
         else if(valor.larguraBytes == 4) valor.imediato = valor.imediato & 0xFFFFFFFFL;
     }
     return valor;
@@ -221,6 +264,8 @@ inline ArgumentoIR GeradorIR::resolverChamadaFuncaoComoValor(const Expressao& ex
     referenciaSlot.imediato = 0;
     referenciaSlot.registrador = slot;
     referenciaSlot.larguraBytes = larguraResultado;
+    referenciaSlot.sinalizado = tipoEhSinalizado(tipoRetorno.tipo);
+    referenciaSlot.elementoSinalizado = elementoEhSinalizado(tipoRetorno.tipo);
     referenciaSlot.larguraElemento = larguraElementoApontado(tipoRetorno.tipo); // relevante se o retorno for usado como ponteiro indexado(ex: "malocar(10)[0]")
     return referenciaSlot;
 }

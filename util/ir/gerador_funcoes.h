@@ -122,6 +122,8 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
         arg.registrador = i;
         arg.larguraBytes = larguraDoTipo(funcao.parametros[i].tipo);
         arg.larguraElemento = larguraElementoApontado(funcao.parametros[i].tipo);
+        arg.sinalizado = tipoEhSinalizado(funcao.parametros[i].tipo);
+        arg.elementoSinalizado = elementoEhSinalizado(funcao.parametros[i].tipo);
         ctx.variaveisLocais.definirComSlot(funcao.parametros[i].nome, arg, i);
         funcaoIR.parametrosLargura.empurrar(arg.larguraBytes);
     }

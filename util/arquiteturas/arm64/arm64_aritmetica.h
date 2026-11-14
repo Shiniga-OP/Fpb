@@ -15,6 +15,7 @@
 inline void ARM64::emitirOperacaoAritmetica(std::ostringstream& saida, const InstrucaoOperacaoAritmetica& instrucao) {
     // regra de promocao: usa a MAIOR largura entre os dois operandos, decide se opera em w(32 bits, largura<=4) ou x(64 bits, largura==8)
     int largura = (instrucao.esquerda.larguraBytes > instrucao.direita.larguraBytes) ? instrucao.esquerda.larguraBytes : instrucao.direita.larguraBytes;
+    if(largura < 4) largura = 4; // promoção pra int: operandos de 1 e 2 bytes são estendidos e operados em 32 bits
     bool usaW = (largura <= 4);
     emitirCarregarValorEmComLargura(saida, "x9", instrucao.esquerda, largura);
     emitirCarregarValorEmComLargura(saida, "x10", instrucao.direita, largura);

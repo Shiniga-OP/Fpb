@@ -8,7 +8,8 @@
 // tipo novo no futuro exige mudar só aqui.
 // car=1, int=4(32 bits), longo=8(64 bits), qualquer ponteiro=8(endereco).
 inline int GeradorIR::larguraDoTipo(TipoVariavel tipo) {
-    if(tipo == TipoVariavel::CAR) return 1;
+    if(tipo == TipoVariavel::CAR || tipo == TipoVariavel::BOOL || tipo == TipoVariavel::BYTE) return 1;
+    if(tipo == TipoVariavel::CURTO) return 2;
     if(tipo == TipoVariavel::INT) return 4;
     return 8; // LONGO, CAR_PONTEIRO, LONGO_PONTEIRO, NULO_PONTEIRO
 }
@@ -21,10 +22,21 @@ inline int GeradorIR::larguraDoTipo(TipoVariavel tipo) {
 // Nao confundir com larguraDoTipo() acima: o PONTEIRO em si sempre
 // ocupa 8 bytes(endereco de 64 bits); aqui e' a largura do que ele APONTA.
 inline int GeradorIR::larguraElementoApontado(TipoVariavel tipoPonteiro) {
-    if(tipoPonteiro == TipoVariavel::CAR_PONTEIRO) return 1;
+    if(tipoPonteiro == TipoVariavel::CAR_PONTEIRO || tipoPonteiro == TipoVariavel::BOOL_PONTEIRO || tipoPonteiro == TipoVariavel::BYTE_PONTEIRO) return 1;
+    if(tipoPonteiro == TipoVariavel::CURTO_PONTEIRO) return 2;
     if(tipoPonteiro == TipoVariavel::INT_PONTEIRO) return 4;
     if(tipoPonteiro == TipoVariavel::LONGO_PONTEIRO) return 8;
     return 1; // tipo não-ponteiro(ou NULO_PONTEIRO, generico) nunca deveria ser indexado sem conversão antes; 1 e o valor historico/seguro
+}
+
+// sinal do VALOR de um tipo: car e bool são sem sinal(zero-estendem), todos os outros com sinal. So importa pra largura 1 e 2.
+inline bool GeradorIR::tipoEhSinalizado(TipoVariavel tipo) {
+    return !(tipo == TipoVariavel::CAR || tipo == TipoVariavel::BOOL);
+}
+
+// sinal de CADA ELEMENTO apontado por um tipo ponteiro: car*, bool* e nulo* são sem sinal, os demais com sinal.
+inline bool GeradorIR::elementoEhSinalizado(TipoVariavel tipoPonteiro) {
+    return tipoPonteiro == TipoVariavel::BYTE_PONTEIRO || tipoPonteiro == TipoVariavel::CURTO_PONTEIRO || tipoPonteiro == TipoVariavel::INT_PONTEIRO || tipoPonteiro == TipoVariavel::LONGO_PONTEIRO;
 }
 
 // traduz o operador aritmético da AST(OperadorAritmetico) pro equivalente
@@ -84,6 +96,8 @@ inline ArgumentoIR GeradorIR::copiarArgumento(const ArgumentoIR& original) {
     copia.simbolo = original.simbolo ? strdup(original.simbolo) : nullptr;
     copia.larguraBytes = original.larguraBytes;
     copia.larguraElemento = original.larguraElemento;
+    copia.sinalizado = original.sinalizado;
+    copia.elementoSinalizado = original.elementoSinalizado;
     return copia;
 }
 

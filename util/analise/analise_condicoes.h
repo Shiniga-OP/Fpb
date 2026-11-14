@@ -42,7 +42,7 @@ inline bool Analisador::ehTokenComparacao(TipoToken tipo) {
 // Conversão de tipo é sempre expressão. Senão, acha o ")" correspondente: se logo depois vem um operador de comparação, é expressão.
 inline bool Analisador::ehCondicaoAgrupada() {
     TipoToken seguinte = tokens[pos + 1].tipo;
-    if(seguinte == TipoToken::NULO || seguinte == TipoToken::INT || seguinte == TipoToken::LONGO || seguinte == TipoToken::CAR) return false;
+    if(seguinte == TipoToken::NULO || ehTokenTipoValor(seguinte)) return false;
     int profundidade = 0;
     size_t i = pos;
     while(tokens[i].tipo != TipoToken::FIM_ARQUIVO) {
@@ -87,7 +87,7 @@ inline Condicao Analisador::analisarCondicaoE(const char* nomeConstrucao) {
     return esq;
 }
 
-// base := "(" condicao ")" | primaria OP primaria
+// base := "(" condicao ")" | primaria OP primaria | primaria
 inline Condicao Analisador::analisarCondicaoBase(const char* nomeConstrucao) {
     if(verificar(TipoToken::ABRE_PARENTESE) && ehCondicaoAgrupada()) {
         pos++;
@@ -98,6 +98,13 @@ inline Condicao Analisador::analisarCondicaoBase(const char* nomeConstrucao) {
     Condicao c;
     c.tipo = Condicao::Tipo::COMPARACAO;
     c.esquerda = analisarExpressaoPrimaria();
+    if(!ehTokenComparacao(atual().tipo)) {
+        // sem operador: "se(sim())" vale "se(sim() != 0)"(qualquer valor diferente de zero é verdadeiro)
+        c.operador = OperadorComparacao::DIFERENTE;
+        c.direita.tipo = Expressao::Tipo::NUMERO_LITERAL;
+        c.direita.valor = strdup("0");
+        return c;
+    }
     c.operador = analisarOperadorComparacao(nomeConstrucao);
     c.direita = analisarExpressaoPrimaria();
     return c;

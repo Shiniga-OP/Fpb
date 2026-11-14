@@ -40,30 +40,8 @@ inline Expressao Analisador::analisarConversao() {
         pos++;
         consumir(TipoToken::VEZES, "esperado '*' apos 'nulo' na conversao de tipo(nulo sozinho nao e' um tipo de valor valido)");
         tipoAlvo = TipoVariavel::NULO_PONTEIRO;
-    } else if(verificar(TipoToken::INT)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            tipoAlvo = TipoVariavel::INT_PONTEIRO;
-        } else {
-            tipoAlvo = TipoVariavel::INT;
-        }
-    } else if(verificar(TipoToken::LONGO)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            tipoAlvo = TipoVariavel::LONGO_PONTEIRO;
-        } else {
-            tipoAlvo = TipoVariavel::LONGO;
-        }
     } else {
-        consumir(TipoToken::CAR, "esperado 'int', 'longo', 'car' ou 'nulo' na conversao de tipo");
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            tipoAlvo = TipoVariavel::CAR_PONTEIRO;
-        } else {
-            tipoAlvo = TipoVariavel::CAR;
-        }
+        tipoAlvo = analisarTipoValor("esperado 'int', 'longo', 'car', 'bool', 'byte', 'curto' ou 'nulo' na conversao de tipo");
     }
     consumir(TipoToken::FECHA_PARENTESE, "esperado ')' apos tipo da conversao");
 
@@ -103,30 +81,9 @@ inline Expressao Analisador::analisarBytes() {
     e.valor = nullptr;
     e.bytesNomeVariavel = nullptr;
 
-    if(verificar(TipoToken::INT)) {
-        pos++;
+    if(ehTokenTipoValor(atual().tipo)) {
         e.bytesEhTipoLiteral = true;
-        e.bytesTipoLiteral = TipoVariavel::INT;
-    } else if(verificar(TipoToken::LONGO)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            e.bytesEhTipoLiteral = true;
-            e.bytesTipoLiteral = TipoVariavel::LONGO_PONTEIRO;
-        } else {
-            e.bytesEhTipoLiteral = true;
-            e.bytesTipoLiteral = TipoVariavel::LONGO;
-        }
-    } else if(verificar(TipoToken::CAR)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            e.bytesEhTipoLiteral = true;
-            e.bytesTipoLiteral = TipoVariavel::CAR_PONTEIRO;
-        } else {
-            e.bytesEhTipoLiteral = true;
-            e.bytesTipoLiteral = TipoVariavel::CAR;
-        }
+        e.bytesTipoLiteral = analisarTipoValor("esperado tipo dentro de 'bytes(...)'");
     } else {
         const Token& nome = consumir(TipoToken::IDENTIFICADOR, "esperado tipo(int/longo/car/car*/longo*) ou variavel dentro de 'bytes(...)'");
         e.bytesEhTipoLiteral = false;
@@ -160,7 +117,7 @@ inline Expressao Analisador::analisarExpressaoPrimaria() {
         e.valor = strdup("0");
         return e;
     }
-    if(verificar(TipoToken::ABRE_PARENTESE) && (tokens[pos + 1].tipo == TipoToken::INT || tokens[pos + 1].tipo == TipoToken::LONGO || tokens[pos + 1].tipo == TipoToken::CAR || tokens[pos + 1].tipo == TipoToken::NULO)) {
+    if(verificar(TipoToken::ABRE_PARENTESE) && (ehTokenTipoValor(tokens[pos + 1].tipo) || tokens[pos + 1].tipo == TipoToken::NULO)) {
         return analisarConversao();
     }
     if(verificar(TipoToken::ABRE_PARENTESE)) {

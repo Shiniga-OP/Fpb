@@ -48,6 +48,9 @@ inline void ARM64::emitirLeituraIndexada(std::ostringstream& saida, const Instru
     if(largura == 1) {
         saida << "ldrb w9, [x9]\n";
         emitirGravarSlot(saida, "x9", instrucao.slotDestino, 1);
+    } else if(largura == 2) {
+        saida << "ldrh w9, [x9]\n";
+        emitirGravarSlot(saida, "x9", instrucao.slotDestino, 2);
     } else if(largura == 4) {
         saida << "ldr w9, [x9]\n";
         emitirGravarSlot(saida, "x9", instrucao.slotDestino, 4);
@@ -74,9 +77,11 @@ inline void ARM64::emitirEscritaIndexada(std::ostringstream& saida, const Instru
     saida << "mul x10, x10, x11\n"; // x10 = indice * largura do elemento
     saida << "add x9, x9, x10\n"; // x9 = endereco final(ponteiro + indice*largura)
     saida << "mov x10, x9\n"; // move o endereco pra x10, libera x9 pro valor
-    emitirCarregarValorEm(saida, "x9", instrucao.valor);
+    emitirCarregarValorEmComLargura(saida, "x9", instrucao.valor, largura == 8 ? 8 : 4);
     if(largura == 1) {
         saida << "strb w9, [x10]\n";
+    } else if(largura == 2) {
+        saida << "strh w9, [x10]\n";
     } else if(largura == 4) {
         saida << "str w9, [x10]\n";
     } else {

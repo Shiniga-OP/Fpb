@@ -8,6 +8,7 @@ enum class TipoToken {
     INCLUIR, CHAMADA_SISTEMA,
     // tipagem:
     NULO, INT, LONGO, CAR, // int(32 bits, 4 bytes), longo(64 bits, 8 bytes, mesma largura de qualquer ponteiro), car(usado como "car*")
+    BOOL, BYTE, CURTO, FLUTUANTE, DOBRO,
     IDENTIFICADOR, TEXTO, NUMERO,
     // estrutura:
     ABRE_PARENTESE, FECHA_PARENTESE, ABRE_CHAVE, FECHA_CHAVE, ABRE_COLCHETE, FECHA_COLCHETE,
@@ -23,7 +24,7 @@ enum class TipoToken {
     // laço:
     ENQUANTO, POR,
     // definição:
-    RETORNE,
+    RETORNE, SEM_SINAL,
     // fim:
     FIM_ARQUIVO
 };

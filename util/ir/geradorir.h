@@ -51,6 +51,8 @@ public:
     // === gerador_tipos.h ===
     int larguraDoTipo(TipoVariavel tipo);
     int larguraElementoApontado(TipoVariavel tipoPonteiro);
+    bool tipoEhSinalizado(TipoVariavel tipo);
+    bool elementoEhSinalizado(TipoVariavel tipoPonteiro);
     OperadorAritmeticoIR traduzirOperadorAritmetico(OperadorAritmetico op);
     OperadorComparacaoIR traduzirOperadorComparacao(OperadorComparacao op);
     ArgumentoIR imediatoInt(long valor);

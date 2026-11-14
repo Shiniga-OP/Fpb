@@ -8,7 +8,7 @@
 inline Comando Analisador::analisarComando() {
     Comando comando;
     bool inicioDeclaracaoNuloPonteiro = verificar(TipoToken::NULO) && tokens[pos + 1].tipo == TipoToken::VEZES;
-    if(verificar(TipoToken::INT) || verificar(TipoToken::LONGO) || verificar(TipoToken::CAR) || inicioDeclaracaoNuloPonteiro) {
+    if(ehTokenTipoValor(atual().tipo) || inicioDeclaracaoNuloPonteiro) {
         comando.tipo = Comando::Tipo::DECLARACAO_VARIAVEL;
         comando.declaracaoVariavel = analisarDeclaracaoVariavel();
         return comando;
@@ -199,30 +199,8 @@ inline DeclaracaoVariavel Analisador::analisarDeclaracaoVariavel() {
         pos++;
         consumir(TipoToken::VEZES, "esperado '*' apos 'nulo' na declaração de variável(nulo sozinho nao e' um tipo de valor valido)");
         decl.tipo = TipoVariavel::NULO_PONTEIRO;
-    } else if(verificar(TipoToken::INT)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            decl.tipo = TipoVariavel::INT_PONTEIRO;
-        } else {
-            decl.tipo = TipoVariavel::INT;
-        }
-    } else if(verificar(TipoToken::LONGO)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            decl.tipo = TipoVariavel::LONGO_PONTEIRO;
-        } else {
-            decl.tipo = TipoVariavel::LONGO;
-        }
     } else {
-        consumir(TipoToken::CAR, "esperado 'int', 'longo' ou 'car' no início da declaração de variável");
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            decl.tipo = TipoVariavel::CAR_PONTEIRO;
-        } else {
-            decl.tipo = TipoVariavel::CAR;
-        }
+        decl.tipo = analisarTipoValor("esperado 'int', 'longo', 'car', 'bool', 'byte' ou 'curto' no início da declaração de variável");
     }
     bool ehArray = false;
     int tamArray = 0;
@@ -239,10 +217,9 @@ inline DeclaracaoVariavel Analisador::analisarDeclaracaoVariavel() {
     if(ehArray) {
         decl.tamArray = tamArray;
         if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
-        if(decl.tipo == TipoVariavel::CAR) decl.tipo = TipoVariavel::CAR_PONTEIRO;
-        else if(decl.tipo == TipoVariavel::INT) decl.tipo = TipoVariavel::INT_PONTEIRO;
-        else if(decl.tipo == TipoVariavel::LONGO) decl.tipo = TipoVariavel::LONGO_PONTEIRO;
-        else erro("array só aceita car, int ou longo");
+        TipoVariavel tipoArray = ponteiroDoTipo(decl.tipo);
+        if(tipoArray == decl.tipo) erro("array só aceita int, longo, car, bool, byte ou curto");
+        decl.tipo = tipoArray;
         decl.ehArray = true;
         return decl;
     }
@@ -323,7 +300,7 @@ inline bool Analisador::ehTokenReatribuicao(TipoToken tipo) {
 // reatribuição) quando ehInicio, ou passo (só reatribuição: "i = i + 1", "i += 1", "i++").
 inline void Analisador::analisarPartePor(Vetor<Comando>& destino, bool ehInicio) {
     Comando comando;
-    bool comecaComTipo = verificar(TipoToken::INT) || verificar(TipoToken::LONGO) || verificar(TipoToken::CAR) || (verificar(TipoToken::NULO) && tokens[pos + 1].tipo == TipoToken::VEZES);
+    bool comecaComTipo = ehTokenTipoValor(atual().tipo) || (verificar(TipoToken::NULO) && tokens[pos + 1].tipo == TipoToken::VEZES);
     if(ehInicio && comecaComTipo) {
         comando.tipo = Comando::Tipo::DECLARACAO_VARIAVEL;
         comando.declaracaoVariavel = analisarDeclaracaoVariavel();

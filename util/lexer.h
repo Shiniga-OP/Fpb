@@ -163,15 +163,28 @@ public:
         }
         Token t;
         t.linha = linhaAtual;
+        // literais booleanos viram numero na hora: verdade = 1, falso = 0
+        if(buf.igual("verdade") || buf.igual("falso")) {
+            t.tipo = TipoToken::NUMERO;
+            t.valor = strdup(buf.igual("verdade") ? "1" : "0");
+            buf.liberar();
+            return t;
+        }
         if(buf.igual("nulo")) t.tipo = TipoToken::NULO;
         else if(buf.igual("int")) t.tipo = TipoToken::INT;
         else if(buf.igual("longo")) t.tipo = TipoToken::LONGO;
         else if(buf.igual("car")) t.tipo = TipoToken::CAR;
+        else if(buf.igual("bool")) t.tipo = TipoToken::BOOL;
+        else if(buf.igual("byte")) t.tipo = TipoToken::BYTE;
+        else if(buf.igual("curto")) t.tipo = TipoToken::CURTO;
+        else if(buf.igual("flu")) t.tipo = TipoToken::FLUTUANTE;
+        else if(buf.igual("dobro")) t.tipo = TipoToken::DOBRO;
         else if(buf.igual("se")) t.tipo = TipoToken::SE;
         else if(buf.igual("senao") || buf.igual("senão")) t.tipo = TipoToken::SENAO;
         else if(buf.igual("enq") || buf.igual("enquanto")) t.tipo = TipoToken::ENQUANTO;
         else if(buf.igual("por")) t.tipo = TipoToken::POR;
         else if(buf.igual("retorne")) t.tipo = TipoToken::RETORNE;
+        else if(buf.igual("sem_sinal")) t.tipo = TipoToken::SEM_SINAL;
         else t.tipo = TipoToken::IDENTIFICADOR;
         t.valor = buf.paraTokenTexto();
         buf.liberar();

@@ -105,21 +105,32 @@ inline std::string ARM64::paraRegistrador32(const char* registradorX) {
 // Senão, respeita a largura do tipo na pilha: largura==1(car) usa ldrb num registrador w(zero-estendido, trunca pra 1
 // byte), largura==4(int) usa ldr num registrador w(32 bits, sem truncar), largura==8(longo/ponteiro) usa ldr num
 // registrador x(64 bits).
-inline void ARM64::emitirCarregarSlot(std::ostringstream& saida, const char* registradorDestino, int slot, int larguraBytes) {
+inline void ARM64::emitirCarregarSlot(std::ostringstream& saida, const char* registradorDestino, int slot, int larguraBytes, bool sinalizado) {
     const char* fisico = registradorFisicoDoSlot(slot);
     bool usaW = (larguraBytes <= 4);
+    std::string destinoW = paraRegistrador32(registradorDestino);
     if(fisico) {
-        std::string destinoStr = usaW ? paraRegistrador32(registradorDestino) : std::string(registradorDestino);
-        std::string origemStr = usaW ? paraRegistrador32(fisico) : std::string(fisico);
+        std::string origemW = paraRegistrador32(fisico);
+        if(larguraBytes == 1 || larguraBytes == 2) {
+            // o registrador físico guarda o valor sem truncar: estende(com ou sem sinal) a partir da largura do tipo
+            const char* sufixo = (larguraBytes == 1) ? "b" : "h";
+            saida << (sinalizado ? "sxt" : "uxt") << sufixo << " " << destinoW << ", " << origemW << "\n";
+            return;
+        }
+        std::string destinoStr = usaW ? destinoW : std::string(registradorDestino);
+        std::string origemStr = usaW ? origemW : std::string(fisico);
         if(destinoStr != origemStr) saida << "mov " << destinoStr << ", " << origemStr << "\n";
         return;
     }
+    int pos = baseSlots + slot * 16;
     if(larguraBytes == 1) {
-        saida << "ldrb " << paraRegistrador32(registradorDestino) << ", [sp, #" << (baseSlots + slot * 16) << "]\n";
+        saida << (sinalizado ? "ldrsb " : "ldrb ") << destinoW << ", [sp, #" << pos << "]\n";
+    } else if(larguraBytes == 2) {
+        saida << (sinalizado ? "ldrsh " : "ldrh ") << destinoW << ", [sp, #" << pos << "]\n";
     } else if(larguraBytes == 4) {
-        saida << "ldr " << paraRegistrador32(registradorDestino) << ", [sp, #" << (baseSlots + slot * 16) << "]\n";
+        saida << "ldr " << destinoW << ", [sp, #" << pos << "]\n";
     } else {
-        saida << "ldr " << registradorDestino << ", [sp, #" << (baseSlots + slot * 16) << "]\n";
+        saida << "ldr " << registradorDestino << ", [sp, #" << pos << "]\n";
     }
 }
 
@@ -136,7 +147,9 @@ inline void ARM64::emitirGravarSlot(std::ostringstream& saida, const char* regis
         if(destinoStr != origemStr) saida << "mov " << destinoStr << ", " << origemStr << "\n";
         return;
     }
-    if(larguraBytes == 1) {
+    if(larguraBytes == 2) {
+        saida << "strh " << paraRegistrador32(registradorOrigem) << ", [sp, #" << (baseSlots + slot * 16) << "]\n";
+    } else if(larguraBytes == 1) {
         saida << "strb " << paraRegistrador32(registradorOrigem) << ", [sp, #" << (baseSlots + slot * 16) << "]\n";
     } else if(larguraBytes == 4) {
         saida << "str " << paraRegistrador32(registradorOrigem) << ", [sp, #" << (baseSlots + slot * 16) << "]\n";
@@ -205,7 +218,7 @@ inline void ARM64::emitirCarregarValorEmComLargura(std::ostringstream& saida, co
         bool usaW = (arg.larguraBytes <= 4);
         emitirMovImediato(saida, registradorDestino, arg.imediato, usaW);
     } else if(arg.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
-        emitirCarregarSlot(saida, registradorDestino, arg.registrador, arg.larguraBytes);
+        emitirCarregarSlot(saida, registradorDestino, arg.registrador, arg.larguraBytes, arg.sinalizado);
     } else {
         throw std::runtime_error("Arquitetura ARM64: esta operação não suporta texto(SIMBOLO_TEXTO) como operando");
     }
@@ -221,10 +234,11 @@ inline void ARM64::emitirReatribuicao(std::ostringstream& saida, const Instrucao
     if(valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
         saida << "ldr x9, =" << valor.simbolo << "\n";
     } else if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
-        emitirCarregarSlot(saida, "x9", valor.registrador, valor.larguraBytes);
+        // carrega com largura e sinal de ORIGEM(estende pra 64 bits se o destino for de 8 bytes) e grava só a largura do destino
+        emitirCarregarValorEmComLargura(saida, "x9", valor, instrucao.larguraDestino);
     } else {
         bool usaW = (valor.larguraBytes <= 4);
         emitirMovImediato(saida, "x9", valor.imediato, usaW);
     }
-    emitirGravarSlot(saida, "x9", instrucao.slotDestino, valor.larguraBytes);
+    emitirGravarSlot(saida, "x9", instrucao.slotDestino, instrucao.larguraDestino);
 }

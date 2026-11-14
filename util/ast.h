@@ -7,7 +7,18 @@
 enum class OperadorAritmetico { SOMA, SUBTRACAO, MULTIPLICACAO, DIVISAO, MODULO };
 
 // tipo declarado de uma variável: int(32 bits, 4 bytes), car(caractere/byte de 8 bits), longo(64 bits, 8 bytes) ou os respectivos ponteiros(car*, int*, longo*, sempre 8 bytes de endereco, mas indexando elementos de largura diferente). Declarado aqui em cima pois CONVERSAO referencia o tipo alvo.
-enum class TipoVariavel { INT, CAR, CAR_PONTEIRO, LONGO, LONGO_PONTEIRO, INT_PONTEIRO, NULO_PONTEIRO };
+enum class TipoVariavel { INT, CAR, CAR_PONTEIRO, LONGO, LONGO_PONTEIRO, INT_PONTEIRO, NULO_PONTEIRO, BOOL, BOOL_PONTEIRO, BYTE, BYTE_PONTEIRO, CURTO, CURTO_PONTEIRO };
+
+// devolve o ponteiro do tipo de valor dado(ex: INT -> INT_PONTEIRO). Tipo que não tem ponteiro correspondente(ou já é ponteiro) volta igual.
+inline TipoVariavel ponteiroDoTipo(TipoVariavel tipo) {
+    if(tipo == TipoVariavel::INT) return TipoVariavel::INT_PONTEIRO;
+    if(tipo == TipoVariavel::CAR) return TipoVariavel::CAR_PONTEIRO;
+    if(tipo == TipoVariavel::LONGO) return TipoVariavel::LONGO_PONTEIRO;
+    if(tipo == TipoVariavel::BOOL) return TipoVariavel::BOOL_PONTEIRO;
+    if(tipo == TipoVariavel::BYTE) return TipoVariavel::BYTE_PONTEIRO;
+    if(tipo == TipoVariavel::CURTO) return TipoVariavel::CURTO_PONTEIRO;
+    return tipo;
+}
 
 // tipo de retorno de uma função: "nulo" continua significando "sem retorno"(mesma palavra chave usada hoje pra declarar função), os demais reusam TipoVariavel pra não duplicar o mesmo espaco de tipos.
 struct TipoRetorno {

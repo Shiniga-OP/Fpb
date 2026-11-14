@@ -8,7 +8,7 @@ inline Programa Analisador::analisar() {
     while(!verificar(TipoToken::FIM_ARQUIVO)) {
         if(verificar(TipoToken::INCLUIR)) {
             programa.inclusoes.empurrar(analisarInclusao());
-        } else if(verificar(TipoToken::NULO) || verificar(TipoToken::INT) || verificar(TipoToken::LONGO) || verificar(TipoToken::CAR)) {
+        } else if(verificar(TipoToken::NULO) || ehTokenTipoValor(atual().tipo)) {
             programa.funcoes.empurrar(analisarFuncao());
         } else {
             erro("Esperado '#incluir' ou declaração de função");
@@ -91,31 +91,7 @@ inline TipoRetorno Analisador::analisarTipoRetorno() {
         return tr;
     }
     tr.ehNulo = false;
-    if(verificar(TipoToken::INT)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            tr.tipo = TipoVariavel::INT_PONTEIRO;
-        } else {
-            tr.tipo = TipoVariavel::INT;
-        }
-    } else if(verificar(TipoToken::LONGO)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            tr.tipo = TipoVariavel::LONGO_PONTEIRO;
-        } else {
-            tr.tipo = TipoVariavel::LONGO;
-        }
-    } else {
-        consumir(TipoToken::CAR, "esperado 'nulo', 'int', 'longo' ou 'car' no tipo de retorno da função");
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            tr.tipo = TipoVariavel::CAR_PONTEIRO;
-        } else {
-            tr.tipo = TipoVariavel::CAR;
-        }
-    }
+    tr.tipo = analisarTipoValor("esperado 'nulo', 'int', 'longo', 'car', 'bool', 'byte' ou 'curto' no tipo de retorno da função");
     return tr;
 }
 
@@ -126,32 +102,33 @@ inline Parametro Analisador::analisarParametro() {
         pos++;
         consumir(TipoToken::VEZES, "esperado '*' apos 'nulo' no tipo do parametro(nulo sozinho nao e' um tipo de valor valido)");
         par.tipo = TipoVariavel::NULO_PONTEIRO;
-    } else if(verificar(TipoToken::INT)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            par.tipo = TipoVariavel::INT_PONTEIRO;
-        } else {
-            par.tipo = TipoVariavel::INT;
-        }
-    } else if(verificar(TipoToken::LONGO)) {
-        pos++;
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            par.tipo = TipoVariavel::LONGO_PONTEIRO;
-        } else {
-            par.tipo = TipoVariavel::LONGO;
-        }
     } else {
-        consumir(TipoToken::CAR, "esperado 'int', 'longo' ou 'car' no tipo do parametro");
-        if(verificar(TipoToken::VEZES)) {
-            pos++;
-            par.tipo = TipoVariavel::CAR_PONTEIRO;
-        } else {
-            par.tipo = TipoVariavel::CAR;
-        }
+        par.tipo = analisarTipoValor("esperado 'int', 'longo', 'car', 'bool', 'byte' ou 'curto' no tipo do parametro");
     }
     const Token& nome = consumir(TipoToken::IDENTIFICADOR, "esperado nome do parametro");
     par.nome = strdup(nome.valor);
     return par;
+}
+
+inline bool Analisador::ehTokenTipoValor(TipoToken tipo) {
+    return tipo == TipoToken::INT || tipo == TipoToken::LONGO || tipo == TipoToken::CAR || tipo == TipoToken::BOOL || tipo == TipoToken::BYTE || tipo == TipoToken::CURTO;
+}
+
+// consome um tipo de valor(int, longo, car, bool, byte, curto) seguido de "*" opcional, e devolve o TipoVariavel correspondente. "nulo" não entra aqui: cada chamador trata antes.
+inline TipoVariavel Analisador::analisarTipoValor(const char* mensagemErro) {
+    TipoToken base = atual().tipo;
+    if(!ehTokenTipoValor(base)) erro(mensagemErro);
+    pos++;
+    TipoVariavel tipo;
+    if(base == TipoToken::INT) tipo = TipoVariavel::INT;
+    else if(base == TipoToken::LONGO) tipo = TipoVariavel::LONGO;
+    else if(base == TipoToken::CAR) tipo = TipoVariavel::CAR;
+    else if(base == TipoToken::BOOL) tipo = TipoVariavel::BOOL;
+    else if(base == TipoToken::BYTE) tipo = TipoVariavel::BYTE;
+    else tipo = TipoVariavel::CURTO;
+    if(verificar(TipoToken::VEZES)) {
+        pos++;
+        return ponteiroDoTipo(tipo);
+    }
+    return tipo;
 }

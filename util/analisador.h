@@ -26,6 +26,8 @@ public:
     DeclaracaoFuncao analisarFuncao();
     TipoRetorno analisarTipoRetorno();
     Parametro analisarParametro();
+    bool ehTokenTipoValor(TipoToken tipo);
+    TipoVariavel analisarTipoValor(const char* mensagemErro);
 
     // === analisador_comandos.h ===
     Comando analisarComando();

@@ -38,6 +38,8 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
     referenciaSlot.imediato = 0;
     referenciaSlot.registrador = slot;
     referenciaSlot.larguraBytes = larguraDoTipo(decl.tipo);
+    referenciaSlot.sinalizado = tipoEhSinalizado(decl.tipo);
+    referenciaSlot.elementoSinalizado = elementoEhSinalizado(decl.tipo);
     referenciaSlot.larguraElemento = larguraElementoApontado(decl.tipo); // so relevante se esta variavel for usada como ponteiro numa indexacao(nome[i]); ver comentario de larguraElementoApontado()
     
     if(decl.ehArray) {
@@ -77,7 +79,8 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
     }
 
     ArgumentoIR valor = resolverExpressao(decl.valorInicial, saida, ctx);
-    valor.larguraBytes = larguraDoTipo(decl.tipo); // a largura da gravacao no slot segue o tipo declarado da variavel, não o tipo da expressão(um "longo" pode virar "car" via cast, e o valor resolvido ja reflete isso, mas fixamos aqui pra garantir consistencia mesmo em literais crus)
+    int larguraDestino = larguraDoTipo(decl.tipo); // a largura da gravacao no slot segue o tipo declarado da variavel, não o tipo da expressão
+    if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = larguraDestino; // imediato não tem slot de origem: monta direto na largura do destino. Registrador mantém largura e sinal de origem pra ser carregado com a extensão certa
 
     // a entrada na tabela precisa ser sempre REGISTRADOR(lê o slot em tempo de execução), nunca o literal resolvido(SIMBOLO_TEXTO/IMEDIATO): o
     // slot pode ser sobrescrito por uma reatribuição mais adiante, e um
@@ -90,6 +93,7 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
     comandoIR.tipo = ComandoIR::Tipo::REATRIBUICAO;
     comandoIR.instrucaoReatribuicao.slotDestino = slot;
     comandoIR.instrucaoReatribuicao.valor = valor;
+    comandoIR.instrucaoReatribuicao.larguraDestino = larguraDestino;
     saida.empurrar(comandoIR);
 }
 
@@ -103,12 +107,13 @@ inline void GeradorIR::gerarReatribuicao(const Reatribuicao& reat, Vetor<Comando
         throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
     }
     ArgumentoIR novoValor = resolverExpressao(reat.valor, saida, ctx);
-    novoValor.larguraBytes = existente.larguraBytes; // a largura da gravacao no slot segue o tipo do slot já declarado, não o tipo da expressão do lado direito
+    if(novoValor.tipo == ArgumentoIR::Tipo::IMEDIATO) novoValor.larguraBytes = existente.larguraBytes; // a gravação segue o tipo do slot já declarado, não o da expressão do lado direito(ver gerarDeclaracaoVariavel)
 
     ComandoIR comandoIR;
     comandoIR.tipo = ComandoIR::Tipo::REATRIBUICAO;
     comandoIR.instrucaoReatribuicao.slotDestino = slot;
     comandoIR.instrucaoReatribuicao.valor = novoValor;
+    comandoIR.instrucaoReatribuicao.larguraDestino = existente.larguraBytes;
     saida.empurrar(comandoIR);
 }
 
@@ -124,7 +129,7 @@ inline void GeradorIR::gerarAtribuicaoIndexada(const AtribuicaoIndexada& atr, Ve
     }
     ArgumentoIR indice = resolverExpressao(atr.indice, saida, ctx);
     ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
-    valor.larguraBytes = ponteiro.larguraElemento; // largura da gravacao segue a largura do elemento apontado pelo ponteiro
+    if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = ponteiro.larguraElemento; // registrador mantém a largura de origem: a arquitetura estende e grava só a largura do elemento
 
     ComandoIR comandoIR;
     comandoIR.tipo = ComandoIR::Tipo::ESCRITA_INDEXADA;

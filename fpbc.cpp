@@ -10,7 +10,7 @@
 #include "util/analisador.h"
 #include "util/ir/geradorir.h"
 #include "util/arquiteturas/arq.h"
-#include "util/arquiteturas/arm64.h"
+#include "util/arquiteturas/arm64/arm64.h"
 
 // informações:
 static std::string versaoAtual = "0.0.1";

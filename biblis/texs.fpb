@@ -1,5 +1,3 @@
-#incluir "mem.fpb";
-
 int textam(car* txt) {
     int i = 0;
     enq(txt[i] != 0) {
@@ -8,8 +6,17 @@ int textam(car* txt) {
     retorne i;
 }
 
-car* inttex(int numero) {
-    car* buffer = malocar(21);
+int texcomp(car* txt1, car* txt2) {
+    int i = 0;
+    por(; txt1[i] != 0; i++) {
+        se(txt1[i] != txt2[i]) retorne 0;
+    }
+    se(txt2[i] != 0) retorne 0;
+    
+    retorne 1;
+}
+
+nulo inttex(int numero, car* buffer) {
     int valor = numero;
 
     int negativo = 0;
@@ -24,7 +31,7 @@ car* inttex(int numero) {
     se(ehZero == 1) {
         buffer[0] = 48;
         buffer[1] = 0;
-        retorne buffer;
+        retorne;
     }
     int indice = 20;
     buffer[indice] = 0;
@@ -60,5 +67,24 @@ car* inttex(int numero) {
         inicio = inicio + 1;
         indice = indice + 1;
     }
-    retorne buffer;
+}
+
+int texint(car* txt) {
+    int i = 0;
+    enq(txt[i] == 32 || (txt[i] >= 9 && txt[i] <= 13)) {
+        i++;
+    }
+    int sinal = 1;
+    se(txt[i] == '-') {
+        sinal = -1;
+        i++;
+    } senao se(txt[i] == '+') {
+        i++;
+    }
+    int resultado = 0;
+    enq(txt[i] >= '0' && txt[i] <= '9') {
+        resultado = resultado * 10 + (txt[i] - '0');
+        i++;
+    }
+    retorne resultado * sinal;
 }

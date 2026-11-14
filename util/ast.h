@@ -148,30 +148,49 @@ struct DeclaracaoVariavel {
     bool ehChamadaSistema; // true se "tipo nome = #chamada_sistema ...;" foi usada(valor inicial vem do retorno da syscall, x0, em vez de uma expressao normal)
     ChamadaSistemaCrua chamadaSistemaInicial; // valido so se ehChamadaSistema == true
 
+    bool ehArray;
+    int tamArray;
+    
     void iniciar() {
         nome = nullptr;
         ehChamadaSistema = false;
+        ehArray = false;
+        tamArray = 0;
     }
+    
     void liberar() {
         free(nome);
         nome = nullptr;
         if(ehChamadaSistema) chamadaSistemaInicial.liberar();
-        else valorInicial.liberar();
+        else if(!ehArray) valorInicial.liberar();
     }
 };
 
 // operador de comparacao usado na condição de um "se".
 enum class OperadorComparacao { IGUAL, DIFERENTE, MAIOR, MENOR, MAIOR_IGUAL, MENOR_IGUAL };
 
-// condicao de um "se": esquerda OP direita, ex: num == num2
+// condicao de um "se"/"enquanto". COMPARACAO: esquerda OP direita, ex: num == num2.
+// E / OU: combinacao de duas condicoes("&&" / "||"), guardadas por ponteiro(alocadas no heap) pra quebrar a recursao de tamanho.
 struct Condicao {
-    Expressao esquerda;
-    OperadorComparacao operador;
-    Expressao direita;
+    enum class Tipo { COMPARACAO, E, OU } tipo;
+    Expressao esquerda; // so COMPARACAO
+    OperadorComparacao operador; // so COMPARACAO
+    Expressao direita; // so COMPARACAO
+    Condicao* condEsquerda = nullptr; // dono: quem criou a condicao(alocado com new). so E/OU
+    Condicao* condDireita = nullptr; // dono: idem. so E/OU
 
     void liberar() {
-        esquerda.liberar();
-        direita.liberar();
+        if(tipo == Tipo::COMPARACAO) {
+            esquerda.liberar();
+            direita.liberar();
+        } else {
+            condEsquerda->liberar();
+            delete condEsquerda;
+            condEsquerda = nullptr;
+            condDireita->liberar();
+            delete condDireita;
+            condDireita = nullptr;
+        }
     }
 };
 
@@ -245,6 +264,26 @@ struct ComandoEnquanto {
     void liberar();
 };
 
+// comando "por(inicio; condicao; passo) { corpo }". "inicio" e "passo" têm 0 ou 1 Comando
+// (declaração/reatribuição e reatribuição, respectivamente). O GeradorIR desdobra em:
+// inicio; enquanto(condicao) { corpo; passo; }
+struct ComandoPor {
+    Vetor<Comando>* inicio; // dono: quem criou o ComandoPor(alocado com new)
+    Condicao condicao;
+    Vetor<Comando>* passo; // dono: idem
+    Vetor<Comando>* corpo; // dono: idem
+
+    void iniciar() {
+        inicio = new Vetor<Comando>();
+        inicio->iniciar();
+        passo = new Vetor<Comando>();
+        passo->iniciar();
+        corpo = new Vetor<Comando>();
+        corpo->iniciar();
+    }
+    void liberar();
+};
+
 // comando "retorne expr;"(funcao tipada) ou "retorne;"(funcao nulo, sem valor).
 struct ComandoRetorne {
     bool temValor;
@@ -258,13 +297,18 @@ struct ComandoRetorne {
 // um comando dentro do corpo de uma função: declaracao de variável,
 // chamada de função normal, chamada de sistema crua, "se", "enquanto", "retorne" ou atribuição indexada(txt[i] = valor).
 struct Comando {
-    enum class Tipo { DECLARACAO_VARIAVEL, REATRIBUICAO, CHAMADA_FUNCAO, CHAMADA_SISTEMA_CRUA, SE, ENQUANTO, RETORNE, ATRIBUICAO_INDEXADA } tipo;
+    enum class Tipo {
+        DECLARACAO_VARIAVEL, REATRIBUICAO,
+        CHAMADA_FUNCAO, CHAMADA_SISTEMA_CRUA,
+        SE, ENQUANTO, POR, RETORNE, ATRIBUICAO_INDEXADA
+    } tipo;
     DeclaracaoVariavel declaracaoVariavel;
     Reatribuicao reatribuicao;
     ChamadaFuncao chamadaFuncao;
     ChamadaSistemaCrua chamadaSistemaCrua;
     ComandoSe comandoSe;
     ComandoEnquanto comandoEnquanto;
+    ComandoPor comandoPor;
     ComandoRetorne comandoRetorne;
     AtribuicaoIndexada atribuicaoIndexada;
 
@@ -275,6 +319,7 @@ struct Comando {
         else if(tipo == Tipo::CHAMADA_SISTEMA_CRUA) chamadaSistemaCrua.liberar();
         else if(tipo == Tipo::SE) comandoSe.liberar();
         else if(tipo == Tipo::ENQUANTO) comandoEnquanto.liberar();
+        else if(tipo == Tipo::POR) comandoPor.liberar();
         else if(tipo == Tipo::RETORNE) comandoRetorne.liberar();
         else if(tipo == Tipo::ATRIBUICAO_INDEXADA) atribuicaoIndexada.liberar();
     }
@@ -302,6 +347,20 @@ inline void ComandoEnquanto::liberar() {
     corpo->liberar();
     delete corpo;
     corpo = nullptr;
+    condicao.liberar();
+}
+
+inline void liberarBlocoComandos(Vetor<Comando>*& bloco) {
+    for(int i = 0; i < bloco->tam; i++) (*bloco)[i].liberar();
+    bloco->liberar();
+    delete bloco;
+    bloco = nullptr;
+}
+
+inline void ComandoPor::liberar() {
+    liberarBlocoComandos(inicio);
+    liberarBlocoComandos(passo);
+    liberarBlocoComandos(corpo);
     condicao.liberar();
 }
 

@@ -313,6 +313,12 @@ public:
                 t.valor = strdup("=");
                 return t;
             case '+':
+                if(!fimDoArquivo() && atual() == '+') {
+                    avancar();
+                    t.tipo = TipoToken::MAIS_MAIS;
+                    t.valor = strdup("++");
+                    return t;
+                }
                 if(!fimDoArquivo() && atual() == '=') {
                     avancar();
                     t.tipo = TipoToken::MAIS_IGUAL;
@@ -323,6 +329,12 @@ public:
                 t.valor = strdup("+");
                 return t;
             case '-':
+                if(!fimDoArquivo() && atual() == '-') {
+                    avancar();
+                    t.tipo = TipoToken::MENOS_MENOS;
+                    t.valor = strdup("--");
+                    return t;
+                }
                 if(!fimDoArquivo() && atual() == '=') {
                     avancar();
                     t.tipo = TipoToken::MENOS_IGUAL;

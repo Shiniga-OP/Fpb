@@ -100,6 +100,8 @@ inline void varrerBlocoParaUsos(const Vetor<ComandoIR>& bloco, Vetor<int>& prime
                     ultimaPos[s] = pos;
                 }
             }
+        } else if(c.tipo == ComandoIR::Tipo::ENDERECO_FRAME) {
+            registrarDefinicaoSlot(c.instrucaoEnderecoFrame.slotDestino, primeiraPos, ultimaPos, pos);
         }
         pos++; // cada ComandoIR do bloco ocupa uma posição própria na numeração
     }

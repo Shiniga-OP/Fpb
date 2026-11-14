@@ -110,6 +110,12 @@ struct InstrucaoOperacaoAritmetica {
 // recursão de tamanho, mesma solução usada em ast.h(ComandoSe).
 struct ComandoIR;
 
+struct InstrucaoEnderecoFrame {
+    int slotDestino;
+    int posArray; // pos dentro da área de arrays do frame
+    void liberar() {}
+};
+
 // desvio condicional no nível de IR: compara esquerda OP direita e executa
 // o bloco "então" ou "senaoCorpo"(se existir).
 struct InstrucaoSe {
@@ -193,7 +199,12 @@ struct InstrucaoEscritaIndexada {
 
 // um comando no nivel de IR: chamada de sistema crua(#chamada_sistema direto no corpo), chamada a uma função de usuario(bl), desvio condicional(se), laço(enquanto), reatribuição de variável, operação aritméticas, ou leitura/escrita indexada(ponteiro[indice]).
 struct ComandoIR {
-    enum class Tipo { CHAMADA_SISTEMA_CRUA, CHAMADA_FUNCAO_USUARIO, SE, ENQUANTO, REATRIBUICAO, OPERACAO_ARITMETICA, RETORNE, LEITURA_INDEXADA, ESCRITA_INDEXADA } tipo;
+    enum class Tipo {
+        CHAMADA_SISTEMA_CRUA, CHAMADA_FUNCAO_USUARIO,
+        SE, ENQUANTO, REATRIBUICAO, OPERACAO_ARITMETICA,
+        RETORNE, LEITURA_INDEXADA, ESCRITA_INDEXADA,
+        ENDERECO_FRAME
+    } tipo;
     InstrucaoChamadaSistemaCrua chamadaSistemaCrua;
     InstrucaoChamadaFuncaoUsuario chamadaFuncaoUsuario;
     InstrucaoSe instrucaoSe;
@@ -203,6 +214,7 @@ struct ComandoIR {
     InstrucaoRetorne instrucaoRetorne;
     InstrucaoLeituraIndexada instrucaoLeituraIndexada;
     InstrucaoEscritaIndexada instrucaoEscritaIndexada;
+    InstrucaoEnderecoFrame instrucaoEnderecoFrame;
 
     void liberar() {
         if(tipo == Tipo::CHAMADA_SISTEMA_CRUA) chamadaSistemaCrua.liberar();
@@ -214,6 +226,7 @@ struct ComandoIR {
         else if(tipo == Tipo::RETORNE) instrucaoRetorne.liberar();
         else if(tipo == Tipo::LEITURA_INDEXADA) instrucaoLeituraIndexada.liberar();
         else if(tipo == Tipo::ESCRITA_INDEXADA) instrucaoEscritaIndexada.liberar();
+        else if(tipo == Tipo::ENDERECO_FRAME) instrucaoEnderecoFrame.liberar();
     }
 };
 
@@ -286,12 +299,15 @@ struct FuncaoIR {
     // acessado via pilha(ldr/str), igual ao comportamento antigo. Tamanho
     // igual a totalSlots; indice by slot.
     Vetor<int> registradorDoSlot;
+    
+    int bytesArrays = 0;
 
     void iniciar() {
         nome = nullptr;
         instrucoes.iniciar();
         totalParametros = 0;
         totalSlots = 0;
+        bytesArrays = 0;
         ehInicio = false;
         parametrosLargura.iniciar();
         registradorDoSlot.iniciar();

@@ -123,10 +123,23 @@ struct TabelaVariaveisLocais {
         definirComSlot(nome, valor, slot);
         return slot;
     }
+    // escopo de bloco("se"/"senao"/"enquanto"/"por"): abrirEscopo() devolve uma marca, e
+    // fecharEscopo(marca) esquece todas as variáveis declaradas depois dela. proximoSlot NÃO
+    // volta atrás de propósito: slots nunca são reaproveitados, então o alocador de
+    // registradores continua enxergando um slot por variável, sem aliasing entre blocos.
+    int abrirEscopo() const { return nomes.tam; }
+    void fecharEscopo(int marca) {
+        for(int i = marca; i < valores.tam; i++) valores[i].liberar();
+        nomes.tam = marca;
+        valores.tam = marca;
+        slots.tam = marca;
+    }
     // retorna true e preenche *saida(copia rasa: símbolo continua sendo dono da tabela) e *saidaSlot se encontrar; false caso contrário.
+    // devolve a declaração MAIS RECENTE com esse nome(varre de trás pra frente): uma variável de
+    // bloco interno sombreia a de mesmo nome de um bloco externo enquanto o escopo interno existir.
     bool buscar(const char* nome, ArgumentoIR* saida, int* saidaSlot = nullptr) const {
         int tamNome = (int)strlen(nome);
-        for(int i = 0; i < nomes.tam; i++) {
+        for(int i = nomes.tam - 1; i >= 0; i--) {
             int tamCandidato;
             const char* candidato = nomes.obter(i, &tamCandidato);
             if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) {

@@ -11,21 +11,34 @@ struct TabelaFuncoesUsuario {
     VetorStr nomes;
     Vetor<int> totaisParametros;
     Vetor<TipoRetorno> tiposRetorno;
+    Vetor<bool> variadicas; // paralelo a nomes: true se o último parâmetro é "longo... nome"(totaisParametros conta ele)
 
     void iniciar() {
         nomes.iniciar();
         totaisParametros.iniciar();
         tiposRetorno.iniciar();
+        variadicas.iniciar();
     }
     void liberar() {
         nomes.liberar();
         totaisParametros.liberar();
         tiposRetorno.liberar();
+        variadicas.liberar();
     }
-    void definir(const char* nome, int totalParametros, TipoRetorno tipoRetorno) {
+    void definir(const char* nome, int totalParametros, TipoRetorno tipoRetorno, bool ehVariadica = false) {
         nomes.empurrar(nome);
         totaisParametros.empurrar(totalParametros);
         tiposRetorno.empurrar(tipoRetorno);
+        variadicas.empurrar(ehVariadica);
+    }
+    bool ehVariadica(const char* nome) const {
+        int tamNome = (int)strlen(nome);
+        for(int i = 0; i < nomes.tam; i++) {
+            int tamCandidato;
+            const char* candidato = nomes.obter(i, &tamCandidato);
+            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) return variadicas[i];
+        }
+        return false;
     }
     bool buscar(const char* nome, int* saida) const {
         int tamNome = (int)strlen(nome);
@@ -149,5 +162,35 @@ struct TabelaVariaveisLocais {
             }
         }
         return false;
+    }
+};
+
+// tabela nome->declaracao de #espaco(struct), incluindo as vindas de bibliotecas. O indice devolvido por buscar() e o "id" do espaco
+// (ArgumentoIR::idEspaco). Busca linear: poucos espacos por programa.
+struct TabelaEspacos {
+    VetorStr nomes;
+    Vetor<const DeclaracaoEspaco*> declaracoes; // não possui: dono é o Programa que contem a declaracao
+
+    void iniciar() {
+        nomes.iniciar();
+        declaracoes.iniciar();
+    }
+    void liberar() {
+        nomes.liberar();
+        declaracoes.liberar();
+    }
+    void definir(const char* nome, const DeclaracaoEspaco* declaracao) {
+        nomes.empurrar(nome);
+        declaracoes.empurrar(declaracao);
+    }
+    // devolve o id(indice) do espaco, ou -1 se nao existir.
+    int buscar(const char* nome) const {
+        int tamNome = (int)strlen(nome);
+        for(int i = 0; i < nomes.tam; i++) {
+            int tamCandidato;
+            const char* candidato = nomes.obter(i, &tamCandidato);
+            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) return i;
+        }
+        return -1;
     }
 };

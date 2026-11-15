@@ -118,6 +118,8 @@ inline void ARM64::emitirBlocoComandos(std::ostringstream& saida, const Vetor<Co
             emitirEscritaIndexada(saida, comando.instrucaoEscritaIndexada);
         } else if(comando.tipo == ComandoIR::Tipo::ENDERECO_FRAME) {
             emitirEnderecoFrame(saida, comando.instrucaoEnderecoFrame);
+        } else if(comando.tipo == ComandoIR::Tipo::ENDERECO_SLOT) {
+            emitirEnderecoSlot(saida, comando.instrucaoEnderecoSlot);
         } else {
             emitirRetorne(saida, comando.instrucaoRetorne);
         }

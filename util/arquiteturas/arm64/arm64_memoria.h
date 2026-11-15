@@ -77,7 +77,11 @@ inline void ARM64::emitirEscritaIndexada(std::ostringstream& saida, const Instru
     saida << "mul x10, x10, x11\n"; // x10 = indice * largura do elemento
     saida << "add x9, x9, x10\n"; // x9 = endereco final(ponteiro + indice*largura)
     saida << "mov x10, x9\n"; // move o endereco pra x10, libera x9 pro valor
-    emitirCarregarValorEmComLargura(saida, "x9", instrucao.valor, largura == 8 ? 8 : 4);
+    if(instrucao.valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
+        saida << "ldr x9, =" << instrucao.valor.simbolo << "\n"; // endereco de texto literal(ex: campo car* numa lista de inicializacao)
+    } else {
+        emitirCarregarValorEmComLargura(saida, "x9", instrucao.valor, largura == 8 ? 8 : 4);
+    }
     if(largura == 1) {
         saida << "strb w9, [x10]\n";
     } else if(largura == 2) {
@@ -93,5 +97,11 @@ inline void ARM64::emitirEscritaIndexada(std::ostringstream& saida, const Instru
 // depois da area de x29/x30(baseArrays), e o slot guarda o ponteiro pra eles.
 inline void ARM64::emitirEnderecoFrame(std::ostringstream& saida, const InstrucaoEnderecoFrame& instrucao) {
     saida << "add x9, sp, #" << (baseArrays + instrucao.posArray) << "\n";
+    emitirGravarSlot(saida, "x9", instrucao.slotDestino, 8);
+}
+// emite "slot destino = endereco do slot de origem": o slot de origem mora na pilha(o alocador de registradores nunca dá registrador
+// físico a um slot com ENDERECO_SLOT), em [sp, baseSlots + slot*16].
+inline void ARM64::emitirEnderecoSlot(std::ostringstream& saida, const InstrucaoEnderecoSlot& instrucao) {
+    saida << "add x9, sp, #" << (baseSlots + instrucao.slotOrigem * 16) << "\n";
     emitirGravarSlot(saida, "x9", instrucao.slotDestino, 8);
 }

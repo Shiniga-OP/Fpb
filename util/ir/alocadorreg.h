@@ -55,6 +55,9 @@ inline void varrerBlocoParaUsos(const Vetor<ComandoIR>& bloco, Vetor<int>& prime
             for(int j = 0; j < c.chamadaFuncaoUsuario.argumentos.tam; j++) {
                 registrarUsoArgumento(c.chamadaFuncaoUsuario.argumentos[j], primeiraPos, ultimaPos, pos);
             }
+            if(c.chamadaFuncaoUsuario.indireta) {
+                registrarUsoArgumento(c.chamadaFuncaoUsuario.enderecoAlvo, primeiraPos, ultimaPos, pos);
+            }
             if(c.chamadaFuncaoUsuario.capturaResultado) {
                 registrarDefinicaoSlot(c.chamadaFuncaoUsuario.slotDestino, primeiraPos, ultimaPos, pos);
             }
@@ -102,8 +105,27 @@ inline void varrerBlocoParaUsos(const Vetor<ComandoIR>& bloco, Vetor<int>& prime
             }
         } else if(c.tipo == ComandoIR::Tipo::ENDERECO_FRAME) {
             registrarDefinicaoSlot(c.instrucaoEnderecoFrame.slotDestino, primeiraPos, ultimaPos, pos);
+        } else if(c.tipo == ComandoIR::Tipo::ENDERECO_SLOT) {
+            registrarDefinicaoSlot(c.instrucaoEnderecoSlot.slotDestino, primeiraPos, ultimaPos, pos);
         }
         pos++; // cada ComandoIR do bloco ocupa uma posição própria na numeração
+    }
+}
+
+// marca em "forcaPilha" todo slot cujo endereço é tomado(ENDERECO_SLOT, de "@nome"): registrador físico não tem endereço, então
+// esse slot nunca ganha registrador e fica o tempo todo na pilha. Varre também os blocos aninhados.
+inline void marcarSlotsComEndereco(const Vetor<ComandoIR>& bloco, Vetor<bool>& forcaPilha) {
+    for(int i = 0; i < bloco.tam; i++) {
+        const ComandoIR& c = bloco[i];
+        if(c.tipo == ComandoIR::Tipo::ENDERECO_SLOT) {
+            forcaPilha[c.instrucaoEnderecoSlot.slotOrigem] = true;
+        } else if(c.tipo == ComandoIR::Tipo::SE) {
+            marcarSlotsComEndereco(*c.instrucaoSe.entao, forcaPilha);
+            if(c.instrucaoSe.temSenao) marcarSlotsComEndereco(*c.instrucaoSe.senaoCorpo, forcaPilha);
+        } else if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
+            marcarSlotsComEndereco(*c.instrucaoEnquanto.comandosCondicao, forcaPilha);
+            marcarSlotsComEndereco(*c.instrucaoEnquanto.corpo, forcaPilha);
+        }
     }
 }
 
@@ -153,9 +175,14 @@ inline void alocarRegistradores(FuncaoIR& funcaoIR) {
     // número de slots por função costuma ser pequeno.
     Vetor<int> ordem;
     ordem.iniciar();
+    Vetor<bool> forcaPilha;
+    forcaPilha.iniciar();
+    for(int s = 0; s < totalSlots; s++) forcaPilha.empurrar(false);
+    marcarSlotsComEndereco(funcaoIR.instrucoes, forcaPilha);
     for(int s = 0; s < totalSlots; s++) {
-        if(primeiraPos[s] >= 0) ordem.empurrar(s);
+        if(primeiraPos[s] >= 0 && !forcaPilha[s]) ordem.empurrar(s);
     }
+    forcaPilha.liberar();
     for(int i = 1; i < ordem.tam; i++) {
         int chave = ordem[i];
         int j = i - 1;

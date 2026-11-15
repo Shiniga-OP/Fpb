@@ -87,7 +87,7 @@ inline Condicao Analisador::analisarCondicaoE(const char* nomeConstrucao) {
     return esq;
 }
 
-// base := "(" condicao ")" | primaria OP primaria | primaria
+// base := "(" condicao ")" | expressao OP expressao | expressao
 inline Condicao Analisador::analisarCondicaoBase(const char* nomeConstrucao) {
     if(verificar(TipoToken::ABRE_PARENTESE) && ehCondicaoAgrupada()) {
         pos++;
@@ -97,7 +97,7 @@ inline Condicao Analisador::analisarCondicaoBase(const char* nomeConstrucao) {
     }
     Condicao c;
     c.tipo = Condicao::Tipo::COMPARACAO;
-    c.esquerda = analisarExpressaoPrimaria();
+    c.esquerda = analisarExpressaoAditiva();
     if(!ehTokenComparacao(atual().tipo)) {
         // sem operador: "se(sim())" vale "se(sim() != 0)"(qualquer valor diferente de zero é verdadeiro)
         c.operador = OperadorComparacao::DIFERENTE;
@@ -106,6 +106,6 @@ inline Condicao Analisador::analisarCondicaoBase(const char* nomeConstrucao) {
         return c;
     }
     c.operador = analisarOperadorComparacao(nomeConstrucao);
-    c.direita = analisarExpressaoPrimaria();
+    c.direita = analisarExpressaoAditiva();
     return c;
 }

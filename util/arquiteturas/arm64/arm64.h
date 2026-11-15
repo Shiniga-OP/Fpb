@@ -52,6 +52,7 @@ public:
     void emitirLeituraIndexada(std::ostringstream& saida, const InstrucaoLeituraIndexada& instrucao);
     void emitirEscritaIndexada(std::ostringstream& saida, const InstrucaoEscritaIndexada& instrucao);
     void emitirEnderecoFrame(std::ostringstream& saida, const InstrucaoEnderecoFrame& instrucao);
+    void emitirEnderecoSlot(std::ostringstream& saida, const InstrucaoEnderecoSlot& instrucao);
 
     // === arm64_fluxo.h ===
     const char* mnemonicoSaltoSeFalso(OperadorComparacaoIR operador);

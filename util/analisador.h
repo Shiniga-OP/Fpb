@@ -16,22 +16,31 @@ public:
 
     // ===== declarações: cada método é definido(inline) no leitor indicado =====
 
-    // === analisador_base.h ===
+    // === analise_base.h ===
     Programa analisar();
     const Token& atual();
     bool verificar(TipoToken tipo);
     const Token& consumir(TipoToken tipo, const char* mensagemErro);
     [[noreturn]] void erro(const char* mensagem);
     Inclusao analisarInclusao();
-    DeclaracaoFuncao analisarFuncao();
-    TipoRetorno analisarTipoRetorno();
-    Parametro analisarParametro();
     bool ehTokenTipoValor(TipoToken tipo);
     TipoVariavel analisarTipoValor(const char* mensagemErro);
+
+    // === analise_funcoes.h ===
+    DeclaracaoFuncao analisarFuncao();
+    void analisarParametrosECorpo(DeclaracaoFuncao& funcao);
+    TipoRetorno analisarTipoRetorno();
+    Parametro analisarParametro();
+
+    // === analise_espacos.h ===
+    DeclaracaoEspaco analisarEspaco();
+    void analisarClasse(Programa& programa);
+    bool ehInicioDeclaracaoEspaco();
 
     // === analisador_comandos.h ===
     Comando analisarComando();
     AtribuicaoIndexada analisarAtribuicaoIndexada();
+    AtribuicaoCampo analisarAtribuicaoCampo();
     Reatribuicao analisarReatribuicao();
     ComandoRetorne analisarRetorne();
     ComandoSe analisarSe();
@@ -45,6 +54,8 @@ public:
     ChamadaSistemaCrua analisarChamadaSistemaCrua();
     ChamadaSistemaCrua analisarChamadaSistemaComDestino();
     ChamadaFuncao analisarChamadaFuncao();
+    bool ehChamadaMetodo();
+    ChamadaFuncao analisarChamadaMetodo();
 
     // === analisador_condicoes.h ===
     OperadorComparacao analisarOperadorComparacao(const char* nomeConstrucao);
@@ -55,18 +66,24 @@ public:
     Condicao analisarCondicaoE(const char* nomeConstrucao);
     Condicao analisarCondicaoBase(const char* nomeConstrucao);
 
-    // --- analisador_expressoes.h ---
+    // === analisador_expressoes.h ===
+    bool operadorDoNivel(int nivel, OperadorAritmetico& op);
+    Expressao analisarBinaria(int nivel);
     Expressao analisarExpressaoAditiva();
     Expressao analisarConversao();
     Expressao analisarExpressaoParentesizada();
     Expressao analisarBytes();
     Expressao analisarExpressaoPrimaria();
     Expressao analisarIndexacao();
+    Expressao montarAcessoCampo(const char* nome, const char* campo);
     Expressao analisarChamadaFuncaoComoExpressao();
+    Expressao analisarChamadaMetodoComoExpressao();
 };
 
 // definições dos métodos (cada arquivo inclui este de volta; #pragma once evita ciclo)
 #include "analise/analise_base.h"
+#include "analise/analise_funcoes.h"
+#include "analise/analise_espacos.h"
 #include "analise/analise_comandos.h"
 #include "analise/analise_condicoes.h"
 #include "analise/analise_expressoes.h"

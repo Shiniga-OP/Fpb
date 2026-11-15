@@ -14,7 +14,9 @@
 // resultado incorreto sem aviso nenhum.
 inline void ARM64::emitirOperacaoAritmetica(std::ostringstream& saida, const InstrucaoOperacaoAritmetica& instrucao) {
     // regra de promocao: usa a MAIOR largura entre os dois operandos, decide se opera em w(32 bits, largura<=4) ou x(64 bits, largura==8)
-    int largura = (instrucao.esquerda.larguraBytes > instrucao.direita.larguraBytes) ? instrucao.esquerda.larguraBytes : instrucao.direita.larguraBytes;
+    // deslocamento usa so a largura do operando da esquerda(mesma regra de resolverExpressao no gerador)
+    bool ehDeslocamento = instrucao.operador == OperadorAritmeticoIR::DESL_ESQ || instrucao.operador == OperadorAritmeticoIR::DESL_DIR;
+    int largura = ehDeslocamento ? instrucao.esquerda.larguraBytes : ((instrucao.esquerda.larguraBytes > instrucao.direita.larguraBytes) ? instrucao.esquerda.larguraBytes : instrucao.direita.larguraBytes);
     if(largura < 4) largura = 4; // promoção pra int: operandos de 1 e 2 bytes são estendidos e operados em 32 bits
     bool usaW = (largura <= 4);
     emitirCarregarValorEmComLargura(saida, "x9", instrucao.esquerda, largura);
@@ -28,6 +30,18 @@ inline void ARM64::emitirOperacaoAritmetica(std::ostringstream& saida, const Ins
     } else if(instrucao.operador == OperadorAritmeticoIR::DIVISAO) {
         emitirChecagemDivisorZero(saida);
         saida << (usaW ? "sdiv w9, w9, w10\n" : "sdiv x9, x9, x10\n");
+    } else if(instrucao.operador == OperadorAritmeticoIR::E_BIT) {
+        saida << (usaW ? "and w9, w9, w10\n" : "and x9, x9, x10\n");
+    } else if(instrucao.operador == OperadorAritmeticoIR::OU_BIT) {
+        saida << (usaW ? "orr w9, w9, w10\n" : "orr x9, x9, x10\n");
+    } else if(instrucao.operador == OperadorAritmeticoIR::XOU) {
+        saida << (usaW ? "eor w9, w9, w10\n" : "eor x9, x9, x10\n");
+    } else if(instrucao.operador == OperadorAritmeticoIR::DESL_ESQ) {
+        saida << (usaW ? "lsl w9, w9, w10\n" : "lsl x9, x9, x10\n");
+    } else if(instrucao.operador == OperadorAritmeticoIR::DESL_DIR) {
+        // esquerda com sinal(int, byte, curto) faz deslocamento aritmetico(asr); sem sinal(car, bool) faz logico(lsr)
+        const char* mnemonico = instrucao.esquerda.sinalizado ? "asr" : "lsr";
+        saida << mnemonico << (usaW ? " w9, w9, w10\n" : " x9, x9, x10\n");
     } else { // MODULO: resto = dividendo - (dividendo/divisor)*divisor.
         // x9=dividendo, x10=divisor. x28 e reservado(fora do pool de
         // TOTAL_REGISTRADORES_FISICOS, ver ir.h) especificamente pra este

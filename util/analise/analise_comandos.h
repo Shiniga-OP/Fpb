@@ -2,13 +2,29 @@
 #pragma once
 #include "../analisador.h"
 
+// true se "tipo" e um operador composto de bit: &=, |=, ^=, <<=, >>=.
+inline bool ehAtribuicaoCompostaDeBit(TipoToken tipo) {
+    return tipo == TipoToken::TAMBEM_IGUAL || tipo == TipoToken::OU_IGUAL || tipo == TipoToken::CIRCUNFLEXO_IGUAL || tipo == TipoToken::MENOR_MENOR_IGUAL || tipo == TipoToken::MAIOR_MAIOR_IGUAL;
+}
+
+// operador que um operador composto representa: "x op= e" vira "x = x op e" (e "x++" / "x--" viram soma / subtração de 1).
+inline OperadorAritmetico operadorDaAtribuicaoComposta(TipoToken tipo) {
+    if(tipo == TipoToken::MAIS_IGUAL || tipo == TipoToken::MAIS_MAIS) return OperadorAritmetico::SOMA;
+    if(tipo == TipoToken::MENOS_IGUAL || tipo == TipoToken::MENOS_MENOS) return OperadorAritmetico::SUBTRACAO;
+    if(tipo == TipoToken::TAMBEM_IGUAL) return OperadorAritmetico::E_BIT;
+    if(tipo == TipoToken::OU_IGUAL) return OperadorAritmetico::OU_BIT;
+    if(tipo == TipoToken::CIRCUNFLEXO_IGUAL) return OperadorAritmetico::XOU;
+    if(tipo == TipoToken::MENOR_MENOR_IGUAL) return OperadorAritmetico::DESL_ESQ;
+    return OperadorAritmetico::DESL_DIR;
+}
+
 // analisa um comando dentro do corpo de uma função: declaração de
 // variável(int/car*/nulo*), chamada de sistema crua(#chamada_sistema)
 // ou chamada de função normal(nome(...)).
 inline Comando Analisador::analisarComando() {
     Comando comando;
     bool inicioDeclaracaoNuloPonteiro = verificar(TipoToken::NULO) && tokens[pos + 1].tipo == TipoToken::VEZES;
-    if(ehTokenTipoValor(atual().tipo) || inicioDeclaracaoNuloPonteiro) {
+    if(ehTokenTipoValor(atual().tipo) || inicioDeclaracaoNuloPonteiro || ehInicioDeclaracaoEspaco()) {
         comando.tipo = Comando::Tipo::DECLARACAO_VARIAVEL;
         comando.declaracaoVariavel = analisarDeclaracaoVariavel();
         return comando;
@@ -48,6 +64,16 @@ inline Comando Analisador::analisarComando() {
         comando.reatribuicao = analisarReatribuicao();
         return comando;
     }
+    if(ehChamadaMetodo()) {
+        comando.tipo = Comando::Tipo::CHAMADA_FUNCAO;
+        comando.chamadaFuncao = analisarChamadaMetodo();
+        return comando;
+    }
+    if(verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::PONTO) {
+        comando.tipo = Comando::Tipo::ATRIBUICAO_CAMPO;
+        comando.atribuicaoCampo = analisarAtribuicaoCampo();
+        return comando;
+    }
     if(verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::ABRE_COLCHETE) {
         comando.tipo = Comando::Tipo::ATRIBUICAO_INDEXADA;
         comando.atribuicaoIndexada = analisarAtribuicaoIndexada();
@@ -75,6 +101,44 @@ inline AtribuicaoIndexada Analisador::analisarAtribuicaoIndexada() {
     return atr;
 }
 
+// analisa: nome.campo = expressao;(ou +=, -=, ++, --, &=, |=, ^=, <<=, >>=, desdobrados como em analisarReatribuicao)
+inline AtribuicaoCampo Analisador::analisarAtribuicaoCampo() {
+    AtribuicaoCampo atr;
+    atr.iniciar();
+    const Token& nome = consumir(TipoToken::IDENTIFICADOR, "esperado nome da variável");
+    atr.nome = strdup(nome.valor);
+    consumir(TipoToken::PONTO, "esperado '.' após nome da variável");
+    const Token& campo = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo após '.'");
+    atr.campo = strdup(campo.valor);
+    TipoToken op = atual().tipo;
+    if(op == TipoToken::IGUAL) {
+        pos++;
+        atr.valor = analisarExpressaoAditiva();
+    } else if(ehTokenReatribuicao(op)) {
+        pos++;
+        Expressao operando;
+        if(op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS) {
+            operando.tipo = Expressao::Tipo::NUMERO_LITERAL;
+            operando.valor = strdup("1");
+        } else {
+            operando = analisarExpressaoAditiva();
+        }
+        Expressao binaria;
+        binaria.tipo = Expressao::Tipo::BINARIA;
+        binaria.valor = nullptr;
+        binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
+        binaria.esquerda = new Expressao(montarAcessoCampo(atr.nome, atr.campo));
+        binaria.direita = new Expressao(operando);
+        atr.valor = binaria;
+    } else {
+        erro("esperado '=', '+=', '-=', '++', '--' ou operador de bit composto na atribuição de campo");
+    }
+    if(verificar(TipoToken::PONTO_VIRGULA)) {
+        consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após atribuição de campo");
+    }
+    return atr;
+}
+
 // analisa: nome = expressao;
 inline Reatribuicao Analisador::analisarReatribuicao() {
     Reatribuicao reat;
@@ -85,10 +149,9 @@ inline Reatribuicao Analisador::analisarReatribuicao() {
     if(op == TipoToken::IGUAL) {
         pos++;
         reat.valor = analisarExpressaoAditiva();
-    } else if(op == TipoToken::MAIS_IGUAL || op == TipoToken::MENOS_IGUAL || op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS) {
-        // "x += e" vira "x = x + e"; "x++" vira "x = x + 1" (idem pra -= e --): sem nó novo na AST.
+    } else if(op == TipoToken::MAIS_IGUAL || op == TipoToken::MENOS_IGUAL || op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS || ehAtribuicaoCompostaDeBit(op)) {
+        // "x += e" vira "x = x + e"; "x++" vira "x = x + 1" (idem pra -=, -- e os de bit: &=, |=, ^=, <<=, >>=): sem nó novo na AST.
         pos++;
-        bool soma = (op == TipoToken::MAIS_IGUAL || op == TipoToken::MAIS_MAIS);
         Expressao variavel;
         variavel.tipo = Expressao::Tipo::IDENTIFICADOR;
         variavel.valor = strdup(reat.nome);
@@ -102,12 +165,12 @@ inline Reatribuicao Analisador::analisarReatribuicao() {
         Expressao binaria;
         binaria.tipo = Expressao::Tipo::BINARIA;
         binaria.valor = nullptr;
-        binaria.operadorAritmetico = soma ? OperadorAritmetico::SOMA : OperadorAritmetico::SUBTRACAO;
+        binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
         binaria.esquerda = new Expressao(variavel);
         binaria.direita = new Expressao(operando);
         reat.valor = binaria;
     } else {
-        erro("esperado '=', '+=', '-=', '++' ou '--' na reatribuição");
+        erro("esperado '=', '+=', '-=', '&=', '|=', '^=', '<<=', '>>=', '++' ou '--' na reatribuição");
     }
     if(verificar(TipoToken::PONTO_VIRGULA)) {
         consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após reatribuição");
@@ -199,6 +262,16 @@ inline DeclaracaoVariavel Analisador::analisarDeclaracaoVariavel() {
         pos++;
         consumir(TipoToken::VEZES, "esperado '*' apos 'nulo' na declaração de variável(nulo sozinho nao e' um tipo de valor valido)");
         decl.tipo = TipoVariavel::NULO_PONTEIRO;
+    } else if(verificar(TipoToken::IDENTIFICADOR)) {
+        // "Nome nome" = espaço por valor(corpo no frame); "Nome* nome" = ponteiro pra espaço.
+        decl.nomeEspaco = strdup(atual().valor);
+        pos++;
+        if(verificar(TipoToken::VEZES)) {
+            pos++;
+            decl.tipo = TipoVariavel::ESPACO_PONTEIRO;
+        } else {
+            decl.tipo = TipoVariavel::ESPACO;
+        }
     } else {
         decl.tipo = analisarTipoValor("esperado 'int', 'longo', 'car', 'bool', 'byte' ou 'curto' no início da declaração de variável");
     }
@@ -223,6 +296,29 @@ inline DeclaracaoVariavel Analisador::analisarDeclaracaoVariavel() {
         decl.ehArray = true;
         return decl;
     }
+    if(decl.tipo == TipoVariavel::ESPACO) {
+        // espaço por valor: "Nome nome;"(campos sem valor) ou "Nome nome = { e1, e2, ... };"
+        if(!verificar(TipoToken::IGUAL)) {
+            if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
+            return decl;
+        }
+        pos++;
+        if(!verificar(TipoToken::ABRE_CHAVE)) {
+            // "Nome nome = expr;": a expressão fica sozinha em listaInicial(temLista continua false). O GeradorIR chama o construtor "Nome_criar" ou copia, se expr for outro espaço do mesmo tipo.
+            decl.listaInicial.empurrar(analisarExpressaoAditiva());
+            if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
+            return decl;
+        }
+        consumir(TipoToken::ABRE_CHAVE, "espaço só pode ser inicializado com uma lista: { valor1, valor2, ... } ou uma expressão");
+        while(!verificar(TipoToken::FECHA_CHAVE)) {
+            decl.listaInicial.empurrar(analisarExpressaoAditiva());
+            if(verificar(TipoToken::VIRGULA)) pos++;
+        }
+        consumir(TipoToken::FECHA_CHAVE, "esperado '}' para fechar a lista de inicialização");
+        decl.temLista = true;
+        if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
+        return decl;
+    }
     consumir(TipoToken::IGUAL, "esperado '=' após nome da variável");
     if(verificar(TipoToken::CHAMADA_SISTEMA)) {
         decl.ehChamadaSistema = true;
@@ -244,10 +340,10 @@ inline ChamadaSistemaCrua Analisador::analisarNucleoChamadaSistema() {
     ChamadaSistemaCrua chamada;
     chamada.iniciar();
 
-    chamada.identificadores.empurrar(analisarExpressaoPrimaria());
+    chamada.identificadores.empurrar(analisarExpressaoAditiva());
     while(verificar(TipoToken::VIRGULA)) {
         pos++;
-        chamada.identificadores.empurrar(analisarExpressaoPrimaria());
+        chamada.identificadores.empurrar(analisarExpressaoAditiva());
     }
     return chamada;
 }
@@ -281,7 +377,7 @@ inline ChamadaFuncao Analisador::analisarChamadaFuncao() {
 
     consumir(TipoToken::ABRE_PARENTESE, "esperado '(' após nome da função chamada");
     while(!verificar(TipoToken::FECHA_PARENTESE)) {
-        chamada.argumentos.empurrar(analisarExpressaoPrimaria());
+        chamada.argumentos.empurrar(analisarExpressaoAditiva());
         if(verificar(TipoToken::VIRGULA)) pos++;
     }
     consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
@@ -291,22 +387,54 @@ inline ChamadaFuncao Analisador::analisarChamadaFuncao() {
     return chamada;
 }
 
-// true se "tipo" pode vir logo depois do nome numa reatribuição: =, +=, -=, ++, --.
+// true se o comando/expressão atual é "nome.metodo(": identificador, '.', identificador e '('.
+inline bool Analisador::ehChamadaMetodo() {
+    if(pos + 3 >= (size_t)tokens.tam) return false;
+    return verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::PONTO && tokens[pos + 2].tipo == TipoToken::IDENTIFICADOR && tokens[pos + 3].tipo == TipoToken::ABRE_PARENTESE;
+}
+
+// analisa: nome.metodo(args); como comando. Vira uma ChamadaFuncao de nome "nome.metodo": o GeradorIR decide se "nome" é
+// variável(chama Classe_metodo(nome, args)) ou o nome de uma classe(chama Classe_metodo(args), método estático).
+inline ChamadaFuncao Analisador::analisarChamadaMetodo() {
+    const Token& base = consumir(TipoToken::IDENTIFICADOR, "esperado nome da variável ou da classe");
+    std::string nomeCompleto = base.valor;
+    consumir(TipoToken::PONTO, "esperado '.' após o nome");
+    const Token& metodo = consumir(TipoToken::IDENTIFICADOR, "esperado nome do método após '.'");
+    nomeCompleto = nomeCompleto + "." + metodo.valor;
+    ChamadaFuncao chamada;
+    chamada.iniciar();
+    chamada.nome = strdup(nomeCompleto.c_str());
+    consumir(TipoToken::ABRE_PARENTESE, "esperado '(' após nome do método");
+    while(!verificar(TipoToken::FECHA_PARENTESE)) {
+        chamada.argumentos.empurrar(analisarExpressaoAditiva());
+        if(verificar(TipoToken::VIRGULA)) pos++;
+    }
+    consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
+    if(verificar(TipoToken::PONTO_VIRGULA)) {
+        consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após chamada de método");
+    }
+    return chamada;
+}
+
+// true se "tipo" pode vir logo depois do nome numa reatribuição: =, +=, -=, ++, --, &=, |=, ^=, <<=, >>=.
 inline bool Analisador::ehTokenReatribuicao(TipoToken tipo) {
-    return tipo == TipoToken::IGUAL || tipo == TipoToken::MAIS_IGUAL || tipo == TipoToken::MENOS_IGUAL || tipo == TipoToken::MAIS_MAIS || tipo == TipoToken::MENOS_MENOS;
+    return tipo == TipoToken::IGUAL || tipo == TipoToken::MAIS_IGUAL || tipo == TipoToken::MENOS_IGUAL || tipo == TipoToken::MAIS_MAIS || tipo == TipoToken::MENOS_MENOS || ehAtribuicaoCompostaDeBit(tipo);
 }
 
 // uma parte do cabeçalho do "por", empurrada em "destino": inicialização (declaração ou
 // reatribuição) quando ehInicio, ou passo (só reatribuição: "i = i + 1", "i += 1", "i++").
 inline void Analisador::analisarPartePor(Vetor<Comando>& destino, bool ehInicio) {
     Comando comando;
-    bool comecaComTipo = ehTokenTipoValor(atual().tipo) || (verificar(TipoToken::NULO) && tokens[pos + 1].tipo == TipoToken::VEZES);
+    bool comecaComTipo = ehTokenTipoValor(atual().tipo) || (verificar(TipoToken::NULO) && tokens[pos + 1].tipo == TipoToken::VEZES) || ehInicioDeclaracaoEspaco();
     if(ehInicio && comecaComTipo) {
         comando.tipo = Comando::Tipo::DECLARACAO_VARIAVEL;
         comando.declaracaoVariavel = analisarDeclaracaoVariavel();
     } else if(verificar(TipoToken::IDENTIFICADOR) && ehTokenReatribuicao(tokens[pos + 1].tipo)) {
         comando.tipo = Comando::Tipo::REATRIBUICAO;
         comando.reatribuicao = analisarReatribuicao();
+    } else if(verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::PONTO) {
+        comando.tipo = Comando::Tipo::ATRIBUICAO_CAMPO;
+        comando.atribuicaoCampo = analisarAtribuicaoCampo();
     } else if(ehInicio) {
         erro("esperado declaração ou reatribuição na inicialização do 'por'");
     } else {

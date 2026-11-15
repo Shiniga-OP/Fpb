@@ -5,6 +5,7 @@
 inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     // 1. registra a assinatura + corpo de cada função do programa principal.
     registrarFuncoes(programa);
+    registrarEspacos(programa);
     // 2. o carregador resolve cada "#incluir"(dedupe por caminho absoluto) e
     //    devolve a AST de cada biblioteca(ex: biblis/impressao.fpb); aqui
     //    registramos assinatura + corpo de cada função delas.
@@ -13,6 +14,7 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     }
     for(int i = 0; i < carregador.programas.tam; i++) {
         registrarFuncoes(*carregador.programas[i], carregador.origem(i));
+        registrarEspacos(*carregador.programas[i], carregador.origem(i));
     }
     // 3. gera FuncaoIR só pras funções alcancaveis a partir
     //    do programa principal(direta ou indiretamente via chamadas "bl"),
@@ -40,7 +42,7 @@ inline void GeradorIR::registrarFuncoes(const Programa& programa, const std::str
             std::string nomeStr = funcao.nome;
             throw std::runtime_error("Função '" + nomeStr + "' definida mais de uma vez (conflito ao incluir '" + origem + "')");
         }
-        funcoesUsuario.definir(funcao.nome, funcao.parametros.tam, funcao.tipoRetorno);
+        funcoesUsuario.definir(funcao.nome, funcao.parametros.tam, funcao.tipoRetorno, funcao.ehVariadica);
         corposFuncoesUsuario.definir(funcao.nome, &funcao);
     }
 }
@@ -84,7 +86,7 @@ inline void GeradorIR::coletarChamadasUsuario(const Vetor<ComandoIR>& bloco, Vet
     for(int i = 0; i < bloco.tam; i++) {
         const ComandoIR& c = bloco[i];
         if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) {
-            saida.empurrar(c.chamadaFuncaoUsuario.nome);
+            if(!c.chamadaFuncaoUsuario.indireta) saida.empurrar(c.chamadaFuncaoUsuario.nome); // chamada por endereço não tem nome de função
         } else if(c.tipo == ComandoIR::Tipo::SE) {
             coletarChamadasUsuario(*c.instrucaoSe.entao, saida);
             if(c.instrucaoSe.temSenao) coletarChamadasUsuario(*c.instrucaoSe.senaoCorpo, saida);
@@ -124,6 +126,9 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
         arg.larguraElemento = larguraElementoApontado(funcao.parametros[i].tipo);
         arg.sinalizado = tipoEhSinalizado(funcao.parametros[i].tipo);
         arg.elementoSinalizado = elementoEhSinalizado(funcao.parametros[i].tipo);
+        arg.ehPonteiro = tipoEhPonteiro(funcao.parametros[i].tipo);
+        if(funcao.parametros[i].nomeEspaco) arg.idEspaco = obterIdEspaco(funcao.parametros[i].nomeEspaco);
+        if(funcao.parametros[i].tipo == TipoVariavel::ESPACO) arg.espacoPorValor = true; // "Nome x" por valor: o chamador passa o endereço de uma cópia, então "x = y" aqui copia campo a campo
         ctx.variaveisLocais.definirComSlot(funcao.parametros[i].nome, arg, i);
         funcaoIR.parametrosLargura.empurrar(arg.larguraBytes);
     }
@@ -154,6 +159,8 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
             terminaComRetorne = true;
         } else if(comando.tipo == Comando::Tipo::ATRIBUICAO_INDEXADA) {
             gerarAtribuicaoIndexada(comando.atribuicaoIndexada, funcaoIR.instrucoes, ctx);
+        } else if(comando.tipo == Comando::Tipo::ATRIBUICAO_CAMPO) {
+            gerarAtribuicaoCampo(comando.atribuicaoCampo, funcaoIR.instrucoes, ctx);
         } else {
             gerarChamadaFuncao(comando.chamadaFuncao, funcaoIR.instrucoes, ctx);
         }

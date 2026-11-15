@@ -24,6 +24,10 @@ struct ArgumentoIR {
     bool elementoSinalizado = false; // so quando este ArgumentoIR e um PONTEIRO: sinal do elemento apontado, aplicado ao resultado de "nome[indice]"
     int larguraElemento = 1; // usado so quando este ArgumentoIR representa um PONTEIRO sendo indexado(nome[indice]): tamanho em bytes de CADA elemento apontado(1 pra car*, 8 pra int*, ou qualquer outro valor se novos tipos forem adicionados no futuro). indice sempre conta em ELEMENTOS(igual C): endereco = ponteiro + indice*larguraElemento
 
+    int idEspaco = -1; // indice na TabelaEspacos do GeradorIR se esta variavel e um espaco(struct) ou ponteiro pra um; -1 se nao
+    bool espacoPorValor = false; // true so pra variavel declarada "Nome var = {...}"(o corpo mora no frame): proibe "a = b"
+    bool ehPonteiro = false; // true se o slot guarda um endereço(variável/parâmetro ponteiro, array, ou resultado de "@"): "@nome" devolve o conteúdo do slot em vez do endereço do slot
+
     void liberar() {
         free(simbolo);
         simbolo = nullptr;
@@ -58,6 +62,8 @@ struct InstrucaoChamadaFuncaoUsuario {
     bool capturaResultado = false; // true se o valor de retorno(x0) precisa ser gravado num slot(chamada usada como expressao, ex: "int x = f();")
     int slotDestino = -1; // valido so se capturaResultado == true
     int resultadoLargura = 8; // largura em bytes da gravacao no slot(1=car, 4=int, 8=longo/ponteiro), valido so se capturaResultado == true
+    bool indireta = false; // true se a chamada é por endereço("f();" com "nulo* f = @(endereco);"): "nome" fica nullptr e a arquitetura emite "blr" no endereço guardado em enderecoAlvo
+    ArgumentoIR enderecoAlvo; // valido so se indireta == true: REGISTRADOR, slot da variável que guarda o endereço da função
 
     void iniciar() {
         nome = nullptr;
@@ -65,12 +71,14 @@ struct InstrucaoChamadaFuncaoUsuario {
         capturaResultado = false;
         slotDestino = -1;
         resultadoLargura = 8;
+        indireta = false;
     }
     void liberar() {
         free(nome);
         nome = nullptr;
         for(int i = 0; i < argumentos.tam; i++) argumentos[i].liberar();
         argumentos.liberar();
+        if(indireta) enderecoAlvo.liberar();
     }
 };
 
@@ -89,8 +97,7 @@ struct InstrucaoRetorne {
 enum class OperadorComparacaoIR { IGUAL, DIFERENTE, MAIOR, MENOR, MAIOR_IGUAL, MENOR_IGUAL };
 
 // mesmo operador aritmetico da AST, copiado aqui pra o IR não depender de ast.h.
-// mesmo operador aritmetico da AST, copiado aqui pra o IR não depender de ast.h.
-enum class OperadorAritmeticoIR { SOMA, SUBTRACAO, MULTIPLICACAO, DIVISAO, MODULO };
+enum class OperadorAritmeticoIR { SOMA, SUBTRACAO, MULTIPLICACAO, DIVISAO, MODULO, E_BIT, OU_BIT, XOU, DESL_ESQ, DESL_DIR };
 
 // calcula esquerda OP direita e grava o resultado no slot destino(mesmo
 // espaço de slots de InstrucaoReatribuicao: 0..5 são parâmetros, dai em
@@ -115,6 +122,14 @@ struct ComandoIR;
 struct InstrucaoEnderecoFrame {
     int slotDestino;
     int posArray; // pos dentro da área de arrays do frame
+    void liberar() {}
+};
+
+// slotDestino = endereço(na pilha) do slot slotOrigem. Usada por "@nome" quando "nome" é escalar. O alocador de registradores
+// deixa slotOrigem sempre na pilha, pois registrador físico não tem endereço.
+struct InstrucaoEnderecoSlot {
+    int slotDestino;
+    int slotOrigem;
     void liberar() {}
 };
 
@@ -206,7 +221,7 @@ struct ComandoIR {
         CHAMADA_SISTEMA_CRUA, CHAMADA_FUNCAO_USUARIO,
         SE, ENQUANTO, REATRIBUICAO, OPERACAO_ARITMETICA,
         RETORNE, LEITURA_INDEXADA, ESCRITA_INDEXADA,
-        ENDERECO_FRAME
+        ENDERECO_FRAME, ENDERECO_SLOT
     } tipo;
     InstrucaoChamadaSistemaCrua chamadaSistemaCrua;
     InstrucaoChamadaFuncaoUsuario chamadaFuncaoUsuario;
@@ -218,6 +233,7 @@ struct ComandoIR {
     InstrucaoLeituraIndexada instrucaoLeituraIndexada;
     InstrucaoEscritaIndexada instrucaoEscritaIndexada;
     InstrucaoEnderecoFrame instrucaoEnderecoFrame;
+    InstrucaoEnderecoSlot instrucaoEnderecoSlot;
 
     void liberar() {
         if(tipo == Tipo::CHAMADA_SISTEMA_CRUA) chamadaSistemaCrua.liberar();
@@ -230,6 +246,7 @@ struct ComandoIR {
         else if(tipo == Tipo::LEITURA_INDEXADA) instrucaoLeituraIndexada.liberar();
         else if(tipo == Tipo::ESCRITA_INDEXADA) instrucaoEscritaIndexada.liberar();
         else if(tipo == Tipo::ENDERECO_FRAME) instrucaoEnderecoFrame.liberar();
+        else if(tipo == Tipo::ENDERECO_SLOT) instrucaoEnderecoSlot.liberar();
     }
 };
 

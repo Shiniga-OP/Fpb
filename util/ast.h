@@ -3,11 +3,11 @@
 #include <stdlib.h>
 #include "config.h"
 
-// operador aritmético usado numa expressão binária(a + b, a - b, a / b, a % b).
-enum class OperadorAritmetico { SOMA, SUBTRACAO, MULTIPLICACAO, DIVISAO, MODULO };
+// operador aritmético ou de bit usado numa expressão binária(a + b, a - b, a / b, a % b, a & b, a | b, a ^ b, a << b, a >> b).
+enum class OperadorAritmetico { SOMA, SUBTRACAO, MULTIPLICACAO, DIVISAO, MODULO, E_BIT, OU_BIT, XOU, DESL_ESQ, DESL_DIR };
 
 // tipo declarado de uma variável: int(32 bits, 4 bytes), car(caractere/byte de 8 bits), longo(64 bits, 8 bytes) ou os respectivos ponteiros(car*, int*, longo*, sempre 8 bytes de endereco, mas indexando elementos de largura diferente). Declarado aqui em cima pois CONVERSAO referencia o tipo alvo.
-enum class TipoVariavel { INT, CAR, CAR_PONTEIRO, LONGO, LONGO_PONTEIRO, INT_PONTEIRO, NULO_PONTEIRO, BOOL, BOOL_PONTEIRO, BYTE, BYTE_PONTEIRO, CURTO, CURTO_PONTEIRO };
+enum class TipoVariavel { INT, CAR, CAR_PONTEIRO, LONGO, LONGO_PONTEIRO, INT_PONTEIRO, NULO_PONTEIRO, BOOL, BOOL_PONTEIRO, BYTE, BYTE_PONTEIRO, CURTO, CURTO_PONTEIRO, ESPACO, ESPACO_PONTEIRO };
 
 // devolve o ponteiro do tipo de valor dado(ex: INT -> INT_PONTEIRO). Tipo que não tem ponteiro correspondente(ou já é ponteiro) volta igual.
 inline TipoVariavel ponteiroDoTipo(TipoVariavel tipo) {
@@ -18,6 +18,11 @@ inline TipoVariavel ponteiroDoTipo(TipoVariavel tipo) {
     if(tipo == TipoVariavel::BYTE) return TipoVariavel::BYTE_PONTEIRO;
     if(tipo == TipoVariavel::CURTO) return TipoVariavel::CURTO_PONTEIRO;
     return tipo;
+}
+
+// true se "tipo" é um ponteiro(car*, int*, ..., nulo*, Nome*). Arrays declarados já chegam aqui com o tipo ponteiro.
+inline bool tipoEhPonteiro(TipoVariavel tipo) {
+    return tipo == TipoVariavel::CAR_PONTEIRO || tipo == TipoVariavel::LONGO_PONTEIRO || tipo == TipoVariavel::INT_PONTEIRO || tipo == TipoVariavel::NULO_PONTEIRO || tipo == TipoVariavel::BOOL_PONTEIRO || tipo == TipoVariavel::BYTE_PONTEIRO || tipo == TipoVariavel::CURTO_PONTEIRO || tipo == TipoVariavel::ESPACO_PONTEIRO;
 }
 
 // tipo de retorno de uma função: "nulo" continua significando "sem retorno"(mesma palavra chave usada hoje pra declarar função), os demais reusam TipoVariavel pra não duplicar o mesmo espaco de tipos.
@@ -49,7 +54,9 @@ struct Expressao {
         CHAMADA_FUNCAO,
         BYTES,
         INDEXACAO,
-        CHAMADA_SISTEMA
+        CHAMADA_SISTEMA,
+        ACESSO_CAMPO,
+        ENDERECO
     } tipo;
     char* valor; // dono: quem criou a expressao(strdup). usado quando tipo != BINARIA e tipo != CONVERSAO e tipo != CHAMADA_FUNCAO e tipo != BYTES e tipo != INDEXACAO e tipo != CHAMADA_SISTEMA
     OperadorAritmetico operadorAritmetico; // usado quando tipo == BINARIA
@@ -61,6 +68,7 @@ struct Expressao {
     bool bytesEhTipoLiteral; // usado quando tipo == BYTES: true se veio de bytes(int/car/car*), false se veio de bytes(variavel)
     TipoVariavel bytesTipoLiteral; // usado quando tipo == BYTES e bytesEhTipoLiteral == true
     char* bytesNomeVariavel; // dono: quem criou a expressao(strdup). usado quando tipo == BYTES e bytesEhTipoLiteral == false
+    bool enderecoDeValor; // usado quando tipo == ENDERECO: true em "@(expr)"(o valor de expr é tratado como endereço), false em "@nome"(endereço da variável "nome"). "esquerda" guarda expr ou o IDENTIFICADOR
     ChamadaSistemaCrua* chamadaSistema; // dono: quem criou a expressao(alocado com new). usado quando tipo == CHAMADA_SISTEMA: "#chamada_sistema id, arg1, ...;" usada como EXPRESSAO(ex: "retorne #chamada_sistema ...;", "escrever(#chamada_sistema ...)", dentro de "se(#chamada_sistema ... == 0)"). O valor da expressao e' o retorno da syscall(x0), igual "nome = #chamada_sistema ..." na declaracao/reatribuicao, so que aqui embutido dentro de outra expressao maior em vez de sozinho num comando.
 
     void liberar() {
@@ -73,7 +81,7 @@ struct Expressao {
             direita->liberar();
             delete direita;
             direita = nullptr;
-        } else if(tipo == Tipo::CONVERSAO) {
+        } else if(tipo == Tipo::CONVERSAO || tipo == Tipo::ACESSO_CAMPO || tipo == Tipo::ENDERECO) { // ACESSO_CAMPO: esquerda = base(IDENTIFICADOR), valor = nome do campo(strdup)
             esquerda->liberar();
             delete esquerda;
             esquerda = nullptr;
@@ -161,18 +169,29 @@ struct DeclaracaoVariavel {
 
     bool ehArray;
     int tamArray;
+    char* nomeEspaco; // dono: quem criou a declaracao(strdup). nome do #espaco quando tipo == ESPACO ou ESPACO_PONTEIRO, senao nullptr
+    Vetor<Expressao> listaInicial; // usado so quando tipo == ESPACO e temLista == true: "Nome var = { e1, e2 };"
+    bool temLista;
     
     void iniciar() {
         nome = nullptr;
         ehChamadaSistema = false;
         ehArray = false;
         tamArray = 0;
+        nomeEspaco = nullptr;
+        listaInicial.iniciar();
+        temLista = false;
     }
     
     void liberar() {
         free(nome);
         nome = nullptr;
-        if(ehChamadaSistema) chamadaSistemaInicial.liberar();
+        free(nomeEspaco);
+        nomeEspaco = nullptr;
+        if(tipo == TipoVariavel::ESPACO) {
+            for(int i = 0; i < listaInicial.tam; i++) listaInicial[i].liberar();
+            listaInicial.liberar();
+        } else if(ehChamadaSistema) chamadaSistemaInicial.liberar();
         else if(!ehArray) valorInicial.liberar();
     }
 };
@@ -234,6 +253,26 @@ struct AtribuicaoIndexada {
         free(nome);
         nome = nullptr;
         indice.liberar();
+        valor.liberar();
+    }
+};
+
+// escrita num campo de um espaco(struct) ja declarado: nome.campo = expr;
+// "x.c += e" e "x.c++" viram "x.c = x.c + e" no analisador, igual Reatribuicao.
+struct AtribuicaoCampo {
+    char* nome; // dono: quem criou a atribuicao(strdup). nome da variavel do espaco
+    char* campo; // dono: idem. nome do campo
+    Expressao valor;
+
+    void iniciar() {
+        nome = nullptr;
+        campo = nullptr;
+    }
+    void liberar() {
+        free(nome);
+        nome = nullptr;
+        free(campo);
+        campo = nullptr;
         valor.liberar();
     }
 };
@@ -311,7 +350,8 @@ struct Comando {
     enum class Tipo {
         DECLARACAO_VARIAVEL, REATRIBUICAO,
         CHAMADA_FUNCAO, CHAMADA_SISTEMA_CRUA,
-        SE, ENQUANTO, POR, RETORNE, ATRIBUICAO_INDEXADA
+        SE, ENQUANTO, POR, RETORNE, ATRIBUICAO_INDEXADA,
+        ATRIBUICAO_CAMPO
     } tipo;
     DeclaracaoVariavel declaracaoVariavel;
     Reatribuicao reatribuicao;
@@ -322,6 +362,7 @@ struct Comando {
     ComandoPor comandoPor;
     ComandoRetorne comandoRetorne;
     AtribuicaoIndexada atribuicaoIndexada;
+    AtribuicaoCampo atribuicaoCampo;
 
     void liberar() {
         if(tipo == Tipo::DECLARACAO_VARIAVEL) declaracaoVariavel.liberar();
@@ -333,6 +374,7 @@ struct Comando {
         else if(tipo == Tipo::POR) comandoPor.liberar();
         else if(tipo == Tipo::RETORNE) comandoRetorne.liberar();
         else if(tipo == Tipo::ATRIBUICAO_INDEXADA) atribuicaoIndexada.liberar();
+        else if(tipo == Tipo::ATRIBUICAO_CAMPO) atribuicaoCampo.liberar();
     }
 };
 
@@ -379,10 +421,14 @@ inline void ComandoPor::liberar() {
 struct Parametro {
     TipoVariavel tipo;
     char* nome; // dono: quem criou o parâmetro(strdup)
+    bool ehVariadico = false; // true se declarado como "longo... nome": o tipo guardado já é longo*, e a chamada empacota os argumentos extras num array de longo
+    char* nomeEspaco = nullptr; // dono: quem criou o parametro(strdup). nome do #espaco quando tipo == ESPACO_PONTEIRO
 
     void liberar() {
         free(nome);
         nome = nullptr;
+        free(nomeEspaco);
+        nomeEspaco = nullptr;
     }
 };
 
@@ -392,12 +438,14 @@ struct DeclaracaoFuncao {
     Vetor<Parametro> parametros;
     Vetor<Comando> corpo;
     TipoRetorno tipoRetorno; // "nulo" ou int/car/car*
+    bool ehVariadica = false; // true se o último parâmetro é "longo... nome"
 
     void iniciar() {
         nome = nullptr;
         parametros.iniciar();
         corpo.iniciar();
         tipoRetorno.ehNulo = true;
+        ehVariadica = false;
     }
     void liberar() {
         free(nome);
@@ -406,6 +454,34 @@ struct DeclaracaoFuncao {
         parametros.liberar();
         for(int i = 0; i < corpo.tam; i++) corpo[i].liberar();
         corpo.liberar();
+    }
+};
+
+// campo de um #espaco: "int x;" ou "car* ptr;". A posicao em bytes nao fica aqui: o GeradorIR calcula o layout(precisa de larguraDoTipo).
+struct CampoEspaco {
+    TipoVariavel tipo;
+    char* nome; // dono: quem criou o campo(strdup)
+
+    void liberar() {
+        free(nome);
+        nome = nullptr;
+    }
+};
+
+// "#espaco Nome { int x; car* ptr; }": tipo composto(struct).
+struct DeclaracaoEspaco {
+    char* nome; // dono: quem criou a declaracao(strdup)
+    Vetor<CampoEspaco> campos;
+
+    void iniciar() {
+        nome = nullptr;
+        campos.iniciar();
+    }
+    void liberar() {
+        free(nome);
+        nome = nullptr;
+        for(int i = 0; i < campos.tam; i++) campos[i].liberar();
+        campos.liberar();
     }
 };
 
@@ -420,15 +496,19 @@ struct Inclusao {
 
 struct Programa {
     Vetor<Inclusao> inclusoes;
+    Vetor<DeclaracaoEspaco> espacos;
     Vetor<DeclaracaoFuncao> funcoes;
 
     void iniciar() {
         inclusoes.iniciar();
+        espacos.iniciar();
         funcoes.iniciar();
     }
     void liberar() {
         for(int i = 0; i < inclusoes.tam; i++) inclusoes[i].liberar();
         inclusoes.liberar();
+        for(int i = 0; i < espacos.tam; i++) espacos[i].liberar();
+        espacos.liberar();
         for(int i = 0; i < funcoes.tam; i++) funcoes[i].liberar();
         funcoes.liberar();
     }

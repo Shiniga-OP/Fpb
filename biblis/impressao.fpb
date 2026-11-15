@@ -9,6 +9,58 @@ nulo escreverl(car* txt) {
     #chamada_sistema 1, 1, "\n", 1;
 }
 
+nulo escreverint(int num) {
+    car[24] txt;
+    inttex(num, txt);
+    #chamada_sistema 1, 1, txt, textam(txt);
+}
+
+nulo escreverhex(int num) {
+    car[8] txt;
+    por(int i = 0; i < 8; i++) {
+        int digito = (num >> (28 - i * 4)) & 15;
+        se(digito < 10) txt[i] = (car)(digito + 48);
+        senao txt[i] = (car)(digito + 87);
+    }
+    #chamada_sistema 1, 1, txt, 8;
+}
+
+// formato: %i(int), %h(hex de 8 dígitos), %t(texto), %c(caractere), %%(porcentagem).
+// os argumentos extras chegam empacotados em "args"(cada um ocupa 8 bytes).
+nulo escreverf(car* fmt, longo... args) {
+    car[1] um;
+    int i = 0;
+    int inicio = 0;
+    int prox = 0;
+    enquanto(fmt[i] != 0) {
+        se(fmt[i] == '%' && fmt[i + 1] != 0) {
+            #chamada_sistema 1, 1, (car*)((longo)fmt + inicio), i - inicio;
+            i++;
+            se(fmt[i] == 'i') {
+                escreverint((int)args[prox]);
+                prox++;
+            } senao se(fmt[i] == 'h') {
+                escreverhex((int)args[prox]);
+                prox++;
+            } senao se(fmt[i] == 't') {
+                escrever((car*)args[prox]);
+                prox++;
+            } senao se(fmt[i] == 'c') {
+                um[0] = (car)args[prox];
+                #chamada_sistema 1, 1, um, 1;
+                prox++;
+            } senao se(fmt[i] == '%') {
+                escrever("%");
+            }
+            i++;
+            inicio = i;
+        } senao {
+            i++;
+        }
+    }
+    #chamada_sistema 1, 1, (car*)((longo)fmt + inicio), i - inicio;
+}
+
 nulo sair(int codigo) {
     #chamada_sistema 2, codigo;
 }

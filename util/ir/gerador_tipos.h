@@ -47,6 +47,12 @@ inline OperadorAritmeticoIR GeradorIR::traduzirOperadorAritmetico(OperadorAritme
         case OperadorAritmetico::SUBTRACAO: return OperadorAritmeticoIR::SUBTRACAO;
         case OperadorAritmetico::MULTIPLICACAO: return OperadorAritmeticoIR::MULTIPLICACAO;
         case OperadorAritmetico::DIVISAO: return OperadorAritmeticoIR::DIVISAO;
+        case OperadorAritmetico::MODULO: return OperadorAritmeticoIR::MODULO;
+        case OperadorAritmetico::E_BIT: return OperadorAritmeticoIR::E_BIT;
+        case OperadorAritmetico::OU_BIT: return OperadorAritmeticoIR::OU_BIT;
+        case OperadorAritmetico::XOU: return OperadorAritmeticoIR::XOU;
+        case OperadorAritmetico::DESL_ESQ: return OperadorAritmeticoIR::DESL_ESQ;
+        case OperadorAritmetico::DESL_DIR: return OperadorAritmeticoIR::DESL_DIR;
         default: return OperadorAritmeticoIR::MODULO;
     }
 }
@@ -98,6 +104,8 @@ inline ArgumentoIR GeradorIR::copiarArgumento(const ArgumentoIR& original) {
     copia.larguraElemento = original.larguraElemento;
     copia.sinalizado = original.sinalizado;
     copia.elementoSinalizado = original.elementoSinalizado;
+    copia.idEspaco = original.idEspaco;
+    copia.espacoPorValor = original.espacoPorValor;
     return copia;
 }
 

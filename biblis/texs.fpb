@@ -1,3 +1,77 @@
+#incluir "./mem.fpb";
+
+#classe Texto {
+    car* txt;
+    longo tam;
+    longo cap;
+    
+    estatico Texto* novo(car* lit) {
+        Texto* t = malocar(bytes(Texto));
+        longo n = 0;
+        enquanto(lit[n] != 0) n++;
+        t.txt = lit;
+        t.tam = n;
+        t.cap = 0;
+        retorne t;
+    }
+
+    Texto* somar(Texto* outro) {
+        longo total = este.tam + outro.tam;
+        car* origem1 = este.txt;
+        car* origem2 = outro.txt;
+        car* buf = malocar(total + 1);
+        longo i = 0;
+        enquanto(i < este.tam) {
+            buf[i] = origem1[i];
+            i++;
+        }
+        longo j = 0;
+        enquanto(j < outro.tam) {
+            buf[i + j] = origem2[j];
+            j++;
+        }
+        buf[total] = 0;
+        Texto* r = malocar(bytes(Texto));
+        r.txt = buf;
+        r.tam = total;
+        r.cap = total + 1;
+        retorne r;
+    }
+
+    nulo liberar() {
+        se(este.cap > 0) mliberar(este.txt);
+        mliberar(este);
+    }
+    
+    nulo criar(car* lit) {
+        longo n = 0;
+        enquanto(lit[n] != 0) n++;
+        este.txt = lit;
+        este.tam = n;
+        este.cap = 0;
+    }
+    
+    bool igual(Texto texto) {
+        retorne texcomp(este.txt, texto.txt);
+    }
+}
+
+int caridc(car* txt, car c) {
+    por(int i = 0; txt[i] != c;) {
+        i++;
+        se(txt[i] == c) retorne i;
+    }
+    retorne -1;
+}
+
+int caridcs(car* txt, car c) {
+    int ocorrencias = 0;
+    por(int i = 0; txt[i] != '\0'; i++) {
+        se(txt[i] == c) ocorrencias++;
+    }
+    retorne ocorrencias;
+}
+
 int textam(car* txt) {
     int i = 0;
     enq(txt[i] != 0) {
@@ -19,16 +93,16 @@ bool texcomp(car* txt1, car* txt2) {
 nulo inttex(int numero, car* buffer) {
     int valor = numero;
 
-    int negativo = 0;
+    bool negativo = falso;
     se(numero < 0) {
-        negativo = 1;
+        negativo = verdade;
         valor = 0 - numero;
     }
-    int ehZero = 0;
+    bool ehZero = falso;
     se(valor == 0) {
-        ehZero = 1;
+        ehZero = verdade;
     }
-    se(ehZero == 1) {
+    se(ehZero) {
         buffer[0] = 48;
         buffer[1] = 0;
         retorne;
@@ -37,8 +111,8 @@ nulo inttex(int numero, car* buffer) {
     buffer[indice] = 0;
     indice = indice - 1;
 
-    int continuar = 1;
-    enq(continuar == 1) {
+    bool continuar = verdade;
+    enq(continuar) {
         int quociente = valor / 10;
         int resto = valor - (quociente * 10);
         
@@ -47,22 +121,22 @@ nulo inttex(int numero, car* buffer) {
         valor = quociente;
 
         se(valor == 0) {
-            continuar = 0;
+            continuar = falso;
         }
     }
-    se(negativo == 1) {
+    se(negativo) {
         buffer[indice] = 45;
         indice = indice - 1;
     }
     int inicio = 0;
     indice = indice + 1;
 
-    int deslocando = 1;
-    enq(deslocando == 1) {
+    bool deslocando = verdade;
+    enq(deslocando) {
         buffer[inicio] = buffer[indice];
         
         se(buffer[indice] == 0) {
-            deslocando = 0;
+            deslocando = falso;
         }
         inicio = inicio + 1;
         indice = indice + 1;

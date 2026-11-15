@@ -63,7 +63,14 @@ inline void ARM64::emitirChamadaFuncaoUsuario(std::ostringstream& saida, const I
             emitirMovImediato(saida, registrador, arg.imediato, usaW);
         }
     }
-    saida << "bl " << instrucao.nome << "\n";
+    if(instrucao.indireta) {
+        // chamada por endereço: x16(IP0, rascunho de chamada da AAPCS64, fora dos que esta arquitetura usa) recebe o endereço DEPOIS dos
+        // argumentos, pois carregar os argumentos usa só x0-x5 e a pilha.
+        emitirCarregarSlot(saida, "x16", instrucao.enderecoAlvo.registrador, 8);
+        saida << "blr x16\n";
+    } else {
+        saida << "bl " << instrucao.nome << "\n";
+    }
     if(instrucao.capturaResultado) {
         emitirGravarSlot(saida, "x0", instrucao.slotDestino, instrucao.resultadoLargura);
     }

@@ -142,6 +142,36 @@ public:
             buf.liberar();
             return t;
         }
+        if(buf.igual("#macro")) {
+            t.tipo = TipoToken::MACRO;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
+        if(buf.igual("#sedef")) {
+            t.tipo = TipoToken::SEDEF;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
+        if(buf.igual("#senaodef")) {
+            t.tipo = TipoToken::SENAODEF;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
+        if(buf.igual("#espaco")) {
+            t.tipo = TipoToken::ESPACO;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
+        if(buf.igual("#classe")) {
+            t.tipo = TipoToken::CLASSE;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
         if(buf.igual("#chamada_sistema")) {
             t.tipo = TipoToken::CHAMADA_SISTEMA;
             t.valor = buf.paraTokenTexto();
@@ -192,6 +222,27 @@ public:
     }
 
     Token lerNumero(int linhaAtual) {
+        if(atual() == '0' && pos + 1 < tamFonte && (fonte[pos + 1] == 'x' || fonte[pos + 1] == 'X')) {
+            // hexadecimal(ex: 0x1F00): vira o número decimal equivalente, pra o resto do compilador só enxergar NUMERO decimal
+            avancar();
+            avancar();
+            BufAcumulador digitos;
+            digitos.iniciar();
+            while(!fimDoArquivo() && isxdigit((unsigned char)atual())) {
+                digitos.empurrar(avancar());
+            }
+            if(digitos.tam == 0) {
+                throw std::runtime_error("Número hexadecimal sem dígitos na linha " + std::to_string(linhaAtual));
+            }
+            char bufNumero[32];
+            snprintf(bufNumero, sizeof(bufNumero), "%ld", (long)strtoull(digitos.dados, nullptr, 16));
+            digitos.liberar();
+            Token tHex;
+            tHex.tipo = TipoToken::NUMERO;
+            tHex.valor = strdup(bufNumero);
+            tHex.linha = linhaAtual;
+            return tHex;
+        }
         BufAcumulador buf;
         buf.iniciar();
         while(!fimDoArquivo() && isdigit((unsigned char)atual())) {
@@ -386,6 +437,12 @@ public:
                     t.valor = strdup("&&");
                     return t;
                 }
+                if(!fimDoArquivo() && atual() == '=') {
+                    avancar();
+                    t.tipo = TipoToken::TAMBEM_IGUAL;
+                    t.valor = strdup("&=");
+                    return t;
+                }
                 t.tipo = TipoToken::TAMBEM;
                 t.valor = strdup("&");
                 return t;
@@ -394,6 +451,12 @@ public:
                     avancar();
                     t.tipo = TipoToken::OU_OU;
                     t.valor = strdup("||");
+                    return t;
+                }
+                if(!fimDoArquivo() && atual() == '=') {
+                    avancar();
+                    t.tipo = TipoToken::OU_IGUAL;
+                    t.valor = strdup("|=");
                     return t;
                 }
                 t.tipo = TipoToken::OU;
@@ -406,6 +469,18 @@ public:
                     t.valor = strdup(">=");
                     return t;
                 }
+                if(!fimDoArquivo() && atual() == '>') {
+                    avancar();
+                    if(!fimDoArquivo() && atual() == '=') {
+                        avancar();
+                        t.tipo = TipoToken::MAIOR_MAIOR_IGUAL;
+                        t.valor = strdup(">>=");
+                        return t;
+                    }
+                    t.tipo = TipoToken::MAIOR_MAIOR;
+                    t.valor = strdup(">>");
+                    return t;
+                }
                 t.tipo = TipoToken::MAIOR;
                 t.valor = strdup(">");
                 return t;
@@ -416,8 +491,49 @@ public:
                     t.valor = strdup("<=");
                     return t;
                 }
+                if(!fimDoArquivo() && atual() == '<') {
+                    avancar();
+                    if(!fimDoArquivo() && atual() == '=') {
+                        avancar();
+                        t.tipo = TipoToken::MENOR_MENOR_IGUAL;
+                        t.valor = strdup("<<=");
+                        return t;
+                    }
+                    t.tipo = TipoToken::MENOR_MENOR;
+                    t.valor = strdup("<<");
+                    return t;
+                }
                 t.tipo = TipoToken::MENOR;
                 t.valor = strdup("<");
+                return t;
+            case '^':
+                if(!fimDoArquivo() && atual() == '=') {
+                    avancar();
+                    t.tipo = TipoToken::CIRCUNFLEXO_IGUAL;
+                    t.valor = strdup("^=");
+                    return t;
+                }
+                t.tipo = TipoToken::CIRCUNFLEXO;
+                t.valor = strdup("^");
+                return t;
+            case '.':
+                if(!fimDoArquivo() && atual() == '.' && pos + 1 < tamFonte && fonte[pos + 1] == '.') {
+                    avancar();
+                    avancar();
+                    t.tipo = TipoToken::RETICENCIAS;
+                    t.valor = strdup("...");
+                    return t;
+                }
+                t.tipo = TipoToken::PONTO;
+                t.valor = strdup(".");
+                return t;
+            case '~':
+                t.tipo = TipoToken::TIL;
+                t.valor = strdup("~");
+                return t;
+            case '@':
+                t.tipo = TipoToken::ARROBA;
+                t.valor = strdup("@");
                 return t;
             default:
                 throw std::runtime_error(std::string("Caractere inesperado '") + c + "' na linha " + std::to_string(linhaAtual));

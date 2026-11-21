@@ -6,6 +6,7 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     // 1. registra a assinatura + corpo de cada função do programa principal.
     registrarFuncoes(programa);
     registrarEspacos(programa);
+    registrarLigacoes(programa);
     // 2. o carregador resolve cada "#incluir"(dedupe por caminho absoluto) e
     //    devolve a AST de cada biblioteca(ex: biblis/impressao.fpb); aqui
     //    registramos assinatura + corpo de cada função delas.
@@ -15,6 +16,7 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     for(int i = 0; i < carregador.programas.tam; i++) {
         registrarFuncoes(*carregador.programas[i], carregador.origem(i));
         registrarEspacos(*carregador.programas[i], carregador.origem(i));
+        registrarLigacoes(*carregador.programas[i]);
     }
     // 3. gera FuncaoIR só pras funções alcancaveis a partir
     //    do programa principal(direta ou indiretamente via chamadas "bl"),
@@ -27,6 +29,10 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
         gerarFuncaoAlcancavel(programa.funcoes[i].nome, ir, jaGeradas);
     }
     jaGeradas.liberar();
+    ir.ehBibli = true;
+    for(int i = 0; i < programa.funcoes.tam; i++) {
+        if(strcmp(programa.funcoes[i].nome, "inicio") == 0) ir.ehBibli = false;
+    }
     return ir;
 }
 
@@ -65,6 +71,7 @@ inline void GeradorIR::gerarFuncaoAlcancavel(const char* nome, ProgramaIR& ir, V
         std::string nomeStr = nome;
         throw std::runtime_error("Função '" + nomeStr + "' não foi declarada (faltou #incluir a biblioteca correta?)");
     }
+    if(corpo->ehExterna) return;
     FuncaoIR funcaoIR = gerarFuncao(*corpo, ir.dados);
     VetorStr chamadasEncontradas;
     chamadasEncontradas.iniciar();
@@ -218,4 +225,18 @@ inline ComandoIR GeradorIR::gerarSairImplicito() {
     comandoIR.chamadaSistemaCrua.argumentos.empurrar(codigo);
 
     return comandoIR;
+}
+
+inline void GeradorIR::registrarLigacoes(const Programa& programa) {
+    for(int i = 0; i < programa.ligacoes.tam; i++) {
+        const char* nome = programa.ligacoes[i].caminho;
+        int tamNome = (int)strlen(nome);
+        bool jaTem = false;
+        for(int j = 0; j < ligacoes.tam && !jaTem; j++) {
+            int tamCandidato;
+            const char* candidato = ligacoes.obter(j, &tamCandidato);
+            jaTem = tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0;
+        }
+        if(!jaTem) ligacoes.empurrar(nome);
+    }
 }

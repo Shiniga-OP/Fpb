@@ -6,7 +6,7 @@
 enum class TipoToken {
     // pré processadores:
     INCLUIR, CHAMADA_SISTEMA, MACRO, SEDEF,
-    SENAODEF, ESPACO, CLASSE,
+    SENAODEF, ESPACO, CLASSE, LIGAR, ALVO,
     // tipagem:
     NULO, INT, LONGO, CAR, // int(32 bits, 4 bytes), longo(64 bits, 8 bytes, mesma largura de qualquer ponteiro), car(usado como "car*")
     BOOL, BYTE, CURTO, FLUTUANTE, DOBRO,

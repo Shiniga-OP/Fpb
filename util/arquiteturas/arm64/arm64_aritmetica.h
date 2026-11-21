@@ -43,16 +43,13 @@ inline void ARM64::emitirOperacaoAritmetica(std::ostringstream& saida, const Ins
         const char* mnemonico = instrucao.esquerda.sinalizado ? "asr" : "lsr";
         saida << mnemonico << (usaW ? " w9, w9, w10\n" : " x9, x9, x10\n");
     } else { // MODULO: resto = dividendo - (dividendo/divisor)*divisor.
-        // x9=dividendo, x10=divisor. x28 e reservado(fora do pool de
-        // TOTAL_REGISTRADORES_FISICOS, ver ir.h) especificamente pra este
-        // caso: guarda o dividendo enquanto x9 vira o quociente(sdiv),
-        // pro msub calcular "dividendo - quociente*divisor" em seguida.
-        // MSUB Xd,Xn,Xm,Xa calcula Xd = Xa - (Xn*Xm): Xa(minuendo) =
-        // x28(dividendo original), Xn*Xm = quociente*divisor.
+        // x9=dividendo, x10=divisor. x11 e rascunho(caller-saved, nao entra no pool de TOTAL_REGISTRADORES_FISICOS):
+        // guarda o dividendo enquanto x9 vira o quociente(sdiv), pro msub calcular "dividendo - quociente*divisor".
+        // MSUB Xd,Xn,Xm,Xa calcula Xd = Xa - (Xn*Xm): Xa(minuendo) = x11(dividendo original), Xn*Xm = quociente*divisor.
         emitirChecagemDivisorZero(saida);
-        saida << "mov x28, x9\n";
+        saida << "mov x11, x9\n";
         saida << (usaW ? "sdiv w9, w9, w10\n" : "sdiv x9, x9, x10\n");
-        saida << (usaW ? "msub w9, w9, w10, w28\n" : "msub x9, x9, x10, x28\n");
+        saida << (usaW ? "msub w9, w9, w10, w11\n" : "msub x9, x9, x10, x11\n");
     }
     emitirGravarSlot(saida, "x9", instrucao.slotDestino, largura);
 }

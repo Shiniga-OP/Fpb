@@ -85,7 +85,7 @@ inline void ARM64::emitirRetorne(std::ostringstream& saida, const InstrucaoRetor
     if(instrucao.temValor) {
         const ArgumentoIR& valor = instrucao.valor;
         if(valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-            saida << "ldr x0, =" << valor.simbolo << "\n";
+            emitirEnderecoSimbolo(saida, "x0", valor.simbolo);
         } else {
             emitirCarregarValorEm(saida, "x0", valor);
         }

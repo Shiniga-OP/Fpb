@@ -439,13 +439,15 @@ struct DeclaracaoFuncao {
     Vetor<Comando> corpo;
     TipoRetorno tipoRetorno; // "nulo" ou int/car/car*
     bool ehVariadica = false; // true se o último parâmetro é "longo... nome"
-
+    bool ehExterna = false;
+    
     void iniciar() {
         nome = nullptr;
         parametros.iniciar();
         corpo.iniciar();
         tipoRetorno.ehNulo = true;
         ehVariadica = false;
+        ehExterna = false;
     }
     void liberar() {
         free(nome);
@@ -498,11 +500,15 @@ struct Programa {
     Vetor<Inclusao> inclusoes;
     Vetor<DeclaracaoEspaco> espacos;
     Vetor<DeclaracaoFuncao> funcoes;
+    Vetor<Inclusao> ligacoes;
+    char* alvo;
 
     void iniciar() {
         inclusoes.iniciar();
         espacos.iniciar();
         funcoes.iniciar();
+        ligacoes.iniciar();
+        alvo = nullptr;
     }
     void liberar() {
         for(int i = 0; i < inclusoes.tam; i++) inclusoes[i].liberar();
@@ -511,5 +517,8 @@ struct Programa {
         espacos.liberar();
         for(int i = 0; i < funcoes.tam; i++) funcoes[i].liberar();
         funcoes.liberar();
+        for(int i = 0; i < ligacoes.tam; i++) ligacoes[i].liberar();
+        ligacoes.liberar();
+        free(alvo);
     }
 };

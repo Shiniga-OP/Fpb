@@ -42,6 +42,7 @@ public:
     void emitirCarregarValorEm(std::ostringstream& saida, const char* registradorDestino, const ArgumentoIR& arg);
     void emitirCarregarValorEmComLargura(std::ostringstream& saida, const char* registradorDestino, const ArgumentoIR& arg, int larguraOperacao);
     void emitirReatribuicao(std::ostringstream& saida, const InstrucaoReatribuicao& instrucao);
+    void emitirEnderecoSimbolo(std::ostringstream& saida, const char* registrador, const char* simbolo);
 
     // === arm64_aritmetica.h ===
     void emitirOperacaoAritmetica(std::ostringstream& saida, const InstrucaoOperacaoAritmetica& instrucao);

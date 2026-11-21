@@ -359,6 +359,7 @@ struct DadoEstaticoIR {
 struct ProgramaIR {
     Vetor<DadoEstaticoIR> dados;
     Vetor<FuncaoIR> funcoes;
+    bool ehBibli = false;
 
     void iniciar() {
         dados.iniciar();

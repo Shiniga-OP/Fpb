@@ -18,7 +18,7 @@ inline void ARM64::emitirChamadaSistemaCrua(std::ostringstream& saida, const Ins
         const ArgumentoIR& arg = instrucao.argumentos[i];
         const char* registrador = registradores[i - 1];
         if(arg.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-            saida << "ldr " << registrador << ", =" << arg.simbolo << "\n";
+            emitirEnderecoSimbolo(saida, registrador, arg.simbolo);
         } else if(arg.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
             // ldrb/ldr(w) num registrador w zera os bits altos do x correspondente, entao o x0-x5 completo chega correto pra chamada de sistema mesmo pra um valor "car"(1 byte) ou "int"(4 bytes).
             emitirCarregarSlot(saida, registrador, arg.registrador, arg.larguraBytes, arg.sinalizado);
@@ -55,7 +55,7 @@ inline void ARM64::emitirChamadaFuncaoUsuario(std::ostringstream& saida, const I
         const ArgumentoIR& arg = instrucao.argumentos[i];
         const char* registrador = registradores[i];
         if(arg.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-            saida << "ldr " << registrador << ", =" << arg.simbolo << "\n";
+            emitirEnderecoSimbolo(saida, registrador, arg.simbolo);
         } else if(arg.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
             emitirCarregarSlot(saida, registrador, arg.registrador, arg.larguraBytes, arg.sinalizado);
         } else {

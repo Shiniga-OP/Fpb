@@ -178,6 +178,12 @@ public:
             buf.liberar();
             return t;
         }
+        if(buf.igual("#ligar") || buf.igual("#alvo")) {
+            t.tipo = buf.igual("#ligar") ? TipoToken::LIGAR : TipoToken::ALVO;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
         std::string msg = "Diretiva desconhecida '";
         msg += buf.dados ? buf.dados : "";
         msg += "' na linha " + std::to_string(linhaAtual);

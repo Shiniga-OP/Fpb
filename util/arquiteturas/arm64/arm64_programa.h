@@ -5,7 +5,13 @@
 inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
     std::ostringstream saida;
 
-    saida << ".global inicio\n";
+    if(programa.ehBibli) {
+        for(int i = 0; i < programa.funcoes.tam; i++) {
+            saida << ".global " << programa.funcoes[i].nome << "\n.type " << programa.funcoes[i].nome << ", %function\n";
+        }
+    } else {
+        saida << ".global inicio\n";
+    }
     saida << ".section .rodata\n";
     for(int i = 0; i < programa.dados.tam; i++) {
         const DadoEstaticoIR& dado = programa.dados[i];

@@ -8,6 +8,10 @@ inline Programa Analisador::analisar() {
     while(!verificar(TipoToken::FIM_ARQUIVO)) {
         if(verificar(TipoToken::INCLUIR)) {
             programa.inclusoes.empurrar(analisarInclusao());
+        } else if(verificar(TipoToken::LIGAR)) {
+            programa.ligacoes.empurrar(analisarInclusao(TipoToken::LIGAR));
+        } else if(verificar(TipoToken::ALVO)) {
+            programa.alvo = analisarInclusao(TipoToken::ALVO).caminho;
         } else if(verificar(TipoToken::ESPACO)) {
             programa.espacos.empurrar(analisarEspaco());
         } else if(verificar(TipoToken::CLASSE)) {
@@ -39,14 +43,12 @@ inline void Analisador::erro(const char* mensagem) {
     throw std::runtime_error(msg);
 }
 
-inline Inclusao Analisador::analisarInclusao() {
-    consumir(TipoToken::INCLUIR, "esperado #incluir");
-    const Token& caminho = consumir(TipoToken::TEXTO, "esperado caminho entre aspas após #incluir");
-    if(verificar(TipoToken::PONTO_VIRGULA)) {
-        consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após declaração #incluir");
-    }
+inline Inclusao Analisador::analisarInclusao(TipoToken diretiva) {
+    pos++;
+    const Token& caminho = consumir(TipoToken::TEXTO, "esperado texto entre aspas após a diretiva");
+    if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
     Inclusao inc;
-    inc.caminho = strdup(caminho.valor); // copia propria: tokens serão liberados a parte
+    inc.caminho = strdup(caminho.valor);
     return inc;
 }
 

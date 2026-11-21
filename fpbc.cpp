@@ -15,6 +15,8 @@
 // informações:
 static std::string versaoAtual = "0.0.1";
 static std::string sistemaAtual = "Linux";
+static std::string montador = "as";
+static std::string ligador = "ld";
 
 // registro de arquiteturas disponiveis. Para adicionar uma nova arquitetura,
 // basta incluir o header dela e adicionar uma linha aqui.
@@ -80,6 +82,10 @@ int main(int argc, char** argv) {
 
         Analisador analisador(tokens);
         auto programa = analisador.analisar();
+        if(programa.alvo) {
+            nomeArquitetura = programa.alvo;
+            nomeArquitetura = nomeArquitetura.substr(0, nomeArquitetura.find('-'));
+        }
 
         std::string diretorioBase = std::filesystem::path(caminhoFonte).parent_path().string();
         if(diretorioBase.empty()) diretorioBase = ".";
@@ -102,17 +108,37 @@ int main(int argc, char** argv) {
         saidaAsm << assembly;
         saidaAsm.close();
 
+        bool ehBibli = programaIR.ehBibli;
         programaIR.liberar();
 
         // monta e linka de verdade, pra sair um binario executavel.
-        if(executar("as " + caminhoAsm + " -o " + caminhoObjeto) != 0) {
+        if(executar(montador + " " + caminhoAsm + " -o " + caminhoObjeto) != 0) {
             std::cerr << "Falha ao montar (as) o arquivo " << caminhoAsm << "\n";
             return 1;
         }
-        if(executar("ld -e inicio " + caminhoObjeto + " -o " + caminhoSaida) != 0) {
+        std::string comandoLigar = ligador + " ";
+        std::string pasta;
+        if(!ehBibli) {
+            comandoLigar += "-e inicio ";
+        } else {
+            pasta = nomeBase + "_ligacoes";
+            std::filesystem::create_directories(pasta);
+            std::ofstream(pasta + "/vazio.s").close();
+            executar(montador + " " + pasta + "/vazio.s -o " + pasta + "/vazio.o");
+            comandoLigar += "-shared -z max-page-size=16384 -L" + pasta + " --no-as-needed ";
+            for(int i = 0; i < geradorIR.ligacoes.tam; i++) {
+                int tam;
+                const char* texto = geradorIR.ligacoes.obter(i, &tam);
+                std::string nome(texto, tam);
+                executar(ligador + " -shared -soname lib" + nome + ".so " + pasta + "/vazio.o -o " + pasta + "/lib" + nome + ".so");
+                comandoLigar += "-l" + nome + " ";
+            }
+        }
+        if(executar(comandoLigar + caminhoObjeto + " -o " + caminhoSaida) != 0) {
             std::cerr << "Falha ao linkar (ld) o arquivo " << caminhoObjeto << "\n";
             return 1;
         }
+        if(!pasta.empty()) std::filesystem::remove_all(pasta);
         if(!manterAsm) std::filesystem::remove(caminhoAsm);
         std::filesystem::remove(caminhoObjeto);
 

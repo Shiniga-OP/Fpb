@@ -232,7 +232,7 @@ inline void ARM64::emitirCarregarValorEmComLargura(std::ostringstream& saida, co
 inline void ARM64::emitirReatribuicao(std::ostringstream& saida, const InstrucaoReatribuicao& instrucao) {
     const ArgumentoIR& valor = instrucao.valor;
     if(valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-        saida << "ldr x9, =" << valor.simbolo << "\n";
+        emitirEnderecoSimbolo(saida, "x9", valor.simbolo);
     } else if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
         // carrega com largura e sinal de ORIGEM(estende pra 64 bits se o destino for de 8 bytes) e grava só a largura do destino
         emitirCarregarValorEmComLargura(saida, "x9", valor, instrucao.larguraDestino);
@@ -241,4 +241,9 @@ inline void ARM64::emitirReatribuicao(std::ostringstream& saida, const Instrucao
         emitirMovImediato(saida, "x9", valor.imediato, usaW);
     }
     emitirGravarSlot(saida, "x9", instrucao.slotDestino, instrucao.larguraDestino);
+}
+
+inline void ARM64::emitirEnderecoSimbolo(std::ostringstream& saida, const char* registrador, const char* simbolo) {
+    saida << "adrp " << registrador << ", " << simbolo << "\n";
+    saida << "add " << registrador << ", " << registrador << ", :lo12:" << simbolo << "\n";
 }

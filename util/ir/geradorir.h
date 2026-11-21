@@ -35,18 +35,21 @@ public:
     CarregadorBiblis carregador; // dono das ASTs das bibliotecas: corposFuncoesUsuario aponta pra dentro delas, entao precisa viver até o fim de gerar()
     int contadorSimbolos = 0;
     int bytesArraysAtual = 0;
+    VetorStr ligacoes;
 
     // diretorioBase: diretório a partir do qual os "#incluir" são resolvidos.
     explicit GeradorIR(const std::string& diretorioBase) : diretorioBase(diretorioBase) {
         funcoesUsuario.iniciar();
         corposFuncoesUsuario.iniciar();
         espacos.iniciar();
+        ligacoes.iniciar();
     }
 
     ~GeradorIR() {
         funcoesUsuario.liberar();
         corposFuncoesUsuario.liberar();
         espacos.liberar();
+        ligacoes.liberar();
     }
 
     // ===== declarações: cada método é definido(inline) no leitor indicado =====
@@ -71,6 +74,7 @@ public:
     FuncaoIR gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<DadoEstaticoIR>& dados);
     bool comandoCrahamadaTerminaProcesso(const ComandoIR& comandoIR);
     ComandoIR gerarSairImplicito();
+    void registrarLigacoes(const Programa& programa);
 
     // === gerador_espacos.h ===
     void registrarEspacos(const Programa& programa, const std::string& origem = "programa principal");

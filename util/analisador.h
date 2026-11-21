@@ -22,7 +22,7 @@ public:
     bool verificar(TipoToken tipo);
     const Token& consumir(TipoToken tipo, const char* mensagemErro);
     [[noreturn]] void erro(const char* mensagem);
-    Inclusao analisarInclusao();
+    Inclusao analisarInclusao(TipoToken diretiva = TipoToken::INCLUIR);
     bool ehTokenTipoValor(TipoToken tipo);
     TipoVariavel analisarTipoValor(const char* mensagemErro);
 

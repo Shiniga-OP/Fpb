@@ -13,7 +13,12 @@ inline void Analisador::analisarParametrosECorpo(DeclaracaoFuncao& funcao) {
         if(verificar(TipoToken::VIRGULA)) pos++;
     }
     consumir(TipoToken::FECHA_PARENTESE, "esperado ')' apos parâmetros");
-
+    
+    if(!verificar(TipoToken::ABRE_CHAVE) || verificar(TipoToken::PONTO_VIRGULA)) {
+        pos++;
+        funcao.ehExterna = true;
+        return;
+    }
     consumir(TipoToken::ABRE_CHAVE, "esperado '{' para iniciar corpo da função");
     while(!verificar(TipoToken::FECHA_CHAVE)) {
         funcao.corpo.empurrar(analisarComando());

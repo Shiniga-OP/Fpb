@@ -107,6 +107,9 @@ inline void varrerBlocoParaUsos(const Vetor<ComandoIR>& bloco, Vetor<int>& prime
             registrarDefinicaoSlot(c.instrucaoEnderecoFrame.slotDestino, primeiraPos, ultimaPos, pos);
         } else if(c.tipo == ComandoIR::Tipo::ENDERECO_SLOT) {
             registrarDefinicaoSlot(c.instrucaoEnderecoSlot.slotDestino, primeiraPos, ultimaPos, pos);
+        } else if(c.tipo == ComandoIR::Tipo::CONVERSAO_NUMERICA) {
+            registrarUsoArgumento(c.instrucaoConversaoNumerica.origem, primeiraPos, ultimaPos, pos);
+            registrarDefinicaoSlot(c.instrucaoConversaoNumerica.slotDestino, primeiraPos, ultimaPos, pos);
         }
         pos++; // cada ComandoIR do bloco ocupa uma posição própria na numeração
     }

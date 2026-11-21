@@ -58,9 +58,18 @@ inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
             // ultimo uso), move pra la; senao grava na pilha como antes.
             // A partir daqui, nenhum uso do parametro confia mais no
             // registrador original x0-x5(pode ser sujado por qualquer chamada dentro do corpo).
-            static const char* registradoresParametro[] = { "x0", "x1", "x2", "x3", "x4", "x5" };
+            // inteiros e ponteiros chegam em x0..x7 e flutuantes em s0..s7/d0..d7, com contadores independentes(AAPCS64)
+            int totalInteiros = 0;
+            int totalFlutuantes = 0;
             for(int p = 0; p < funcao.totalParametros; p++) {
-                emitirGravarSlot(saida, registradoresParametro[p], p, funcao.parametrosLargura[p]);
+                int largura = funcao.parametrosLargura[p];
+                if(funcao.parametrosFlutuante[p]) {
+                    saida << "fmov " << (largura == 4 ? "w9, s" : "x9, d") << totalFlutuantes++ << "\n";
+                    emitirGravarSlot(saida, "x9", p, largura);
+                } else {
+                    std::string registrador = "x" + std::to_string(totalInteiros++);
+                    emitirGravarSlot(saida, registrador.c_str(), p, largura);
+                }
             }
             saida << "\n";
         }
@@ -96,6 +105,7 @@ inline long ARM64::numSistema(ChamadaSistemaId id) {
         case ChamadaSistemaId::SAIR: return 93;
         case ChamadaSistemaId::ALOCAR: return 222; // mmap
         case ChamadaSistemaId::LIBERAR: return 215; // munmap
+        case ChamadaSistemaId::ALEATORIO: return 278;
         default: throw std::runtime_error("Arquitetura ARM64: chamada de sistema sem mapeamento");
     }
 }
@@ -126,6 +136,8 @@ inline void ARM64::emitirBlocoComandos(std::ostringstream& saida, const Vetor<Co
             emitirEnderecoFrame(saida, comando.instrucaoEnderecoFrame);
         } else if(comando.tipo == ComandoIR::Tipo::ENDERECO_SLOT) {
             emitirEnderecoSlot(saida, comando.instrucaoEnderecoSlot);
+        } else if(comando.tipo == ComandoIR::Tipo::CONVERSAO_NUMERICA) {
+            emitirConversaoNumerica(saida, comando.instrucaoConversaoNumerica);
         } else {
             emitirRetorne(saida, comando.instrucaoRetorne);
         }

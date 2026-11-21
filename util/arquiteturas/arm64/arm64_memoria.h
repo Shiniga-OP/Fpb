@@ -78,7 +78,7 @@ inline void ARM64::emitirEscritaIndexada(std::ostringstream& saida, const Instru
     saida << "add x9, x9, x10\n"; // x9 = endereco final(ponteiro + indice*largura)
     saida << "mov x10, x9\n"; // move o endereco pra x10, libera x9 pro valor
     if(instrucao.valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-        emitirEnderecoSimbolo(saida, "x9", instrucao.valor.simbolo); // endereco de texto literal(ex: campo car* numa lista de inicializacao)
+        emitirEnderecoSimbolo(saida, "x9", instrucao.valor.simbolo, instrucao.valor.ehFuncao);
     } else {
         emitirCarregarValorEmComLargura(saida, "x9", instrucao.valor, largura == 8 ? 8 : 4);
     }

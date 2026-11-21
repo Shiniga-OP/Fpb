@@ -1,0 +1,24 @@
+#classe Mat {
+    estatico longo aleatorio() {
+        longo semente = 0;
+        #chamada_sistema 5, @semente, 8, 0;
+        semente = Mat.proximo(semente);
+        retorne semente;
+    }
+
+    estatico int piso(flu x) {
+        int xi = (int)x;
+        retorne x < xi ? xi - 1 : xi;
+    }
+
+    estatico int abs(int x) {
+        retorne x < 0 ? -x : x;
+    }
+
+    estatico longo proximo(longo x) {
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        retorne x;
+    }
+}

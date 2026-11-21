@@ -5,18 +5,18 @@
 
 enum class TipoToken {
     // pré processadores:
-    INCLUIR, CHAMADA_SISTEMA, MACRO, SEDEF,
+    INCLUIR, CHAMADA_SISTEMA, MACRO, MACROFIM, SEDEF,
     SENAODEF, ESPACO, CLASSE, LIGAR, ALVO,
     // tipagem:
     NULO, INT, LONGO, CAR, // int(32 bits, 4 bytes), longo(64 bits, 8 bytes, mesma largura de qualquer ponteiro), car(usado como "car*")
     BOOL, BYTE, CURTO, FLUTUANTE, DOBRO,
-    IDENTIFICADOR, TEXTO, NUMERO,
+    IDENTIFICADOR, TEXTO, NUMERO, DECIMAL,
     // estrutura:
     ABRE_PARENTESE, FECHA_PARENTESE, ABRE_CHAVE,
     FECHA_CHAVE, ABRE_COLCHETE, FECHA_COLCHETE,
     // pontuação:
     VIRGULA, PONTO_VIRGULA, RETICENCIAS, PONTO,
-    ARROBA,
+    ARROBA, INTERROGACAO, DOIS_PONTOS,
     // operadores:
     IGUAL, MAIS, MENOS, VEZES, DIVIDIR, PORCENTAGEM,
     // operadores compostos:

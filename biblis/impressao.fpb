@@ -25,6 +25,16 @@ nulo escreverhex(int num) {
     #chamada_sistema 1, 1, txt, 8;
 }
 
+nulo escreverhex64(longo num) {
+    car[16] txt;
+    por(int i = 0; i < 16; i++) {
+        longo digito = (num >> (60 - i * 4)) & 15;
+        se(digito < 10) txt[i] = (car)(digito + 48);
+        senao txt[i] = (car)(digito + 87);
+    }
+    #chamada_sistema 1, 1, txt, 16;
+}
+
 // formato: %i(int), %h(hex de 8 dígitos), %t(texto), %c(caractere), %%(porcentagem).
 // os argumentos extras chegam empacotados em "args"(cada um ocupa 8 bytes).
 nulo escreverf(car* fmt, longo... args) {
@@ -39,8 +49,18 @@ nulo escreverf(car* fmt, longo... args) {
             se(fmt[i] == 'i') {
                 escreverint((int)args[prox]);
                 prox++;
+            } senao se(fmt[i] == 'f') {
+                longo bits = args[prox];
+                dobro* ponteiro = (dobro*)@bits;
+                car[48] tex;
+                dobrotex(ponteiro[0], 6, tex);
+                escrever(tex);
+                prox++;
             } senao se(fmt[i] == 'h') {
                 escreverhex((int)args[prox]);
+                prox++;
+            } senao se(fmt[i] == 'H') {
+                escreverhex64(args[prox]);
                 prox++;
             } senao se(fmt[i] == 't') {
                 escrever((car*)args[prox]);

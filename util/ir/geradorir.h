@@ -11,6 +11,7 @@
 #include "tabelasir.h"
 #include "alocadorreg.h"
 #include "carregadorbiblis.h"
+#include "../preprocessador.h"
 
 // estado compartilhado por todos os métodos que geram UMA função: a
 // declaração sendo gerada, a lista de dados estáticos do programa e a tabela
@@ -38,7 +39,8 @@ public:
     VetorStr ligacoes;
 
     // diretorioBase: diretório a partir do qual os "#incluir" são resolvidos.
-    explicit GeradorIR(const std::string& diretorioBase) : diretorioBase(diretorioBase) {
+    explicit GeradorIR(const std::string& diretorioBase, Preprocessador* pre = nullptr) : diretorioBase(diretorioBase) {
+        carregador.preprocessador = pre;
         funcoesUsuario.iniciar();
         corposFuncoesUsuario.iniciar();
         espacos.iniciar();
@@ -56,6 +58,7 @@ public:
 
     // === gerador_tipos.h ===
     int larguraDoTipo(TipoVariavel tipo);
+    bool tipoEhFlutuante(TipoVariavel tipo);
     int larguraElementoApontado(TipoVariavel tipoPonteiro);
     bool tipoEhSinalizado(TipoVariavel tipo);
     bool elementoEhSinalizado(TipoVariavel tipoPonteiro);
@@ -65,6 +68,7 @@ public:
     ArgumentoIR referenciaSlotInt(int slot);
     ArgumentoIR copiarArgumento(const ArgumentoIR& original);
     char* gerarNomeSimbolo(const char* textoOriginal);
+    bool elementoEhFlutuante(TipoVariavel tipoPonteiro);
 
     // === gerador_funcoes.h ===
     ProgramaIR gerar(const Programa& programa);
@@ -93,7 +97,10 @@ public:
     ArgumentoIR resolverChamadaSistemaComoValor(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverChamadaFuncaoComoValor(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverEndereco(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR converterParaTipo(ArgumentoIR valor, bool destinoFlutuante, int larguraDestino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    void promoverFlutuantes(ArgumentoIR& esq, ArgumentoIR& dir, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverOperadorEspaco(OperadorAritmetico op, ArgumentoIR esquerda, ArgumentoIR direita, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR resolverTernaria(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
 
     // === gerador_condicoes.h ===
     void atribuirMarcacao(int slot, long valor, Vetor<ComandoIR>& saida);

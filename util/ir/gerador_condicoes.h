@@ -21,6 +21,7 @@ inline void GeradorIR::marcarSeVerdadeira(const Condicao& cond, int slot, Vetor<
     if(cond.tipo == Condicao::Tipo::COMPARACAO) {
         comandoIR.instrucaoSe.esquerda = resolverExpressao(cond.esquerda, saida, ctx);
         comandoIR.instrucaoSe.direita = resolverExpressao(cond.direita, saida, ctx);
+        promoverFlutuantes(comandoIR.instrucaoSe.esquerda, comandoIR.instrucaoSe.direita, saida, ctx);
         comandoIR.instrucaoSe.operador = traduzirOperadorComparacao(cond.operador);
         atribuirMarcacao(slot, 1, *comandoIR.instrucaoSe.entao);
         saida.empurrar(comandoIR);
@@ -46,6 +47,7 @@ inline void GeradorIR::resolverCondicao(const Condicao& cond, Vetor<ComandoIR>& 
     if(cond.tipo == Condicao::Tipo::COMPARACAO) {
         esquerda = resolverExpressao(cond.esquerda, saida, ctx);
         direita = resolverExpressao(cond.direita, saida, ctx);
+        promoverFlutuantes(esquerda, direita, saida, ctx);
         operador = traduzirOperadorComparacao(cond.operador);
         return;
     }

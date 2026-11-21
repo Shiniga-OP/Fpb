@@ -8,14 +8,17 @@ enum class ChamadaSistemaId {
     ESCREVER = 1,
     SAIR = 2,
     ALOCAR = 3,
-    LIBERAR = 4
+    LIBERAR = 4,
+    ALEATORIO = 5
 };
 
 // uma instrução IR genérica: "chame o sistema X com estes argumentos".
 // os argumentos podem ser um literal de texto(referencia a um simbolo)
 // ou um valor imediato(numero).
 struct ArgumentoIR {
-    enum class Tipo { SIMBOLO_TEXTO, IMEDIATO, REGISTRADOR } tipo;
+    enum class Tipo {
+        SIMBOLO_TEXTO, IMEDIATO, REGISTRADOR
+    } tipo;
     char* simbolo; // dono: quem criou o argumento(strdup). usado quando tipo == SIMBOLO_TEXTO
     long imediato = 0; // usado quando tipo == IMEDIATO
     int registrador = -1; // usado quando tipo == REGISTRADOR: indice x0..x5 (posição do parâmetro)
@@ -27,7 +30,10 @@ struct ArgumentoIR {
     int idEspaco = -1; // indice na TabelaEspacos do GeradorIR se esta variavel e um espaco(struct) ou ponteiro pra um; -1 se nao
     bool espacoPorValor = false; // true so pra variavel declarada "Nome var = {...}"(o corpo mora no frame): proibe "a = b"
     bool ehPonteiro = false; // true se o slot guarda um endereço(variável/parâmetro ponteiro, array, ou resultado de "@"): "@nome" devolve o conteúdo do slot em vez do endereço do slot
-
+    bool ehFlutuante = false; // true pra flu(4 bytes) e dobro(8 bytes): o valor(ou o imediato) guarda o padrão de bits do float/double, e a arquitetura opera nos registradores de ponto flutuante
+    bool elementoFlutuante = false; // so quando este ArgumentoIR e um PONTEIRO: true se o elemento apontado é flu/dobro, aplicado ao resultado de "nome[indice]"
+    bool ehFuncao = false; // true se tipo == SIMBOLO_TEXTO guarda o símbolo de uma função("@funcao"): o endereço vem pela GOT, não por adrp/add direto
+    
     void liberar() {
         free(simbolo);
         simbolo = nullptr;
@@ -62,6 +68,7 @@ struct InstrucaoChamadaFuncaoUsuario {
     bool capturaResultado = false; // true se o valor de retorno(x0) precisa ser gravado num slot(chamada usada como expressao, ex: "int x = f();")
     int slotDestino = -1; // valido so se capturaResultado == true
     int resultadoLargura = 8; // largura em bytes da gravacao no slot(1=car, 4=int, 8=longo/ponteiro), valido so se capturaResultado == true
+    bool resultadoFlutuante = false; // true se a função devolve flu/dobro(valor em s0/d0 em vez de x0), valido so se capturaResultado == true
     bool indireta = false; // true se a chamada é por endereço("f();" com "nulo* f = @(endereco);"): "nome" fica nullptr e a arquitetura emite "blr" no endereço guardado em enderecoAlvo
     ArgumentoIR enderecoAlvo; // valido so se indireta == true: REGISTRADOR, slot da variável que guarda o endereço da função
 
@@ -71,6 +78,7 @@ struct InstrucaoChamadaFuncaoUsuario {
         capturaResultado = false;
         slotDestino = -1;
         resultadoLargura = 8;
+        resultadoFlutuante = false;
         indireta = false;
     }
     void liberar() {
@@ -131,6 +139,19 @@ struct InstrucaoEnderecoSlot {
     int slotDestino;
     int slotOrigem;
     void liberar() {}
+};
+
+// slotDestino = (tipo destino)origem entre inteiro e flutuante: scvtf(int -> flu/dobro), fcvtzs(flu/dobro -> int) e fcvt(flu <-> dobro).
+// "larguraDestino" é a largura em bytes do valor gravado no slot e "destinoFlutuante" diz se o destino é flu/dobro ou inteiro.
+struct InstrucaoConversaoNumerica {
+    int slotDestino;
+    ArgumentoIR origem;
+    int larguraDestino;
+    bool destinoFlutuante;
+
+    void liberar() {
+        origem.liberar();
+    }
 };
 
 // desvio condicional no nível de IR: compara esquerda OP direita e executa
@@ -215,13 +236,13 @@ struct InstrucaoEscritaIndexada {
     }
 };
 
-// um comando no nivel de IR: chamada de sistema crua(#chamada_sistema direto no corpo), chamada a uma função de usuario(bl), desvio condicional(se), laço(enquanto), reatribuição de variável, operação aritméticas, ou leitura/escrita indexada(ponteiro[indice]).
+// um comando no nivel de IR: chamada de sistema crua(#chamada_sistema direto no corpo), chamada a uma função de usuario(bl), desvio condicional(se), laço(enquanto), reatribuição de variável, operação aritméticas, leitura/escrita indexada(ponteiro[indice]) ou conversão numérica.
 struct ComandoIR {
     enum class Tipo {
         CHAMADA_SISTEMA_CRUA, CHAMADA_FUNCAO_USUARIO,
         SE, ENQUANTO, REATRIBUICAO, OPERACAO_ARITMETICA,
         RETORNE, LEITURA_INDEXADA, ESCRITA_INDEXADA,
-        ENDERECO_FRAME, ENDERECO_SLOT
+        ENDERECO_FRAME, ENDERECO_SLOT, CONVERSAO_NUMERICA
     } tipo;
     InstrucaoChamadaSistemaCrua chamadaSistemaCrua;
     InstrucaoChamadaFuncaoUsuario chamadaFuncaoUsuario;
@@ -234,6 +255,7 @@ struct ComandoIR {
     InstrucaoEscritaIndexada instrucaoEscritaIndexada;
     InstrucaoEnderecoFrame instrucaoEnderecoFrame;
     InstrucaoEnderecoSlot instrucaoEnderecoSlot;
+    InstrucaoConversaoNumerica instrucaoConversaoNumerica;
 
     void liberar() {
         if(tipo == Tipo::CHAMADA_SISTEMA_CRUA) chamadaSistemaCrua.liberar();
@@ -247,6 +269,7 @@ struct ComandoIR {
         else if(tipo == Tipo::ESCRITA_INDEXADA) instrucaoEscritaIndexada.liberar();
         else if(tipo == Tipo::ENDERECO_FRAME) instrucaoEnderecoFrame.liberar();
         else if(tipo == Tipo::ENDERECO_SLOT) instrucaoEnderecoSlot.liberar();
+        else if(tipo == Tipo::CONVERSAO_NUMERICA) instrucaoConversaoNumerica.liberar();
     }
 };
 
@@ -311,6 +334,9 @@ struct FuncaoIR {
     bool ehInicio = false; // caso especial: nunca emite "ret"
     bool temRetornoTipado = false; // true se a funcao foi declarada com int/car/car*(exige "retorne" em vez do "sair implicito"); usado so pra decidir se emite o rotulo de fim(toda funcao com "retorne" no meio do corpo precisa dele, independente do tipo, mas mantido explicito aqui pra clareza)
     Vetor<int> parametrosLargura; // paralelo aos primeiros totalParametros slots: largura em bytes do tipo do parametro correspondente(1=car, 4=int, 8=longo/ponteiro), usado pelo prologo da arquitetura pra gravar com a largura certa(strb/str32/str64)
+    Vetor<bool> parametrosFlutuante; // paralelo a parametrosLargura: true se o parâmetro é flu/dobro(chega em s0..s7/d0..d7 em vez de x0..x7)
+    bool retornoFlutuante = false; // true se a função devolve flu/dobro(valor em s0/d0)
+    int retornoLargura = 8; // largura em bytes do valor devolvido(4 pra flu, 8 pra dobro), usado quando retornoFlutuante == true
 
     // mapa slot -> indice de registrador fisico(0..TOTAL_REGISTRADORES_FISICOS-1,
     // correspondendo a x19..x27, todos salvos: ver comentario de
@@ -319,7 +345,7 @@ struct FuncaoIR {
     // acessado via pilha(ldr/str), igual ao comportamento antigo. Tamanho
     // igual a totalSlots; indice by slot.
     Vetor<int> registradorDoSlot;
-    
+
     int bytesArrays = 0;
 
     void iniciar() {
@@ -330,6 +356,9 @@ struct FuncaoIR {
         bytesArrays = 0;
         ehInicio = false;
         parametrosLargura.iniciar();
+        parametrosFlutuante.iniciar();
+        retornoFlutuante = false;
+        retornoLargura = 8;
         registradorDoSlot.iniciar();
     }
     void liberar() {
@@ -338,6 +367,7 @@ struct FuncaoIR {
         for(int i = 0; i < instrucoes.tam; i++) instrucoes[i].liberar();
         instrucoes.liberar();
         parametrosLargura.liberar();
+        parametrosFlutuante.liberar();
         registradorDoSlot.liberar();
     }
 };

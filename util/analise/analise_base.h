@@ -53,7 +53,7 @@ inline Inclusao Analisador::analisarInclusao(TipoToken diretiva) {
 }
 
 inline bool Analisador::ehTokenTipoValor(TipoToken tipo) {
-    return tipo == TipoToken::INT || tipo == TipoToken::LONGO || tipo == TipoToken::CAR || tipo == TipoToken::BOOL || tipo == TipoToken::BYTE || tipo == TipoToken::CURTO;
+    return tipo == TipoToken::INT || tipo == TipoToken::LONGO || tipo == TipoToken::CAR || tipo == TipoToken::BOOL || tipo == TipoToken::BYTE || tipo == TipoToken::CURTO || tipo == TipoToken::FLUTUANTE || tipo == TipoToken::DOBRO;
 }
 
 // consome um tipo de valor(int, longo, car, bool, byte, curto) seguido de "*" opcional, e devolve o TipoVariavel correspondente. "nulo" não entra aqui: cada chamador trata antes.
@@ -65,6 +65,8 @@ inline TipoVariavel Analisador::analisarTipoValor(const char* mensagemErro) {
     if(base == TipoToken::INT) tipo = TipoVariavel::INT;
     else if(base == TipoToken::LONGO) tipo = TipoVariavel::LONGO;
     else if(base == TipoToken::CAR) tipo = TipoVariavel::CAR;
+    else if(base == TipoToken::FLUTUANTE) tipo = TipoVariavel::FLUTUANTE;
+    else if(base == TipoToken::DOBRO) tipo = TipoVariavel::DOBRO;
     else if(base == TipoToken::BOOL) tipo = TipoVariavel::BOOL;
     else if(base == TipoToken::BYTE) tipo = TipoVariavel::BYTE;
     else tipo = TipoVariavel::CURTO;

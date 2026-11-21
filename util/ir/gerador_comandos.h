@@ -21,7 +21,9 @@ inline void GeradorIR::gerarRetorne(const ComandoRetorne& comandoRetorne, Vetor<
     comandoIR.tipo = ComandoIR::Tipo::RETORNE;
     comandoIR.instrucaoRetorne.temValor = comandoRetorne.temValor;
     if(comandoRetorne.temValor) {
-        comandoIR.instrucaoRetorne.valor = resolverExpressao(comandoRetorne.valor, saida, ctx);
+        ArgumentoIR valorRetorno = resolverExpressao(comandoRetorne.valor, saida, ctx);
+        TipoVariavel tipoRetorno = ctx.funcao.tipoRetorno.tipo;
+        comandoIR.instrucaoRetorne.valor = converterParaTipo(valorRetorno, tipoEhFlutuante(tipoRetorno), larguraDoTipo(tipoRetorno), saida, ctx);
     }
     saida.empurrar(comandoIR);
 }
@@ -42,7 +44,9 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
     referenciaSlot.elementoSinalizado = elementoEhSinalizado(decl.tipo);
     referenciaSlot.larguraElemento = larguraElementoApontado(decl.tipo); // so relevante se esta variavel for usada como ponteiro numa indexacao(nome[i]); ver comentario de larguraElementoApontado()
     referenciaSlot.ehPonteiro = tipoEhPonteiro(decl.tipo);
-
+    referenciaSlot.ehFlutuante = tipoEhFlutuante(decl.tipo);
+    referenciaSlot.elementoFlutuante = elementoEhFlutuante(decl.tipo);
+    
     if(decl.nomeEspaco) referenciaSlot.idEspaco = obterIdEspaco(decl.nomeEspaco);
     if(decl.ehArray) {
         if(decl.tamArray <= 0) throw std::runtime_error("Array precisa ter tamanho maior que zero");
@@ -108,6 +112,7 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
             TipoVariavel tipoCampo;
             posicaoDoCampo(id, espaco.campos[i].nome, &posCampo, &tipoCampo);
             ArgumentoIR valor = resolverExpressao(decl.listaInicial[i], saida, ctx);
+            valor = converterParaTipo(valor, tipoEhFlutuante(tipoCampo), larguraDoTipo(tipoCampo), saida, ctx);
             emitirEscritaCampo(referenciaSlot, posCampo, tipoCampo, valor, saida);
         }
         return;
@@ -133,12 +138,12 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
         saida.empurrar(comandoIR);
         return;
     }
-
     ArgumentoIR valor = resolverExpressao(decl.valorInicial, saida, ctx);
     if(referenciaSlot.idEspaco >= 0 && valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.idEspaco >= 0 && valor.idEspaco != referenciaSlot.idEspaco) {
         std::string nomeStr = decl.nome;
         throw std::runtime_error("Variável '" + nomeStr + "' recebe um ponteiro de outro espaço");
     }
+    valor = converterParaTipo(valor, referenciaSlot.ehFlutuante, larguraDoTipo(decl.tipo), saida, ctx);
     int larguraDestino = larguraDoTipo(decl.tipo); // a largura da gravacao no slot segue o tipo declarado da variavel, não o tipo da expressão
     if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = larguraDestino; // imediato não tem slot de origem: monta direto na largura do destino. Registrador mantém largura e sinal de origem pra ser carregado com a extensão certa
 
@@ -177,6 +182,7 @@ inline void GeradorIR::gerarReatribuicao(const Reatribuicao& reat, Vetor<Comando
         return;
     }
     ArgumentoIR novoValor = resolverExpressao(reat.valor, saida, ctx);
+    novoValor = converterParaTipo(novoValor, existente.ehFlutuante, existente.larguraBytes, saida, ctx);
     if(novoValor.tipo == ArgumentoIR::Tipo::IMEDIATO) novoValor.larguraBytes = existente.larguraBytes; // a gravação segue o tipo do slot já declarado, não o da expressão do lado direito(ver gerarDeclaracaoVariavel)
 
     ComandoIR comandoIR;
@@ -199,6 +205,7 @@ inline void GeradorIR::gerarAtribuicaoIndexada(const AtribuicaoIndexada& atr, Ve
     }
     ArgumentoIR indice = resolverExpressao(atr.indice, saida, ctx);
     ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
+    valor = converterParaTipo(valor, ponteiro.elementoFlutuante, ponteiro.larguraElemento, saida, ctx);
     if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = ponteiro.larguraElemento; // registrador mantém a largura de origem: a arquitetura estende e grava só a largura do elemento
 
     ComandoIR comandoIR;
@@ -402,6 +409,7 @@ inline void GeradorIR::resolverArgumentosChamada(const char* nome, const Vetor<E
     corposFuncoesUsuario.buscar(nome, &declaracao);
     for(int j = 0; j < fixos; j++) {
         ArgumentoIR arg = resolverExpressao(argumentos[j], saida, ctx);
+        if(declaracao) arg = converterParaTipo(arg, tipoEhFlutuante(declaracao->parametros[j].tipo), larguraDoTipo(declaracao->parametros[j].tipo), saida, ctx);
         if(declaracao && declaracao->parametros[j].tipo == TipoVariavel::ESPACO) {
             // parâmetro "Nome x"(por valor, como em C): a função recebe o endereço de uma CÓPIA no frame de quem chama.
             int idParametro = obterIdEspaco(declaracao->parametros[j].nomeEspaco);
@@ -437,6 +445,7 @@ inline void GeradorIR::resolverArgumentosChamada(const char* nome, const Vetor<E
 
     for(int i = 0; i < extras; i++) {
         ArgumentoIR valor = resolverExpressao(argumentos[fixos + i], saida, ctx);
+        if(valor.ehFlutuante) valor = converterParaTipo(valor, true, 8, saida, ctx); // como em C: flu nos extras vira dobro
         if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = 8; // monta o imediato direto em 64 bits
         ComandoIR comandoEscrita;
         comandoEscrita.tipo = ComandoIR::Tipo::ESCRITA_INDEXADA;
@@ -531,14 +540,22 @@ inline bool GeradorIR::prepararChamadaIndireta(const char* nome, const Vetor<Exp
     if(variavel.larguraBytes != 8) {
         throw std::runtime_error("Variável '" + nomeStr + "' não pode ser chamada como função: precisa guardar um endereço de 8 bytes");
     }
-    if(argumentos.tam > 6) {
-        throw std::runtime_error("Chamada por '" + nomeStr + "' aceita no máximo 6 argumentos");
+    int totalInteiros = 0;
+    int totalFlutuantes = 0;
+    if(argumentos.tam > 16) {
+        throw std::runtime_error("Chamada por '" + nomeStr + "' aceita no máximo 8 argumentos inteiros e 8 flutuantes");
     }
     chamada.indireta = true;
     chamada.enderecoAlvo = copiarArgumento(variavel);
     chamada.enderecoAlvo.ehPonteiro = variavel.ehPonteiro;
     for(int i = 0; i < argumentos.tam; i++) {
-        chamada.argumentos.empurrar(resolverExpressao(argumentos[i], saida, ctx));
+        ArgumentoIR arg = resolverExpressao(argumentos[i], saida, ctx);
+        if(arg.ehFlutuante) totalFlutuantes++;
+        else totalInteiros++;
+        chamada.argumentos.empurrar(arg);
+    }
+    if(totalInteiros > 8 || totalFlutuantes > 8) {
+        throw std::runtime_error("Chamada por '" + nomeStr + "' aceita no máximo 8 argumentos inteiros e 8 flutuantes");
     }
     return true;
 }

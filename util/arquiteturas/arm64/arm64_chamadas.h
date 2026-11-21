@@ -18,7 +18,7 @@ inline void ARM64::emitirChamadaSistemaCrua(std::ostringstream& saida, const Ins
         const ArgumentoIR& arg = instrucao.argumentos[i];
         const char* registrador = registradores[i - 1];
         if(arg.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-            emitirEnderecoSimbolo(saida, registrador, arg.simbolo);
+            emitirEnderecoSimbolo(saida, registrador, arg.simbolo, arg.ehFuncao);
         } else if(arg.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
             // ldrb/ldr(w) num registrador w zera os bits altos do x correspondente, entao o x0-x5 completo chega correto pra chamada de sistema mesmo pra um valor "car"(1 byte) ou "int"(4 bytes).
             emitirCarregarSlot(saida, registrador, arg.registrador, arg.larguraBytes, arg.sinalizado);
@@ -47,21 +47,13 @@ inline void ARM64::emitirChamadaSistemaCrua(std::ostringstream& saida, const Ins
 // "int x = f();"), grava x0(valor de retorno, convenção AAPCS64) no
 // slot destino logo apos o bl, antes que qualquer outra chamada possa sujar x0.
 inline void ARM64::emitirChamadaFuncaoUsuario(std::ostringstream& saida, const InstrucaoChamadaFuncaoUsuario& instrucao) {
-    static const char* registradores[] = { "x0", "x1", "x2", "x3", "x4", "x5" };
-    if(instrucao.argumentos.tam > 6) {
-        throw std::runtime_error("Arquitetura ARM64: chamada de função aceita no máximo 6 argumentos");
-    }
+    int totalInteiros = 0;
+    int totalFlutuantes = 0;
     for(int i = 0; i < instrucao.argumentos.tam; i++) {
-        const ArgumentoIR& arg = instrucao.argumentos[i];
-        const char* registrador = registradores[i];
-        if(arg.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-            emitirEnderecoSimbolo(saida, registrador, arg.simbolo);
-        } else if(arg.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
-            emitirCarregarSlot(saida, registrador, arg.registrador, arg.larguraBytes, arg.sinalizado);
-        } else {
-            bool usaW = (arg.larguraBytes <= 4);
-            emitirMovImediato(saida, registrador, arg.imediato, usaW);
-        }
+        emitirArgumentoChamada(saida, instrucao.argumentos[i], totalInteiros, totalFlutuantes);
+    }
+    if(totalInteiros > 8 || totalFlutuantes > 8) {
+        throw std::runtime_error("Arquitetura ARM64: chamada de função aceita no máximo 8 argumentos inteiros e 8 flutuantes");
     }
     if(instrucao.indireta) {
         // chamada por endereço: x16(IP0, rascunho de chamada da AAPCS64, fora dos que esta arquitetura usa) recebe o endereço DEPOIS dos
@@ -72,7 +64,12 @@ inline void ARM64::emitirChamadaFuncaoUsuario(std::ostringstream& saida, const I
         saida << "bl " << instrucao.nome << "\n";
     }
     if(instrucao.capturaResultado) {
-        emitirGravarSlot(saida, "x0", instrucao.slotDestino, instrucao.resultadoLargura);
+        if(instrucao.resultadoFlutuante) {
+            saida << (instrucao.resultadoLargura == 4 ? "fmov w9, s0\n" : "fmov x9, d0\n");
+            emitirGravarSlot(saida, "x9", instrucao.slotDestino, instrucao.resultadoLargura);
+        } else {
+            emitirGravarSlot(saida, "x0", instrucao.slotDestino, instrucao.resultadoLargura);
+        }
     }
     saida << "\n";
 }

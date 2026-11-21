@@ -105,9 +105,15 @@ inline void GeradorIR::coletarChamadasUsuario(const Vetor<ComandoIR>& bloco, Vet
 }
 
 inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<DadoEstaticoIR>& dados) {
-    if(funcao.parametros.tam > 6) {
+    int totalInteiros = 0;
+    int totalFlutuantes = 0;
+    for(int i = 0; i < funcao.parametros.tam; i++) {
+        if(tipoEhFlutuante(funcao.parametros[i].tipo)) totalFlutuantes++;
+        else totalInteiros++;
+    }
+    if(totalInteiros > 8 || totalFlutuantes > 8) {
         std::string nomeStr = funcao.nome;
-        throw std::runtime_error("Função '" + nomeStr + "' aceita no máximo 6 parâmetros");
+        throw std::runtime_error("Função '" + nomeStr + "' aceita no máximo 8 parâmetros inteiros e 8 flutuantes");
     }
     FuncaoIR funcaoIR;
     funcaoIR.iniciar();
@@ -134,11 +140,16 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
         arg.sinalizado = tipoEhSinalizado(funcao.parametros[i].tipo);
         arg.elementoSinalizado = elementoEhSinalizado(funcao.parametros[i].tipo);
         arg.ehPonteiro = tipoEhPonteiro(funcao.parametros[i].tipo);
+        arg.ehFlutuante = tipoEhFlutuante(funcao.parametros[i].tipo);
+        arg.elementoFlutuante = elementoEhFlutuante(funcao.parametros[i].tipo);
         if(funcao.parametros[i].nomeEspaco) arg.idEspaco = obterIdEspaco(funcao.parametros[i].nomeEspaco);
         if(funcao.parametros[i].tipo == TipoVariavel::ESPACO) arg.espacoPorValor = true; // "Nome x" por valor: o chamador passa o endereço de uma cópia, então "x = y" aqui copia campo a campo
         ctx.variaveisLocais.definirComSlot(funcao.parametros[i].nome, arg, i);
         funcaoIR.parametrosLargura.empurrar(arg.larguraBytes);
+        funcaoIR.parametrosFlutuante.empurrar(arg.ehFlutuante);
     }
+    funcaoIR.retornoFlutuante = !funcao.tipoRetorno.ehNulo && tipoEhFlutuante(funcao.tipoRetorno.tipo);
+    funcaoIR.retornoLargura = funcao.tipoRetorno.ehNulo ? 8 : larguraDoTipo(funcao.tipoRetorno.tipo);
     bool terminaComSair = false;
     bool terminaComRetorne = false;
     for(int i = 0; i < funcao.corpo.tam; i++) {

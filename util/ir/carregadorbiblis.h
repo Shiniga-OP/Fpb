@@ -11,6 +11,7 @@
 #include "../ast.h"
 #include "../lexer.h"
 #include "../analisador.h"
+#include "../preprocessador.h"
 
 // Localiza, le e faz o parsing dos arquivos .fpb incluidos via "#incluir".
 // Não sabe nada sobre IR nem sobre tabelas de funções: só devolve as ASTs
@@ -23,8 +24,9 @@
 class CarregadorBiblis {
 public:
     VetorStr caminhosJaIncluidos; // caminhos absolutos ja processados, pra não incluir o mesmo arquivo duas vezes
-    Vetor<Programa*> programas;   // dono: CarregadorBiblis. mesma ordem de "origens"
-    VetorStr origens;             // caminho relativo, como escrito no #incluir, de cada item de "programas"(usado só em mensagens de erro)
+    Vetor<Programa*> programas; // dono: CarregadorBiblis. mesma ordem de "origens"
+    VetorStr origens; // caminho relativo, como escrito no #incluir, de cada item de "programas"(usado só em mensagens de erro)
+    Preprocessador* preprocessador = nullptr;
 
     CarregadorBiblis() {
         caminhosJaIncluidos.iniciar();
@@ -91,6 +93,7 @@ public:
 
         Lexer lexer(conteudo.c_str());
         Vetor<Token> tokens = lexer.tokenizar();
+        if(preprocessador) tokens = preprocessador->processar(tokens, caminhoAbsoluto.parent_path().string());
         Analisador analisador(tokens);
 
         // aloca no heap e mantem em "programas": quem registrou as funções

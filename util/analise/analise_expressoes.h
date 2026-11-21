@@ -2,6 +2,13 @@
 #pragma once
 #include "../analisador.h"
 
+inline Expressao montarNumeroLiteral(const char* valor) {
+    Expressao e;
+    e.tipo = Expressao::Tipo::NUMERO_LITERAL;
+    e.valor = strdup(valor);
+    return e;
+}
+
 // operador binario do nivel dado, se o token atual pertencer a ele. Niveis, do mais fraco ao mais forte:
 // 0 "|", 1 "^", 2 "&", 3 "<<" ">>", 4 "+" "-", 5 "*" "/" "%". O nivel 6 e a expressao primaria.
 inline bool Analisador::operadorDoNivel(int nivel, OperadorAritmetico& op) {
@@ -41,8 +48,36 @@ inline Expressao Analisador::analisarBinaria(int nivel) {
     return esquerda;
 }
 
-// ponto de entrada de qualquer expressao com operadores(aritmeticos e de bit): comeca no nivel mais fraco.
+// ponto de entrada de qualquer expressao: operadores aritmeticos e de bit, e "cond ? a : b" no nivel mais fraco(associativo a direita).
+// le primeiro como expressao comum; se logo depois vem comparacao, "&&", "||" ou "?", era a condicao de um ternario: volta ao inicio e le como condicao.
+// se a leitura comum falhar(ex: "(a == 1 || b == 2) ? x : y", onde o parentese tem uma condicao), tambem tenta como condicao.
 inline Expressao Analisador::analisarExpressaoAditiva() {
+    size_t inicio = pos;
+    Expressao base;
+    bool leu = true;
+    try {
+        base = analisarBinaria(0);
+    } catch(const std::runtime_error&) {
+        leu = false;
+    }
+    if(leu && !ehTokenComparacao(atual().tipo) && !verificar(TipoToken::OU_OU) && !verificar(TipoToken::TAMBEM_TAMBEM) && !verificar(TipoToken::INTERROGACAO)) {
+        return base;
+    }
+    if(leu) base.liberar();
+    pos = inicio;
+    Expressao e;
+    e.tipo = Expressao::Tipo::TERNARIA;
+    e.valor = nullptr;
+    e.condicaoTernaria = new Condicao(analisarCondicao("?"));
+    consumir(TipoToken::INTERROGACAO, "esperado '?' depois da condição do operador ternário");
+    e.esquerda = new Expressao(analisarExpressaoAditiva());
+    consumir(TipoToken::DOIS_PONTOS, "esperado ':' no operador ternário");
+    e.direita = new Expressao(analisarExpressaoAditiva());
+    return e;
+}
+
+// expressao sem ternario: usada pelos dois lados de uma comparacao em analisarCondicaoBase(senao "a < b ? x : y" entraria em loop).
+inline Expressao Analisador::analisarExpressaoSemTernario() {
     return analisarBinaria(0);
 }
 
@@ -131,10 +166,16 @@ inline Expressao Analisador::analisarExpressaoPrimaria() {
         } else {
             e.enderecoDeValor = false;
             const Token& nome = consumir(TipoToken::IDENTIFICADOR, "esperado nome da variável ou '(' após '@'");
-            Expressao variavel;
-            variavel.tipo = Expressao::Tipo::IDENTIFICADOR;
-            variavel.valor = strdup(nome.valor);
-            e.esquerda = new Expressao(variavel);
+            if(verificar(TipoToken::PONTO)) {
+                pos++; // consome '.'
+                const Token& campo = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo após '.'");
+                e.esquerda = new Expressao(montarAcessoCampo(nome.valor, campo.valor));
+            } else {
+                Expressao variavel;
+                variavel.tipo = Expressao::Tipo::IDENTIFICADOR;
+                variavel.valor = strdup(nome.valor);
+                e.esquerda = new Expressao(variavel);
+            }
         }
         return e;
     }
@@ -152,13 +193,39 @@ inline Expressao Analisador::analisarExpressaoPrimaria() {
         e.direita = new Expressao(menosUm);
         return e;
     }
-    if(verificar(TipoToken::MENOS) && tokens[pos + 1].tipo == TipoToken::NUMERO) {
+    if(verificar(TipoToken::MENOS) && (tokens[pos + 1].tipo == TipoToken::NUMERO || tokens[pos + 1].tipo == TipoToken::DECIMAL)) {
         pos++; // consome '-'
         const Token& t = tokens[pos++];
         Expressao e;
-        e.tipo = Expressao::Tipo::NUMERO_LITERAL;
+        e.tipo = (t.tipo == TipoToken::DECIMAL) ? Expressao::Tipo::DECIMAL_LITERAL : Expressao::Tipo::NUMERO_LITERAL;
         std::string valorNegativo = std::string("-") + t.valor;
         e.valor = strdup(valorNegativo.c_str());
+        return e;
+    }
+    if(verificar(TipoToken::MENOS)) {
+        // "-x" vira "0 - x": sem nó novo na AST nem instrução nova no IR
+        pos++;
+        Expressao e;
+        e.tipo = Expressao::Tipo::BINARIA;
+        e.valor = nullptr;
+        e.operadorAritmetico = OperadorAritmetico::SUBTRACAO;
+        e.esquerda = new Expressao(montarNumeroLiteral("0"));
+        e.direita = new Expressao(analisarExpressaoPrimaria());
+        return e;
+    }
+    if(verificar(TipoToken::EXCLAMACAO)) {
+        // "!x" como valor vira "x == 0 ? 1 : 0". Dentro de condição, quem trata o "!" é analisarCondicaoBase.
+        pos++;
+        Expressao e;
+        e.tipo = Expressao::Tipo::TERNARIA;
+        e.valor = nullptr;
+        e.condicaoTernaria = new Condicao();
+        e.condicaoTernaria->tipo = Condicao::Tipo::COMPARACAO;
+        e.condicaoTernaria->esquerda = analisarExpressaoPrimaria();
+        e.condicaoTernaria->operador = OperadorComparacao::IGUAL;
+        e.condicaoTernaria->direita = montarNumeroLiteral("0");
+        e.esquerda = new Expressao(montarNumeroLiteral("1"));
+        e.direita = new Expressao(montarNumeroLiteral("0"));
         return e;
     }
     if(verificar(TipoToken::NULO)) {
@@ -188,6 +255,13 @@ inline Expressao Analisador::analisarExpressaoPrimaria() {
         const Token& t = tokens[pos++];
         Expressao e;
         e.tipo = Expressao::Tipo::NUMERO_LITERAL;
+        e.valor = strdup(t.valor);
+        return e;
+    }
+    if(verificar(TipoToken::DECIMAL)) {
+        const Token& t = tokens[pos++];
+        Expressao e;
+        e.tipo = Expressao::Tipo::DECIMAL_LITERAL;
         e.valor = strdup(t.valor);
         return e;
     }

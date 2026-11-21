@@ -7,7 +7,7 @@
 enum class OperadorAritmetico { SOMA, SUBTRACAO, MULTIPLICACAO, DIVISAO, MODULO, E_BIT, OU_BIT, XOU, DESL_ESQ, DESL_DIR };
 
 // tipo declarado de uma variável: int(32 bits, 4 bytes), car(caractere/byte de 8 bits), longo(64 bits, 8 bytes) ou os respectivos ponteiros(car*, int*, longo*, sempre 8 bytes de endereco, mas indexando elementos de largura diferente). Declarado aqui em cima pois CONVERSAO referencia o tipo alvo.
-enum class TipoVariavel { INT, CAR, CAR_PONTEIRO, LONGO, LONGO_PONTEIRO, INT_PONTEIRO, NULO_PONTEIRO, BOOL, BOOL_PONTEIRO, BYTE, BYTE_PONTEIRO, CURTO, CURTO_PONTEIRO, ESPACO, ESPACO_PONTEIRO };
+enum class TipoVariavel { INT, CAR, CAR_PONTEIRO, LONGO, LONGO_PONTEIRO, INT_PONTEIRO, NULO_PONTEIRO, BOOL, BOOL_PONTEIRO, BYTE, BYTE_PONTEIRO, CURTO, CURTO_PONTEIRO, ESPACO, ESPACO_PONTEIRO, FLUTUANTE, FLUTUANTE_PONTEIRO, DOBRO, DOBRO_PONTEIRO };
 
 // devolve o ponteiro do tipo de valor dado(ex: INT -> INT_PONTEIRO). Tipo que não tem ponteiro correspondente(ou já é ponteiro) volta igual.
 inline TipoVariavel ponteiroDoTipo(TipoVariavel tipo) {
@@ -17,12 +17,14 @@ inline TipoVariavel ponteiroDoTipo(TipoVariavel tipo) {
     if(tipo == TipoVariavel::BOOL) return TipoVariavel::BOOL_PONTEIRO;
     if(tipo == TipoVariavel::BYTE) return TipoVariavel::BYTE_PONTEIRO;
     if(tipo == TipoVariavel::CURTO) return TipoVariavel::CURTO_PONTEIRO;
+    if(tipo == TipoVariavel::FLUTUANTE) return TipoVariavel::FLUTUANTE_PONTEIRO;
+    if(tipo == TipoVariavel::DOBRO) return TipoVariavel::DOBRO_PONTEIRO;
     return tipo;
 }
 
 // true se "tipo" é um ponteiro(car*, int*, ..., nulo*, Nome*). Arrays declarados já chegam aqui com o tipo ponteiro.
 inline bool tipoEhPonteiro(TipoVariavel tipo) {
-    return tipo == TipoVariavel::CAR_PONTEIRO || tipo == TipoVariavel::LONGO_PONTEIRO || tipo == TipoVariavel::INT_PONTEIRO || tipo == TipoVariavel::NULO_PONTEIRO || tipo == TipoVariavel::BOOL_PONTEIRO || tipo == TipoVariavel::BYTE_PONTEIRO || tipo == TipoVariavel::CURTO_PONTEIRO || tipo == TipoVariavel::ESPACO_PONTEIRO;
+    return tipo == TipoVariavel::CAR_PONTEIRO || tipo == TipoVariavel::LONGO_PONTEIRO || tipo == TipoVariavel::INT_PONTEIRO || tipo == TipoVariavel::NULO_PONTEIRO || tipo == TipoVariavel::BOOL_PONTEIRO || tipo == TipoVariavel::BYTE_PONTEIRO || tipo == TipoVariavel::CURTO_PONTEIRO || tipo == TipoVariavel::ESPACO_PONTEIRO || tipo == TipoVariavel::FLUTUANTE_PONTEIRO || tipo == TipoVariavel::DOBRO_PONTEIRO;
 }
 
 // tipo de retorno de uma função: "nulo" continua significando "sem retorno"(mesma palavra chave usada hoje pra declarar função), os demais reusam TipoVariavel pra não duplicar o mesmo espaco de tipos.
@@ -43,20 +45,17 @@ struct TipoRetorno {
 // Expressao só precisa do PONTEIRO(alocado com new), a definição completa
 // de ChamadaSistemaCrua continua vindo depois, ja que só ai ela pode usar Expressao por valor dentro do Vetor.
 struct ChamadaSistemaCrua;
+struct Condicao;
 
 struct Expressao {
     enum class Tipo {
-        TEXTO_LITERAL,
-        IDENTIFICADOR,
-        NUMERO_LITERAL,
-        BINARIA,
-        CONVERSAO,
-        CHAMADA_FUNCAO,
-        BYTES,
-        INDEXACAO,
-        CHAMADA_SISTEMA,
-        ACESSO_CAMPO,
-        ENDERECO
+        TEXTO_LITERAL, IDENTIFICADOR,
+        NUMERO_LITERAL, DECIMAL_LITERAL,
+        BINARIA, CONVERSAO,
+        CHAMADA_FUNCAO, BYTES,
+        INDEXACAO, CHAMADA_SISTEMA,
+        ACESSO_CAMPO, ENDERECO,
+        TERNARIA
     } tipo;
     char* valor; // dono: quem criou a expressao(strdup). usado quando tipo != BINARIA e tipo != CONVERSAO e tipo != CHAMADA_FUNCAO e tipo != BYTES e tipo != INDEXACAO e tipo != CHAMADA_SISTEMA
     OperadorAritmetico operadorAritmetico; // usado quando tipo == BINARIA
@@ -70,7 +69,8 @@ struct Expressao {
     char* bytesNomeVariavel; // dono: quem criou a expressao(strdup). usado quando tipo == BYTES e bytesEhTipoLiteral == false
     bool enderecoDeValor; // usado quando tipo == ENDERECO: true em "@(expr)"(o valor de expr é tratado como endereço), false em "@nome"(endereço da variável "nome"). "esquerda" guarda expr ou o IDENTIFICADOR
     ChamadaSistemaCrua* chamadaSistema; // dono: quem criou a expressao(alocado com new). usado quando tipo == CHAMADA_SISTEMA: "#chamada_sistema id, arg1, ...;" usada como EXPRESSAO(ex: "retorne #chamada_sistema ...;", "escrever(#chamada_sistema ...)", dentro de "se(#chamada_sistema ... == 0)"). O valor da expressao e' o retorno da syscall(x0), igual "nome = #chamada_sistema ..." na declaracao/reatribuicao, so que aqui embutido dentro de outra expressao maior em vez de sozinho num comando.
-
+    Condicao* condicaoTernaria; // dono: quem criou a expressao(alocado com new). usado quando tipo == TERNARIA: "esquerda" é o valor se verdadeira e "direita" o valor se falsa
+    
     void liberar() {
         free(valor);
         valor = nullptr;
@@ -103,10 +103,19 @@ struct Expressao {
             free(bytesNomeVariavel);
             bytesNomeVariavel = nullptr;
         } else if(tipo == Tipo::CHAMADA_SISTEMA) {
-            liberarChamadaSistemaDeExpressao(); // definida so depois de ChamadaSistemaCrua estar completa(ver comentario junto dela)
+            liberarChamadaSistemaDeExpressao();
+        } else if(tipo == Tipo::TERNARIA) {
+            liberarCondicaoTernaria();
+            esquerda->liberar();
+            delete esquerda;
+            esquerda = nullptr;
+            direita->liberar();
+            delete direita;
+            direita = nullptr;
         }
     }
     void liberarChamadaSistemaDeExpressao(); // implementada apos ChamadaSistemaCrua estar definida por completo(ver mais abaixo no arquivo)
+    void liberarCondicaoTernaria(); // implementada apos Condicao estar definida por completo
 };
 
 // uma chamada de funcao dentro de um corpo: escrever("Ola\n");
@@ -125,8 +134,6 @@ struct ChamadaFuncao {
         argumentos.liberar();
     }
 };
-
-
 
 // chamada de sistema crua dentro do corpo: #chamada_sistema número, saida, msg, tamanho_msg;
 // ou, com captura de retorno: nome = #chamada_sistema número, arg1, arg2, ...;
@@ -223,6 +230,12 @@ struct Condicao {
         }
     }
 };
+
+inline void Expressao::liberarCondicaoTernaria() {
+    condicaoTernaria->liberar();
+    delete condicaoTernaria;
+    condicaoTernaria = nullptr;
+}
 
 // reatribuicao de uma variável já declarada: nome = expr;
 struct Reatribuicao {

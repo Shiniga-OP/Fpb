@@ -1,0 +1,9 @@
+#ligar "EGL"
+
+nulo* eglGetDisplay(nulo* id);
+int eglInitialize(nulo* tela, int* maior, int* menor);
+int eglChooseConfig(nulo* tela, int* atribs, nulo* configs, int tam, int* num);
+nulo* eglCreateWindowSurface(nulo* tela, nulo* config, nulo* janela, int* atribs);
+nulo* eglCreateContext(nulo* tela, nulo* config, nulo* compart, int* atribs);
+int eglMakeCurrent(nulo* tela, nulo* superficie, nulo* leitura, nulo* ctx);
+int eglSwapBuffers(nulo* tela, nulo* superficie);

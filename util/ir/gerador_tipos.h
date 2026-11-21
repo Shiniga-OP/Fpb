@@ -10,7 +10,7 @@
 inline int GeradorIR::larguraDoTipo(TipoVariavel tipo) {
     if(tipo == TipoVariavel::CAR || tipo == TipoVariavel::BOOL || tipo == TipoVariavel::BYTE) return 1;
     if(tipo == TipoVariavel::CURTO) return 2;
-    if(tipo == TipoVariavel::INT) return 4;
+    if(tipo == TipoVariavel::INT || tipo == TipoVariavel::FLUTUANTE) return 4;
     return 8; // LONGO, CAR_PONTEIRO, LONGO_PONTEIRO, NULO_PONTEIRO
 }
 
@@ -24,8 +24,8 @@ inline int GeradorIR::larguraDoTipo(TipoVariavel tipo) {
 inline int GeradorIR::larguraElementoApontado(TipoVariavel tipoPonteiro) {
     if(tipoPonteiro == TipoVariavel::CAR_PONTEIRO || tipoPonteiro == TipoVariavel::BOOL_PONTEIRO || tipoPonteiro == TipoVariavel::BYTE_PONTEIRO) return 1;
     if(tipoPonteiro == TipoVariavel::CURTO_PONTEIRO) return 2;
-    if(tipoPonteiro == TipoVariavel::INT_PONTEIRO) return 4;
-    if(tipoPonteiro == TipoVariavel::LONGO_PONTEIRO) return 8;
+    if(tipoPonteiro == TipoVariavel::INT_PONTEIRO || tipoPonteiro == TipoVariavel::FLUTUANTE_PONTEIRO) return 4;
+    if(tipoPonteiro == TipoVariavel::LONGO_PONTEIRO || tipoPonteiro == TipoVariavel::DOBRO_PONTEIRO) return 8;
     return 1; // tipo não-ponteiro(ou NULO_PONTEIRO, generico) nunca deveria ser indexado sem conversão antes; 1 e o valor historico/seguro
 }
 
@@ -34,9 +34,18 @@ inline bool GeradorIR::tipoEhSinalizado(TipoVariavel tipo) {
     return !(tipo == TipoVariavel::CAR || tipo == TipoVariavel::BOOL);
 }
 
+// true pra flu(32 bits) e dobro(64 bits): o valor mora nos slots como o padrao de bits do float/double.
+inline bool GeradorIR::tipoEhFlutuante(TipoVariavel tipo) {
+    return tipo == TipoVariavel::FLUTUANTE || tipo == TipoVariavel::DOBRO;
+}
+
 // sinal de CADA ELEMENTO apontado por um tipo ponteiro: car*, bool* e nulo* são sem sinal, os demais com sinal.
 inline bool GeradorIR::elementoEhSinalizado(TipoVariavel tipoPonteiro) {
     return tipoPonteiro == TipoVariavel::BYTE_PONTEIRO || tipoPonteiro == TipoVariavel::CURTO_PONTEIRO || tipoPonteiro == TipoVariavel::INT_PONTEIRO || tipoPonteiro == TipoVariavel::LONGO_PONTEIRO;
+}
+
+inline bool GeradorIR::elementoEhFlutuante(TipoVariavel tipoPonteiro) {
+    return tipoPonteiro == TipoVariavel::FLUTUANTE_PONTEIRO || tipoPonteiro == TipoVariavel::DOBRO_PONTEIRO;
 }
 
 // traduz o operador aritmético da AST(OperadorAritmetico) pro equivalente
@@ -106,6 +115,10 @@ inline ArgumentoIR GeradorIR::copiarArgumento(const ArgumentoIR& original) {
     copia.elementoSinalizado = original.elementoSinalizado;
     copia.idEspaco = original.idEspaco;
     copia.espacoPorValor = original.espacoPorValor;
+    copia.ehPonteiro = original.ehPonteiro;
+    copia.ehFlutuante = original.ehFlutuante;
+    copia.elementoFlutuante = original.elementoFlutuante;
+    copia.ehFuncao = original.ehFuncao;
     return copia;
 }
 

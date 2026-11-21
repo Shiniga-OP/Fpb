@@ -42,6 +42,16 @@ struct BufAcumulador {
     }
 };
 
+inline bool ehInicioIdentificador(char c) {
+    unsigned char u = (unsigned char)c;
+    return isalpha(u) || u == '_' || u >= 128;
+}
+
+inline bool ehCorpoIdentificador(char c) {
+    unsigned char u = (unsigned char)c;
+    return isalnum(u) || u == '_' || u >= 128;
+}
+
 class Lexer {
 public:
     char* fonte; // não possui: apenas le, quem chamou e dono
@@ -66,7 +76,7 @@ public:
 
             if(c == '#') {
                 tokens.empurrar(lerDiretiva(linhaAtual));
-            } else if(isalpha((unsigned char)c) || c == '_') {
+            } else if(ehInicioIdentificador(c)) {
                 tokens.empurrar(lerIdentificadorOuPalavraChave(linhaAtual));
             } else if(isdigit((unsigned char)c)) {
                 tokens.empurrar(lerNumero(linhaAtual));
@@ -148,6 +158,12 @@ public:
             buf.liberar();
             return t;
         }
+        if(buf.igual("#macrofim")) {
+            t.tipo = TipoToken::MACROFIM;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
         if(buf.igual("#sedef")) {
             t.tipo = TipoToken::SEDEF;
             t.valor = buf.paraTokenTexto();
@@ -194,7 +210,7 @@ public:
     Token lerIdentificadorOuPalavraChave(int linhaAtual) {
         BufAcumulador buf;
         buf.iniciar();
-        while(!fimDoArquivo() && (isalnum((unsigned char)atual()) || atual() == '_')) {
+        while(!fimDoArquivo() && ehCorpoIdentificador(atual())) {
             buf.empurrar(avancar());
         }
         Token t;
@@ -254,8 +270,18 @@ public:
         while(!fimDoArquivo() && isdigit((unsigned char)atual())) {
             buf.empurrar(avancar());
         }
+        bool decimal = false;
+        if(!fimDoArquivo() && atual() == '.' && pos + 1 < tamFonte && isdigit((unsigned char)fonte[pos + 1])) {
+            decimal = true;
+            buf.empurrar(avancar());
+            while(!fimDoArquivo() && isdigit((unsigned char)atual())) buf.empurrar(avancar());
+        }
+        if(!fimDoArquivo() && atual() == 'f') {
+            decimal = true;
+            buf.empurrar(avancar());
+        }
         Token t;
-        t.tipo = TipoToken::NUMERO;
+        t.tipo = decimal ? TipoToken::DECIMAL : TipoToken::NUMERO;
         t.valor = buf.paraTokenTexto();
         t.linha = linhaAtual;
         buf.liberar();
@@ -415,14 +441,32 @@ public:
                 t.valor = strdup("-");
                 return t;
             case '*':
+                if(!fimDoArquivo() && atual() == '=') {
+                    avancar();
+                    t.tipo = TipoToken::VEZES_IGUAL;
+                    t.valor = strdup("*=");
+                    return t;
+                }
                 t.tipo = TipoToken::VEZES;
                 t.valor = strdup("*");
                 return t;
             case '/':
+                if(!fimDoArquivo() && atual() == '=') {
+                    avancar();
+                    t.tipo = TipoToken::DIVIDIR_IGUAL;
+                    t.valor = strdup("/=");
+                    return t;
+                }
                 t.tipo = TipoToken::DIVIDIR;
                 t.valor = strdup("/");
                 return t;
             case '%':
+                if(!fimDoArquivo() && atual() == '=') {
+                    avancar();
+                    t.tipo = TipoToken::PORCENTAGEM_IGUAL;
+                    t.valor = strdup("%=");
+                    return t;
+                }
                 t.tipo = TipoToken::PORCENTAGEM;
                 t.valor = strdup("%");
                 return t;
@@ -540,6 +584,14 @@ public:
             case '@':
                 t.tipo = TipoToken::ARROBA;
                 t.valor = strdup("@");
+                return t;
+            case '?':
+                t.tipo = TipoToken::INTERROGACAO;
+                t.valor = strdup("?");
+                return t;
+            case ':':
+                t.tipo = TipoToken::DOIS_PONTOS;
+                t.valor = strdup(":");
                 return t;
             default:
                 throw std::runtime_error(std::string("Caractere inesperado '") + c + "' na linha " + std::to_string(linhaAtual));

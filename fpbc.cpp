@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include "util/lexer.h"
 #include "util/analisador.h"
+#include "util/preprocessador.h"
 #include "util/ir/geradorir.h"
 #include "util/arquiteturas/arq.h"
 #include "util/arquiteturas/arm64/arm64.h"
@@ -77,8 +78,14 @@ int main(int argc, char** argv) {
     try {
         std::string codigoFonte = lerArquivo(caminhoFonte);
 
+        std::string diretorioBase = std::filesystem::path(caminhoFonte).parent_path().string();
+        if(diretorioBase.empty()) diretorioBase = ".";
+
         Lexer lexer(codigoFonte.c_str());
         auto tokens = lexer.tokenizar();
+
+        Preprocessador preprocessador;
+        tokens = preprocessador.processar(tokens, diretorioBase);
 
         Analisador analisador(tokens);
         auto programa = analisador.analisar();
@@ -87,9 +94,7 @@ int main(int argc, char** argv) {
             nomeArquitetura = nomeArquitetura.substr(0, nomeArquitetura.find('-'));
         }
 
-        std::string diretorioBase = std::filesystem::path(caminhoFonte).parent_path().string();
-        if(diretorioBase.empty()) diretorioBase = ".";
-        GeradorIR geradorIR(diretorioBase);
+        GeradorIR geradorIR(diretorioBase, &preprocessador);
         auto programaIR = geradorIR.gerar(programa);
 
         // libera memoria manual da AST/tokens(sem RAII, entao liberamos explicitamente)

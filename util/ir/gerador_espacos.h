@@ -100,6 +100,7 @@ inline ArgumentoIR GeradorIR::resolverAcessoCampo(const Expressao& expressao, Ve
     referenciaSlot.imediato = 0;
     referenciaSlot.registrador = slot;
     referenciaSlot.larguraBytes = largura;
+    referenciaSlot.ehFlutuante = tipoEhFlutuante(tipoCampo);
     referenciaSlot.sinalizado = tipoEhSinalizado(tipoCampo);
     referenciaSlot.elementoSinalizado = elementoEhSinalizado(tipoCampo);
     referenciaSlot.larguraElemento = larguraElementoApontado(tipoCampo);
@@ -135,5 +136,6 @@ inline void GeradorIR::gerarAtribuicaoCampo(const AtribuicaoCampo& atr, Vetor<Co
     TipoVariavel tipoCampo;
     posicaoDoCampo(base.idEspaco, atr.campo, &posCampo, &tipoCampo);
     ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
+    valor = converterParaTipo(valor, tipoEhFlutuante(tipoCampo), larguraDoTipo(tipoCampo), saida, ctx);
     emitirEscritaCampo(base, posCampo, tipoCampo, valor, saida);
 }

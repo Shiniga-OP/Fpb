@@ -42,11 +42,13 @@ public:
     void emitirCarregarValorEm(std::ostringstream& saida, const char* registradorDestino, const ArgumentoIR& arg);
     void emitirCarregarValorEmComLargura(std::ostringstream& saida, const char* registradorDestino, const ArgumentoIR& arg, int larguraOperacao);
     void emitirReatribuicao(std::ostringstream& saida, const InstrucaoReatribuicao& instrucao);
-    void emitirEnderecoSimbolo(std::ostringstream& saida, const char* registrador, const char* simbolo);
+    void emitirEnderecoSimbolo(std::ostringstream& saida, const char* registrador, const char* simbolo, bool ehFuncao = false);
+    void emitirArgumentoChamada(std::ostringstream& saida, const ArgumentoIR& arg, int& totalInteiros, int& totalFlutuantes);
 
     // === arm64_aritmetica.h ===
     void emitirOperacaoAritmetica(std::ostringstream& saida, const InstrucaoOperacaoAritmetica& instrucao);
     void emitirChecagemDivisorZero(std::ostringstream& saida);
+    void emitirConversaoNumerica(std::ostringstream& saida, const InstrucaoConversaoNumerica& instrucao);
 
     // === arm64_memoria.h ===
     void emitirTexTam(std::ostringstream& saida, const ArgumentoIR& argumentoPonteiro);
@@ -56,7 +58,8 @@ public:
     void emitirEnderecoSlot(std::ostringstream& saida, const InstrucaoEnderecoSlot& instrucao);
 
     // === arm64_fluxo.h ===
-    const char* mnemonicoSaltoSeFalso(OperadorComparacaoIR operador);
+    const char* mnemonicoSaltoSeFalso(OperadorComparacaoIR operador, bool flutuante = false);
+    void emitirComparacao(std::ostringstream& saida, const ArgumentoIR& esq, const ArgumentoIR& dir);
     void emitirSe(std::ostringstream& saida, const InstrucaoSe& instrucao, const ProgramaIR& programa);
     void emitirEnquanto(std::ostringstream& saida, const InstrucaoEnquanto& instrucao, const ProgramaIR& programa);
     void emitirRetorne(std::ostringstream& saida, const InstrucaoRetorne& instrucao);

@@ -162,3 +162,61 @@ int texint(car* txt) {
     }
     retorne resultado * sinal;
 }
+
+nulo dobrotex(dobro numero, int casas, car* buffer) {
+    dobro valor = numero;
+    bool negativo = falso;
+    se(numero < 0.0) {
+        negativo = verdade;
+        valor = -numero;
+    }
+    longo escala = 1;
+    por(int c = 0; c < casas; c++) {
+        escala = escala * 10;
+    }
+    dobro escalaDobro = (dobro)escala;
+    valor = valor + 0.5 / escalaDobro;
+
+    longo inteiro = (longo)valor;
+    longo fracao = (longo)((valor - (dobro)inteiro) * escalaDobro);
+    se(fracao >= escala) {
+        fracao = escala - 1;
+    }
+    int pos = 0;
+    se(negativo) {
+        buffer[pos] = 45;
+        pos++;
+    }
+    car[24] digitos;
+    int total = 0;
+    bool continuar = verdade;
+    enq(continuar) {
+        longo quociente = inteiro / 10;
+        longo resto = inteiro - (quociente * 10);
+        digitos[total] = (car)(resto + 48);
+        total++;
+        inteiro = quociente;
+
+        se(inteiro == 0) {
+            continuar = falso;
+        }
+    }
+    enq(total > 0) {
+        total--;
+        buffer[pos] = digitos[total];
+        pos++;
+    }
+    se(casas > 0) {
+        buffer[pos] = 46;
+        pos++;
+        int ultimo = pos + casas - 1;
+        por(int i = 0; i < casas; i++) {
+            longo quocFracao = fracao / 10;
+            longo restoFracao = fracao - (quocFracao * 10);
+            buffer[ultimo - i] = (car)(restoFracao + 48);
+            fracao = quocFracao;
+        }
+        pos = pos + casas;
+    }
+    buffer[pos] = 0;
+}

@@ -8,7 +8,10 @@
 // SIGNED do ARM64(lt/gt/le/ge), coerente com o resto do compilador
 // tratar todo inteiro como signed(ex: "sdiv" em vez de "udiv" na
 // divisao em emitirOperacaoAritmetica).
-inline const char* ARM64::mnemonicoSaltoSeFalso(OperadorComparacaoIR operador) {
+inline const char* ARM64::mnemonicoSaltoSeFalso(OperadorComparacaoIR operador, bool flutuante) {
+    // fcmp com NaN(nao ordenado) tem que cair em "falso" pra qualquer comparacao exceto "!=": por isso < e <= usam pl e hi em vez de ge e gt
+    if(flutuante && operador == OperadorComparacaoIR::MENOR) return "b.pl";
+    if(flutuante && operador == OperadorComparacaoIR::MENOR_IGUAL) return "b.hi";
     switch(operador) {
         case OperadorComparacaoIR::IGUAL: return "b.ne";
         case OperadorComparacaoIR::DIFERENTE: return "b.eq";
@@ -27,12 +30,10 @@ inline void ARM64::emitirSe(std::ostringstream& saida, const InstrucaoSe& instru
     std::string rotuloSenao = "_se_senao_" + std::to_string(idRotulo);
     std::string rotuloFim = "_se_fim_" + std::to_string(idRotulo);
 
-    emitirCarregarValorEmComLargura(saida, "x9", instrucao.esquerda, 8);
-    emitirCarregarValorEmComLargura(saida, "x10", instrucao.direita, 8);
-    saida << "cmp x9, x10\n";
+    emitirComparacao(saida, instrucao.esquerda, instrucao.direita);
 
     bool temSenao = instrucao.temSenao;
-    const char* saltoSeFalso = mnemonicoSaltoSeFalso(instrucao.operador);
+    const char* saltoSeFalso = mnemonicoSaltoSeFalso(instrucao.operador, instrucao.esquerda.ehFlutuante);
     saida << saltoSeFalso << " " << (temSenao ? rotuloSenao : rotuloFim) << "\n\n";
 
     emitirBlocoComandos(saida, *instrucao.entao, programa);
@@ -62,11 +63,9 @@ inline void ARM64::emitirEnquanto(std::ostringstream& saida, const InstrucaoEnqu
 
     saida << rotuloTopo << ":\n";
     emitirBlocoComandos(saida, *instrucao.comandosCondicao, programa);
-    emitirCarregarValorEmComLargura(saida, "x9", instrucao.esquerda, 8);
-    emitirCarregarValorEmComLargura(saida, "x10", instrucao.direita, 8);
-    saida << "cmp x9, x10\n";
+    emitirComparacao(saida, instrucao.esquerda, instrucao.direita);
 
-    const char* saltoSeFalso = mnemonicoSaltoSeFalso(instrucao.operador);
+    const char* saltoSeFalso = mnemonicoSaltoSeFalso(instrucao.operador, instrucao.esquerda.ehFlutuante);
     saida << saltoSeFalso << " " << rotuloFim << "\n\n";
 
     emitirBlocoComandos(saida, *instrucao.corpo, programa);
@@ -84,11 +83,30 @@ inline void ARM64::emitirEnquanto(std::ostringstream& saida, const InstrucaoEnqu
 inline void ARM64::emitirRetorne(std::ostringstream& saida, const InstrucaoRetorne& instrucao) {
     if(instrucao.temValor) {
         const ArgumentoIR& valor = instrucao.valor;
-        if(valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-            emitirEnderecoSimbolo(saida, "x0", valor.simbolo);
+        if(funcaoAtual->retornoFlutuante) {
+            emitirCarregarValorEm(saida, "x9", valor);
+            saida << (funcaoAtual->retornoLargura == 4 ? "fmov s0, w9\n" : "fmov d0, x9\n");
+        } else if(valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
+            emitirEnderecoSimbolo(saida, "x0", valor.simbolo, valor.ehFuncao);
         } else {
             emitirCarregarValorEm(saida, "x0", valor);
         }
     }
     saida << "b _fim_" << funcaoAtual->nome << "\n\n";
+}
+// compara esquerda com direita: "cmp" de 64 bits pra inteiros, "fcmp" pra flutuantes(os dois lados ja foram promovidos pro mesmo tipo no gerador).
+inline void ARM64::emitirComparacao(std::ostringstream& saida, const ArgumentoIR& esq, const ArgumentoIR& dir) {
+    if(esq.ehFlutuante) {
+        bool dobro = esq.larguraBytes == 8;
+        const char* prefixo = dobro ? "d" : "s";
+        emitirCarregarValorEm(saida, "x9", esq);
+        emitirCarregarValorEm(saida, "x10", dir);
+        saida << "fmov " << prefixo << "16, " << (dobro ? "x9" : "w9") << "\n";
+        saida << "fmov " << prefixo << "17, " << (dobro ? "x10" : "w10") << "\n";
+        saida << "fcmp " << prefixo << "16, " << prefixo << "17\n";
+        return;
+    }
+    emitirCarregarValorEmComLargura(saida, "x9", esq, 8);
+    emitirCarregarValorEmComLargura(saida, "x10", dir, 8);
+    saida << "cmp x9, x10\n";
 }

@@ -13,6 +13,23 @@
 // com "sair(1)" se o divisor for zero, em vez de deixar passar um
 // resultado incorreto sem aviso nenhum.
 inline void ARM64::emitirOperacaoAritmetica(std::ostringstream& saida, const InstrucaoOperacaoAritmetica& instrucao) {
+    if(instrucao.esquerda.ehFlutuante) {
+        // os dois lados ja foram promovidos pro mesmo tipo no gerador. v16/v17 sao caller-saved e fora do que esta arquitetura usa.
+        bool dobro = instrucao.esquerda.larguraBytes == 8;
+        const char* prefixo = dobro ? "d" : "s";
+        emitirCarregarValorEm(saida, "x9", instrucao.esquerda);
+        emitirCarregarValorEm(saida, "x10", instrucao.direita);
+        saida << "fmov " << prefixo << "16, " << (dobro ? "x9" : "w9") << "\n";
+        saida << "fmov " << prefixo << "17, " << (dobro ? "x10" : "w10") << "\n";
+        const char* mnemonico = "fadd";
+        if(instrucao.operador == OperadorAritmeticoIR::SUBTRACAO) mnemonico = "fsub";
+        else if(instrucao.operador == OperadorAritmeticoIR::MULTIPLICACAO) mnemonico = "fmul";
+        else if(instrucao.operador == OperadorAritmeticoIR::DIVISAO) mnemonico = "fdiv";
+        saida << mnemonico << " " << prefixo << "16, " << prefixo << "16, " << prefixo << "17\n";
+        saida << "fmov " << (dobro ? "x9" : "w9") << ", " << prefixo << "16\n";
+        emitirGravarSlot(saida, "x9", instrucao.slotDestino, dobro ? 8 : 4);
+        return;
+    }
     // regra de promocao: usa a MAIOR largura entre os dois operandos, decide se opera em w(32 bits, largura<=4) ou x(64 bits, largura==8)
     // deslocamento usa so a largura do operando da esquerda(mesma regra de resolverExpressao no gerador)
     bool ehDeslocamento = instrucao.operador == OperadorAritmeticoIR::DESL_ESQ || instrucao.operador == OperadorAritmeticoIR::DESL_DIR;
@@ -67,4 +84,28 @@ inline void ARM64::emitirChecagemDivisorZero(std::ostringstream& saida) {
     saida << "mov x8, " << numSistema(ChamadaSistemaId::SAIR) << "\n";
     saida << "svc 0\n";
     saida << rotuloContinua << ":\n";
+}
+// emite "slot = (tipo destino)origem" entre inteiro e flutuante: scvtf(int -> flu/dobro), fcvtzs(flu/dobro -> int, trunca pra zero) e fcvt(flu <-> dobro).
+inline void ARM64::emitirConversaoNumerica(std::ostringstream& saida, const InstrucaoConversaoNumerica& instrucao) {
+    const ArgumentoIR& origem = instrucao.origem;
+    int largura = instrucao.larguraDestino;
+    if(instrucao.destinoFlutuante) {
+        const char* destino = largura == 4 ? "s16" : "d16";
+        if(origem.ehFlutuante) {
+            bool origemFlu = origem.larguraBytes == 4;
+            emitirCarregarValorEm(saida, "x9", origem);
+            saida << (origemFlu ? "fmov s17, w9\n" : "fmov d17, x9\n");
+            saida << "fcvt " << destino << ", " << (origemFlu ? "s17" : "d17") << "\n";
+        } else {
+            emitirCarregarValorEmComLargura(saida, "x9", origem, 8);
+            saida << "scvtf " << destino << ", x9\n";
+        }
+        saida << (largura == 4 ? "fmov w9, s16\n" : "fmov x9, d16\n");
+    } else {
+        bool origemFlu = origem.larguraBytes == 4;
+        emitirCarregarValorEm(saida, "x9", origem);
+        saida << (origemFlu ? "fmov s16, w9\n" : "fmov d16, x9\n");
+        saida << "fcvtzs " << (largura == 8 ? "x9" : "w9") << ", " << (origemFlu ? "s16" : "d16") << "\n";
+    }
+    emitirGravarSlot(saida, "x9", instrucao.slotDestino, largura);
 }

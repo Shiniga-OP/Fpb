@@ -54,7 +54,8 @@ inline bool Analisador::ehCondicaoAgrupada() {
         i++;
     }
     if(tokens[i].tipo == TipoToken::FIM_ARQUIVO) return false;
-    return !ehTokenComparacao(tokens[i + 1].tipo);
+    TipoToken depois = tokens[i + 1].tipo;
+    return depois == TipoToken::FECHA_PARENTESE || depois == TipoToken::OU_OU || depois == TipoToken::TAMBEM_TAMBEM || depois == TipoToken::PONTO_VIRGULA || depois == TipoToken::INTERROGACAO;
 }
 
 inline Condicao Analisador::montarCondicaoLogica(Condicao::Tipo tipo, const Condicao& esq, const Condicao& dir) {
@@ -87,8 +88,34 @@ inline Condicao Analisador::analisarCondicaoE(const char* nomeConstrucao) {
     return esq;
 }
 
+inline OperadorComparacao inverterOperadorComparacao(OperadorComparacao operador) {
+    if(operador == OperadorComparacao::IGUAL) return OperadorComparacao::DIFERENTE;
+    if(operador == OperadorComparacao::DIFERENTE) return OperadorComparacao::IGUAL;
+    if(operador == OperadorComparacao::MAIOR) return OperadorComparacao::MENOR_IGUAL;
+    if(operador == OperadorComparacao::MENOR) return OperadorComparacao::MAIOR_IGUAL;
+    if(operador == OperadorComparacao::MAIOR_IGUAL) return OperadorComparacao::MENOR;
+    return OperadorComparacao::MAIOR;
+}
+
+// "!cond" sem nó novo: inverte o operador da comparação e, em E/OU, aplica De Morgan(E vira OU, OU vira E, nos dois lados).
+inline void negarCondicao(Condicao& cond) {
+    if(cond.tipo == Condicao::Tipo::COMPARACAO) {
+        cond.operador = inverterOperadorComparacao(cond.operador);
+        return;
+    }
+    negarCondicao(*cond.condEsquerda);
+    negarCondicao(*cond.condDireita);
+    cond.tipo = (cond.tipo == Condicao::Tipo::E) ? Condicao::Tipo::OU : Condicao::Tipo::E;
+}
+
 // base := "(" condicao ")" | expressao OP expressao | expressao
 inline Condicao Analisador::analisarCondicaoBase(const char* nomeConstrucao) {
+    if(verificar(TipoToken::EXCLAMACAO)) {
+        pos++;
+        Condicao interna = analisarCondicaoBase(nomeConstrucao);
+        negarCondicao(interna);
+        return interna;
+    }
     if(verificar(TipoToken::ABRE_PARENTESE) && ehCondicaoAgrupada()) {
         pos++;
         Condicao interna = analisarCondicao(nomeConstrucao);
@@ -97,7 +124,7 @@ inline Condicao Analisador::analisarCondicaoBase(const char* nomeConstrucao) {
     }
     Condicao c;
     c.tipo = Condicao::Tipo::COMPARACAO;
-    c.esquerda = analisarExpressaoAditiva();
+    c.esquerda = analisarExpressaoSemTernario();
     if(!ehTokenComparacao(atual().tipo)) {
         // sem operador: "se(sim())" vale "se(sim() != 0)"(qualquer valor diferente de zero é verdadeiro)
         c.operador = OperadorComparacao::DIFERENTE;
@@ -106,6 +133,6 @@ inline Condicao Analisador::analisarCondicaoBase(const char* nomeConstrucao) {
         return c;
     }
     c.operador = analisarOperadorComparacao(nomeConstrucao);
-    c.direita = analisarExpressaoAditiva();
+    c.direita = analisarExpressaoSemTernario();
     return c;
 }

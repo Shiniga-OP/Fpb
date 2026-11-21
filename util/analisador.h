@@ -78,6 +78,7 @@ public:
     Expressao montarAcessoCampo(const char* nome, const char* campo);
     Expressao analisarChamadaFuncaoComoExpressao();
     Expressao analisarChamadaMetodoComoExpressao();
+    Expressao analisarExpressaoSemTernario();
 };
 
 // definições dos métodos (cada arquivo inclui este de volta; #pragma once evita ciclo)

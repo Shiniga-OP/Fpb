@@ -1,0 +1,4 @@
+#ligar "GLESv2"
+
+nulo glClearColor(flu r, flu g, flu b, flu a);
+nulo glClear(int mascara);

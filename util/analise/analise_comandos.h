@@ -3,8 +3,8 @@
 #include "../analisador.h"
 
 // true se "tipo" e um operador composto de bit: &=, |=, ^=, <<=, >>=.
-inline bool ehAtribuicaoCompostaDeBit(TipoToken tipo) {
-    return tipo == TipoToken::TAMBEM_IGUAL || tipo == TipoToken::OU_IGUAL || tipo == TipoToken::CIRCUNFLEXO_IGUAL || tipo == TipoToken::MENOR_MENOR_IGUAL || tipo == TipoToken::MAIOR_MAIOR_IGUAL;
+inline bool ehAtribuicaoComposta(TipoToken tipo) {
+    return tipo == TipoToken::TAMBEM_IGUAL || tipo == TipoToken::OU_IGUAL || tipo == TipoToken::CIRCUNFLEXO_IGUAL || tipo == TipoToken::MENOR_MENOR_IGUAL || tipo == TipoToken::MAIOR_MAIOR_IGUAL || tipo == TipoToken::VEZES_IGUAL || tipo == TipoToken::DIVIDIR_IGUAL || tipo == TipoToken::PORCENTAGEM_IGUAL;
 }
 
 // operador que um operador composto representa: "x op= e" vira "x = x op e" (e "x++" / "x--" viram soma / subtração de 1).
@@ -15,6 +15,9 @@ inline OperadorAritmetico operadorDaAtribuicaoComposta(TipoToken tipo) {
     if(tipo == TipoToken::OU_IGUAL) return OperadorAritmetico::OU_BIT;
     if(tipo == TipoToken::CIRCUNFLEXO_IGUAL) return OperadorAritmetico::XOU;
     if(tipo == TipoToken::MENOR_MENOR_IGUAL) return OperadorAritmetico::DESL_ESQ;
+    if(tipo == TipoToken::VEZES_IGUAL) return OperadorAritmetico::MULTIPLICACAO;
+    if(tipo == TipoToken::DIVIDIR_IGUAL) return OperadorAritmetico::DIVISAO;
+    if(tipo == TipoToken::PORCENTAGEM_IGUAL) return OperadorAritmetico::MODULO;
     return OperadorAritmetico::DESL_DIR;
 }
 
@@ -131,7 +134,7 @@ inline AtribuicaoCampo Analisador::analisarAtribuicaoCampo() {
         binaria.direita = new Expressao(operando);
         atr.valor = binaria;
     } else {
-        erro("esperado '=', '+=', '-=', '++', '--' ou operador de bit composto na atribuição de campo");
+        erro("esperado '=', '+=', '-=', '*=', '%=', '/=', '++', '--' ou operador de bit composto na atribuição de campo");
     }
     if(verificar(TipoToken::PONTO_VIRGULA)) {
         consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após atribuição de campo");
@@ -149,7 +152,7 @@ inline Reatribuicao Analisador::analisarReatribuicao() {
     if(op == TipoToken::IGUAL) {
         pos++;
         reat.valor = analisarExpressaoAditiva();
-    } else if(op == TipoToken::MAIS_IGUAL || op == TipoToken::MENOS_IGUAL || op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS || ehAtribuicaoCompostaDeBit(op)) {
+    } else if(op == TipoToken::MAIS_IGUAL || op == TipoToken::MENOS_IGUAL || op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS || ehAtribuicaoComposta(op)) {
         // "x += e" vira "x = x + e"; "x++" vira "x = x + 1" (idem pra -=, -- e os de bit: &=, |=, ^=, <<=, >>=): sem nó novo na AST.
         pos++;
         Expressao variavel;
@@ -170,7 +173,7 @@ inline Reatribuicao Analisador::analisarReatribuicao() {
         binaria.direita = new Expressao(operando);
         reat.valor = binaria;
     } else {
-        erro("esperado '=', '+=', '-=', '&=', '|=', '^=', '<<=', '>>=', '++' ou '--' na reatribuição");
+        erro("esperado '=', '+=', '*=', '%=', '/=', '-=', '&=', '|=', '^=', '<<=', '>>=', '++' ou '--' na reatribuição");
     }
     if(verificar(TipoToken::PONTO_VIRGULA)) {
         consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após reatribuição");
@@ -418,7 +421,7 @@ inline ChamadaFuncao Analisador::analisarChamadaMetodo() {
 
 // true se "tipo" pode vir logo depois do nome numa reatribuição: =, +=, -=, ++, --, &=, |=, ^=, <<=, >>=.
 inline bool Analisador::ehTokenReatribuicao(TipoToken tipo) {
-    return tipo == TipoToken::IGUAL || tipo == TipoToken::MAIS_IGUAL || tipo == TipoToken::MENOS_IGUAL || tipo == TipoToken::MAIS_MAIS || tipo == TipoToken::MENOS_MENOS || ehAtribuicaoCompostaDeBit(tipo);
+    return tipo == TipoToken::IGUAL || tipo == TipoToken::MAIS_IGUAL || tipo == TipoToken::MENOS_IGUAL || tipo == TipoToken::MAIS_MAIS || tipo == TipoToken::MENOS_MENOS || ehAtribuicaoComposta(tipo);
 }
 
 // uma parte do cabeçalho do "por", empurrada em "destino": inicialização (declaração ou

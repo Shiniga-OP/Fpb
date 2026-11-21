@@ -1,0 +1,160 @@
+#incluir "../mem.fpb"
+// jni.fpb: abstração da JNI pra arm64-android
+// precisa de malocar/mliberar: se vêm de outra biblioteca, inclua ela aqui
+
+// tipos(descritores JNI)
+#macro J_CONTEXTO "Landroid/content/Context;" #macrofim
+#macro J_TEXTO "Ljava/lang/CharSequence;" #macrofim
+#macro J_TOAST "Landroid/widget/Toast;" #macrofim
+
+// nome + assinatura de métodos comuns, prontos pra passar em chamar*(...)
+#macro TOAST_FAZER_TEXTO "makeText", "(" J_CONTEXTO J_TEXTO "I)" J_TOAST #macrofim
+#macro TOAST_MOSTRAR "show", "()V" #macrofim
+
+#classe JNI {
+    nulo* atividade;
+    longo* amb;
+    longo ctx;
+    nulo* fAcharClasse;
+    nulo* fClasseDe;
+    nulo* fAcharMetodo;
+    nulo* fAcharMetodoEst;
+    nulo* fAcharCampoEst;
+    nulo* fCampoEstInt;
+    nulo* fChamarObjA;
+    nulo* fChamarNuloA;
+    nulo* fChamarEstObjA;
+    nulo* fNovoTexto;
+
+    estatico JNI* novo(nulo* atividade) {
+        JNI* j = malocar(bytes(JNI));
+        longo* atv = (longo*)atividade;
+        longo* amb = (longo*)atv[2];
+        longo* tab = (longo*)amb[0];
+        j.atividade = atividade;
+        j.amb = amb;
+        j.ctx = atv[3];
+        j.fAcharClasse = @(tab[6]);
+        j.fClasseDe = @(tab[31]);
+        j.fAcharMetodo = @(tab[33]);
+        j.fChamarObjA = @(tab[36]);
+        j.fChamarNuloA = @(tab[63]);
+        j.fAcharMetodoEst = @(tab[113]);
+        j.fChamarEstObjA = @(tab[116]);
+        j.fAcharCampoEst = @(tab[144]);
+        j.fCampoEstInt = @(tab[150]);
+        j.fNovoTexto = @(tab[167]);
+        retorne j;
+    }
+
+    Classe* acharClasse(car* caminho) {
+        retorne Classe.novo(este, caminho);
+    }
+
+    longo texto(car* txt) {
+        nulo* f = este.fNovoTexto;
+        retorne f(este.amb, txt);
+    }
+
+    // baixo nível: usados por Classe e Objeto
+    longo idClasse(car* caminho) {
+        nulo* f = este.fAcharClasse;
+        retorne f(este.amb, caminho);
+    }
+
+    longo classeDe(longo obj) {
+        nulo* f = este.fClasseDe;
+        retorne f(este.amb, obj);
+    }
+
+    longo acharMetodo(longo cls, car* nome, car* assin) {
+        nulo* f = este.fAcharMetodo;
+        retorne f(este.amb, cls, nome, assin);
+    }
+
+    longo acharMetodoEst(longo cls, car* nome, car* assin) {
+        nulo* f = este.fAcharMetodoEst;
+        retorne f(este.amb, cls, nome, assin);
+    }
+
+    longo acharCampoEst(longo cls, car* nome, car* assin) {
+        nulo* f = este.fAcharCampoEst;
+        retorne f(este.amb, cls, nome, assin);
+    }
+
+    longo campoEstInt(longo cls, longo id) {
+        nulo* f = este.fCampoEstInt;
+        retorne f(este.amb, cls, id);
+    }
+
+    longo chamarObjA(longo obj, longo id, longo* args) {
+        nulo* f = este.fChamarObjA;
+        retorne f(este.amb, obj, id, args);
+    }
+
+    nulo chamarNuloA(longo obj, longo id, longo* args) {
+        nulo* f = este.fChamarNuloA;
+        f(este.amb, obj, id, args);
+    }
+
+    longo chamarEstObjA(longo cls, longo id, longo* args) {
+        nulo* f = este.fChamarEstObjA;
+        retorne f(este.amb, cls, id, args);
+    }
+}
+
+#classe Classe {
+    JNI* jni;
+    longo cls;
+
+    estatico Classe* novo(JNI* jni, car* caminho) {
+        Classe* c = malocar(bytes(Classe));
+        c.jni = jni;
+        c.cls = jni.idClasse(caminho);
+        retorne c;
+    }
+
+    // campo estático int(ex: Toast.LENGTH_SHORT)
+    longo var(car* nome) {
+        JNI* j = este.jni;
+        longo id = j.acharCampoEst(este.cls, nome, "I");
+        retorne j.campoEstInt(este.cls, id);
+    }
+
+    // método estático que devolve objeto
+    Objeto* chamarEstObj(car* nome, car* assin, longo... args) {
+        JNI* j = este.jni;
+        longo id = j.acharMetodoEst(este.cls, nome, assin);
+        longo obj = j.chamarEstObjA(este.cls, id, args);
+        retorne Objeto.novo(j, obj);
+    }
+}
+
+#classe Objeto {
+    JNI* jni;
+    longo obj;
+
+    estatico Objeto* novo(JNI* jni, longo obj) {
+        Objeto* o = malocar(bytes(Objeto));
+        o.jni = jni;
+        o.obj = obj;
+        retorne o;
+    }
+
+    // método de instância que devolve nulo
+    nulo chamar(car* nome, car* assin, longo... args) {
+        JNI* j = este.jni;
+        longo cls = j.classeDe(este.obj);
+        longo id = j.acharMetodo(cls, nome, assin);
+        j.chamarNuloA(este.obj, id, args);
+    }
+
+    // método de instância que devolve objeto
+    Objeto* chamarObj(car* nome, car* assin, longo... args) {
+        JNI* j = este.jni;
+        longo cls = j.classeDe(este.obj);
+        longo id = j.acharMetodo(cls, nome, assin);
+        longo resultado = j.chamarObjA(este.obj, id, args);
+        retorne Objeto.novo(j, resultado);
+    }
+}

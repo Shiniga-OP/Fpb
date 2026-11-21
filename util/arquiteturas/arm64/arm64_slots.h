@@ -232,7 +232,7 @@ inline void ARM64::emitirCarregarValorEmComLargura(std::ostringstream& saida, co
 inline void ARM64::emitirReatribuicao(std::ostringstream& saida, const InstrucaoReatribuicao& instrucao) {
     const ArgumentoIR& valor = instrucao.valor;
     if(valor.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
-        emitirEnderecoSimbolo(saida, "x9", valor.simbolo);
+        emitirEnderecoSimbolo(saida, "x9", valor.simbolo, valor.ehFuncao);
     } else if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
         // carrega com largura e sinal de ORIGEM(estende pra 64 bits se o destino for de 8 bytes) e grava só a largura do destino
         emitirCarregarValorEmComLargura(saida, "x9", valor, instrucao.larguraDestino);
@@ -243,7 +243,31 @@ inline void ARM64::emitirReatribuicao(std::ostringstream& saida, const Instrucao
     emitirGravarSlot(saida, "x9", instrucao.slotDestino, instrucao.larguraDestino);
 }
 
-inline void ARM64::emitirEnderecoSimbolo(std::ostringstream& saida, const char* registrador, const char* simbolo) {
+inline void ARM64::emitirEnderecoSimbolo(std::ostringstream& saida, const char* registrador, const char* simbolo, bool ehFuncao) {
+    if(ehFuncao) {
+        saida << "adrp " << registrador << ", :got:" << simbolo << "\n";
+        saida << "ldr " << registrador << ", [" << registrador << ", :got_lo12:" << simbolo << "]\n";
+        return;
+    }
     saida << "adrp " << registrador << ", " << simbolo << "\n";
     saida << "add " << registrador << ", " << registrador << ", :lo12:" << simbolo << "\n";
+}
+
+// carrega um argumento de chamada de funcao no proximo registrador da classe dele: inteiro/ponteiro/texto em x0..x7, flutuante em s0..s7/d0..d7
+// (contadores independentes, como a AAPCS64). x9 e o rascunho da ida e volta flutuante <-> inteiro.
+inline void ARM64::emitirArgumentoChamada(std::ostringstream& saida, const ArgumentoIR& arg, int& totalInteiros, int& totalFlutuantes) {
+    if(arg.ehFlutuante) {
+        bool ehFlu = arg.larguraBytes == 4;
+        emitirCarregarValorEm(saida, "x9", arg);
+        saida << "fmov " << (ehFlu ? "s" : "d") << totalFlutuantes++ << ", " << (ehFlu ? "w9" : "x9") << "\n";
+        return;
+    }
+    std::string registrador = "x" + std::to_string(totalInteiros++);
+    if(arg.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
+        emitirEnderecoSimbolo(saida, registrador.c_str(), arg.simbolo, arg.ehFuncao);
+    } else if(arg.tipo == ArgumentoIR::Tipo::REGISTRADOR) {
+        emitirCarregarSlot(saida, registrador.c_str(), arg.registrador, arg.larguraBytes, arg.sinalizado);
+    } else {
+        emitirMovImediato(saida, registrador.c_str(), arg.imediato, arg.larguraBytes <= 4);
+    }
 }

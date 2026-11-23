@@ -27,7 +27,7 @@ inline OperadorAritmetico operadorDaAtribuicaoComposta(TipoToken tipo) {
 inline Comando Analisador::analisarComando() {
     Comando comando;
     bool inicioDeclaracaoNuloPonteiro = verificar(TipoToken::NULO) && tokens[pos + 1].tipo == TipoToken::VEZES;
-    if(ehTokenTipoValor(atual().tipo) || inicioDeclaracaoNuloPonteiro || ehInicioDeclaracaoEspaco()) {
+    if(verificar(TipoToken::FINAL) || ehTokenTipoValor(atual().tipo) || inicioDeclaracaoNuloPonteiro || ehInicioDeclaracaoEspaco()) {
         comando.tipo = Comando::Tipo::DECLARACAO_VARIAVEL;
         comando.declaracaoVariavel = analisarDeclaracaoVariavel();
         return comando;
@@ -50,6 +50,11 @@ inline Comando Analisador::analisarComando() {
     if(verificar(TipoToken::POR)) {
         comando.tipo = Comando::Tipo::POR;
         comando.comandoPor = analisarPor();
+        return comando;
+    }
+    if(verificar(TipoToken::APAGAR)) {
+        comando.tipo = Comando::Tipo::APAGAR;
+        comando.comandoApagar = analisarApagar();
         return comando;
     }
     if(verificar(TipoToken::RETORNE)) {
@@ -260,6 +265,10 @@ inline void Analisador::analisarBloco(Vetor<Comando>& corpo) {
 inline DeclaracaoVariavel Analisador::analisarDeclaracaoVariavel() {
     DeclaracaoVariavel decl;
     decl.iniciar();
+    if(verificar(TipoToken::FINAL)) {
+        pos++;
+        decl.ehFinal = true;
+    }
 
     if(verificar(TipoToken::NULO)) {
         pos++;
@@ -289,6 +298,10 @@ inline DeclaracaoVariavel Analisador::analisarDeclaracaoVariavel() {
     }
     const Token& nome = consumir(TipoToken::IDENTIFICADOR, "esperado nome da variável");
     decl.nome = strdup(nome.valor);
+    if(decl.ehFinal) {
+        if(ehArray) erro("'final' não vale para array");
+        if(decl.tipo == TipoVariavel::ESPACO || decl.tipo == TipoVariavel::ESPACO_PONTEIRO) erro("'final' só vale para tipos de valor e ponteiros de valor");
+    }
 
     if(ehArray) {
         decl.tamArray = tamArray;
@@ -322,7 +335,19 @@ inline DeclaracaoVariavel Analisador::analisarDeclaracaoVariavel() {
         if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
         return decl;
     }
-    consumir(TipoToken::IGUAL, "esperado '=' após nome da variável");
+    if(decl.tipo == TipoVariavel::ESPACO_PONTEIRO && verificar(TipoToken::IGUAL) && tokens[pos + 1].tipo == TipoToken::ABRE_CHAVE) {
+        pos += 2;
+        while(!verificar(TipoToken::FECHA_CHAVE)) {
+            decl.listaInicial.empurrar(analisarExpressaoAditiva());
+            if(verificar(TipoToken::VIRGULA)) pos++;
+        }
+        consumir(TipoToken::FECHA_CHAVE, "esperado '}' para fechar a lista de inicialização");
+        decl.temLista = true;
+        if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
+        return decl;
+    }
+    consumir(TipoToken::IGUAL, "esperado '=' após nome da variável ('final' exige valor inicial)");
+    if(decl.ehFinal && verificar(TipoToken::CHAMADA_SISTEMA)) erro("'final' não aceita #chamada_sistema: o valor precisa ser constante");
     if(verificar(TipoToken::CHAMADA_SISTEMA)) {
         decl.ehChamadaSistema = true;
         decl.chamadaSistemaInicial = analisarChamadaSistemaCrua();
@@ -465,4 +490,15 @@ inline ComandoPor Analisador::analisarPor() {
 
     analisarBloco(*comandoPor.corpo);
     return comandoPor;
+}
+
+// analisa: apagar expressao;
+inline ComandoApagar Analisador::analisarApagar() {
+    consumir(TipoToken::APAGAR, "esperado 'apagar'");
+    ComandoApagar ca;
+    ca.alvo = analisarExpressaoAditiva();
+    if(verificar(TipoToken::PONTO_VIRGULA)) {
+        consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após 'apagar'");
+    }
+    return ca;
 }

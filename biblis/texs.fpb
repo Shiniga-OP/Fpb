@@ -1,58 +1,51 @@
-#incluir "./mem.fpb";
+#incluir "~biblis/mem.fpb";
 
 #classe Texto {
     car* txt;
     longo tam;
-    longo cap;
-    
-    estatico Texto* novo(car* lit) {
-        Texto* t = malocar(bytes(Texto));
-        longo n = 0;
-        enquanto(lit[n] != 0) n++;
-        t.txt = lit;
-        t.tam = n;
-        t.cap = 0;
-        retorne t;
+
+    nulo criar(car* lit) {
+        longo n = textam(lit);
+        car* buf = malocar(n + 1);
+        por(longo i = 0; i <= n; i++) buf[i] = lit[i];
+        este.txt = buf;
+        este.tam = n;
+    }
+
+    nulo copiar(Texto* origem) {
+        este.criar(origem.txt);
+    }
+
+    nulo liberar() {
+        se(este.txt != 0) mliberar(este.txt);
+        este.txt = 0;
+        este.tam = 0;
     }
 
     Texto* somar(Texto* outro) {
         longo total = este.tam + outro.tam;
-        car* origem1 = este.txt;
-        car* origem2 = outro.txt;
+        Texto* r = mlocar(bytes(Texto));
         car* buf = malocar(total + 1);
+        car* a = este.txt;
+        car* b = outro.txt;
         longo i = 0;
         enquanto(i < este.tam) {
-            buf[i] = origem1[i];
+            buf[i] = a[i];
             i++;
         }
         longo j = 0;
         enquanto(j < outro.tam) {
-            buf[i + j] = origem2[j];
+            buf[i + j] = b[j];
             j++;
         }
         buf[total] = 0;
-        Texto* r = malocar(bytes(Texto));
         r.txt = buf;
         r.tam = total;
-        r.cap = total + 1;
         retorne r;
     }
 
-    nulo liberar() {
-        se(este.cap > 0) mliberar(este.txt);
-        mliberar(este);
-    }
-    
-    nulo criar(car* lit) {
-        longo n = 0;
-        enquanto(lit[n] != 0) n++;
-        este.txt = lit;
-        este.tam = n;
-        este.cap = 0;
-    }
-    
-    bool igual(Texto texto) {
-        retorne texcomp(este.txt, texto.txt);
+    bool igual(Texto* outro) {
+        retorne texcomp(este.txt, outro.txt);
     }
 }
 

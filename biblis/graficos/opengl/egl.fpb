@@ -1,3 +1,4 @@
+// biblis/graficos/opengl/egl.fpb
 #ligar "EGL"
 
 nulo* eglGetDisplay(nulo* id);
@@ -7,3 +8,62 @@ nulo* eglCreateWindowSurface(nulo* tela, nulo* config, nulo* janela, int* atribs
 nulo* eglCreateContext(nulo* tela, nulo* config, nulo* compart, int* atribs);
 int eglMakeCurrent(nulo* tela, nulo* superficie, nulo* leitura, nulo* ctx);
 int eglSwapBuffers(nulo* tela, nulo* superficie);
+nulo* eglCreatePbufferSurface(nulo* tela, nulo* config, int* atribs);
+int eglBindAPI(int api);
+nulo eglSwapInterval(nulo* tela, int ms);
+
+#classe EGL {
+    // atributos(pares nome, valor, terminados em NENHUM):
+    estatico final int NENHUM = 0x3038;
+    estatico final int TIPO_SUPERFICIE = 0x3033;
+    estatico final int PBUFFER_BIT = 0x0001;
+    estatico final int TIPO_RENDER = 0x3040;
+    estatico final int GLES2_BIT = 0x0004;
+    estatico final int VERMELHO = 0x3024;
+    estatico final int VERDE = 0x3023;
+    estatico final int AZUL = 0x3022;
+    estatico final int PROFUNDIDADE = 0x3025;
+    estatico final int LARGURA = 0x3057;
+    estatico final int ALTURA = 0x3056;
+    estatico final int VERSAO_CLIENTE = 0x3098;
+    estatico final int API_GLES = 0x30A0;
+
+    estatico nulo* criarSuperficieOffscreen(nulo* tela, nulo* config, int* atribs) {
+        retorne eglCreatePbufferSurface(tela, config, atribs);
+    }
+
+    estatico int vincularAPI(int api) {
+        retorne eglBindAPI(api);
+    }
+
+    estatico nulo* obterTela(nulo* id) {
+        retorne eglGetDisplay(id);
+    }
+    
+    estatico int iniciar(nulo* tela, int* maior, int* menor) {
+        retorne eglInitialize(tela, maior, menor);
+    }
+    
+    estatico int escolherConfig(nulo* tela, int* atribs, nulo* configs, int tam, int* num) {
+        retorne eglChooseConfig(tela, atribs, configs, tam, num);
+    }
+    
+    estatico nulo* criarSuperficieJanela(nulo* tela, nulo* config, nulo* janela, int* atribs) {
+        retorne eglCreateWindowSurface(tela, config, janela, atribs);
+    }
+    
+    estatico nulo* criarCtx(nulo* tela, nulo* config, nulo* compart, int* atribs) {
+        retorne eglCreateContext(tela, config, compart, atribs);
+    }
+    
+    estatico int defAtual(nulo* tela, nulo* superficie, nulo* leitura, nulo* ctx) {
+        retorne eglMakeCurrent(tela, superficie, leitura, ctx);
+    }
+    estatico int trocarBuffers(nulo* tela, nulo* superficie) {
+        retorne eglSwapBuffers(tela, superficie);
+    }
+    
+    estatico nulo trocarIntervalo(nulo* tela, int ms) {
+        eglSwapInterval(tela, ms);
+    }
+}

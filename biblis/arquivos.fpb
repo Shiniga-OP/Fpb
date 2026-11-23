@@ -1,0 +1,38 @@
+#incluir "~biblis/mem.fpb"
+#incluir "~biblis/sischamada.fpb"
+
+#classe Arquivo {
+    int ad;
+    car* caminho;
+
+    estatico Arquivo* abrir(car* caminho) {
+        int ad = #chamada_sistema ABRIR, -100, caminho, 0, 0;
+        se(ad < 0) retorne nulo;
+        Arquivo* a = malocar(bytes(Arquivo));
+        a.ad = ad;
+        a.caminho = caminho;
+        retorne a;
+    }
+    
+    estatico bool existe(car* caminho) {
+        int ad = #chamada_sistema ABRIR, -100, caminho, 0, 0;
+        se(ad < 0) retorne falso;
+        #chamada_sistema FECHAR, ad;
+        retorne verdade;
+    }
+
+    longo ler(nulo* buffer, longo tam) {
+        retorne #chamada_sistema LER, este.ad, buffer, tam;
+    }
+
+    nulo fechar() {
+        #chamada_sistema FECHAR, este.ad;
+    }
+    
+    longo tam() {
+        longo atual = #chamada_sistema POSICIONAR, este.ad, 0, 1; // guarda onde está
+        longo fim = #chamada_sistema POSICIONAR, este.ad, 0, 2; // vai pro fim: devolve o tamanho
+        #chamada_sistema POSICIONAR, este.ad, atual, 0; // volta pra onde estava
+        retorne fim;
+    }
+}

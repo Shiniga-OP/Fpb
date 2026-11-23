@@ -7,6 +7,7 @@
 #include <sstream>
 #include <filesystem>
 #include <string.h>
+#include <stdlib.h>
 #include "../config.h"
 #include "../ast.h"
 #include "../lexer.h"
@@ -27,6 +28,7 @@ public:
     Vetor<Programa*> programas; // dono: CarregadorBiblis. mesma ordem de "origens"
     VetorStr origens; // caminho relativo, como escrito no #incluir, de cada item de "programas"(usado só em mensagens de erro)
     Preprocessador* preprocessador = nullptr;
+    std::string raizBiblis = raizBiblisPadrao(); // raiz das bibliotecas, usada nos "~caminho"
 
     CarregadorBiblis() {
         caminhosJaIncluidos.iniciar();
@@ -66,7 +68,7 @@ public:
     // vezes. Inclusões feitas pela própria biblioteca são carregadas em
     // seguida, recursivamente.
     void carregar(const char* caminhoRelativo, const std::string& diretorioAtual) {
-        std::filesystem::path caminho = std::filesystem::path(diretorioAtual) / caminhoRelativo;
+        std::filesystem::path caminho = resolverCaminhoInclusao(caminhoRelativo, diretorioAtual, raizBiblis);
         std::error_code erroCaminho;
         std::filesystem::path caminhoAbsoluto = std::filesystem::canonical(caminho, erroCaminho);
         if(erroCaminho) {

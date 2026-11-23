@@ -203,11 +203,12 @@ inline const char* nomeMetodoOperador(OperadorAritmetico op) {
 inline ArgumentoIR GeradorIR::resolverOperadorEspaco(OperadorAritmetico op, ArgumentoIR esquerda, ArgumentoIR direita, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     int idEspaco = esquerda.idEspaco;
     std::string nomeEspacoStr = espacos.declaracoes[idEspaco]->nome;
-    std::string nomeFuncao = nomeEspacoStr + "_" + nomeMetodoOperador(op);
-    int totalParametros;
-    if(!funcoesUsuario.buscar(nomeFuncao.c_str(), &totalParametros)) {
-        throw std::runtime_error("Espaço '" + nomeEspacoStr + "' não tem o método '" + nomeFuncao + "' (necessário pra esse operador)");
+    std::string nomeFuncao;
+    if(!buscarMetodo(idEspaco, nomeMetodoOperador(op), nomeFuncao)) {
+        throw std::runtime_error("Espaço '" + nomeEspacoStr + "' não tem o método '" + nomeEspacoStr + "_" + nomeMetodoOperador(op) + "' (necessário pra esse operador)");
     }
+    int totalParametros;
+    funcoesUsuario.buscar(nomeFuncao.c_str(), &totalParametros);
     if(totalParametros != 2) {
         throw std::runtime_error("O método '" + nomeFuncao + "' precisa ter exatamente 1 parâmetro além de 'este'");
     }
@@ -218,12 +219,17 @@ inline ArgumentoIR GeradorIR::resolverOperadorEspaco(OperadorAritmetico op, Argu
     }
     const DeclaracaoFuncao* declaracao = nullptr;
     corposFuncoesUsuario.buscar(nomeFuncao.c_str(), &declaracao);
-    if(declaracao && declaracao->parametros[1].tipo == TipoVariavel::ESPACO) {
+    if(declaracao && declaracao->parametros[1].nomeEspaco) {
         int idParametro = obterIdEspaco(declaracao->parametros[1].nomeEspaco);
-        if(direita.tipo != ArgumentoIR::Tipo::REGISTRADOR || direita.idEspaco != idParametro) {
-            throw std::runtime_error("O operando direito de '" + nomeFuncao + "' precisa ser um espaço do tipo esperado");
+        bool ehDoTipo = direita.tipo == ArgumentoIR::Tipo::REGISTRADOR && ehSubespaco(direita.idEspaco, idParametro);
+        if(!ehDoTipo) {
+            if(direita.tipo == ArgumentoIR::Tipo::REGISTRADOR && direita.idEspaco >= 0) {
+                throw std::runtime_error("O operando direito de '" + nomeFuncao + "' é de outro espaço");
+            }
+            direita = criarTemporarioDeValor(idParametro, direita, saida, ctx); // texto + "literal"
+        } else if(declaracao->parametros[1].tipo == TipoVariavel::ESPACO) {
+            direita = criarCopiaEspaco(direita, idParametro, saida, ctx);
         }
-        direita = criarCopiaEspaco(direita, idParametro, saida, ctx);
     }
     ComandoIR comandoIR;
     comandoIR.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
@@ -250,7 +256,11 @@ inline ArgumentoIR GeradorIR::resolverOperadorEspaco(OperadorAritmetico op, Argu
     referenciaSlot.elementoSinalizado = elementoEhSinalizado(tipoRetorno.tipo);
     referenciaSlot.larguraElemento = larguraElementoApontado(tipoRetorno.tipo);
     referenciaSlot.ehPonteiro = tipoEhPonteiro(tipoRetorno.tipo);
-    if(tipoRetorno.tipo == TipoVariavel::ESPACO_PONTEIRO) referenciaSlot.idEspaco = idEspaco;
+    if(tipoRetorno.tipo == TipoVariavel::ESPACO_PONTEIRO) {
+        referenciaSlot.idEspaco = idEspaco;
+        referenciaSlot.ehTemporario = true;
+        registrarTemporario(slot, idEspaco, true, ctx);
+    }
     return referenciaSlot;
 }
 
@@ -649,6 +659,10 @@ inline ArgumentoIR GeradorIR::resolverEndereco(const Expressao& expressao, Vetor
         endereco.espacoPorValor = false;
         endereco.ehPonteiro = true;
         return endereco;
+    }
+    if(variavel.tipo == ArgumentoIR::Tipo::IMEDIATO) {
+        std::string nomeStr = expressao.esquerda->valor;
+        throw std::runtime_error("Variável '" + nomeStr + "' é final: constante não tem endereço");
     }
     int slotDestino = ctx.variaveisLocais.proximoSlot++;
     ComandoIR comandoIR;

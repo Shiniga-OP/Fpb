@@ -6,6 +6,8 @@
 #include <memory>
 #include <unordered_map>
 #include <cstdlib>
+#include <cstring>
+#include <elf.h>
 #include "util/lexer.h"
 #include "util/analisador.h"
 #include "util/preprocessador.h"
@@ -18,6 +20,10 @@ static std::string versaoAtual = "0.0.1";
 static std::string sistemaAtual = "Linux";
 static std::string montador = "as";
 static std::string ligador = "ld";
+
+// linker dinâmico dos executáveis gerados. Vazio = descobre sozinho(ver descobrirInterprete). "-interp" só serve de exceção.
+static std::string interprete;
+static std::string pastasExtras;
 
 // registro de arquiteturas disponiveis. Para adicionar uma nova arquitetura,
 // basta incluir o header dela e adicionar uma linha aqui.
@@ -40,17 +46,70 @@ static int executar(const std::string& comando) {
     return std::system(comando.c_str());
 }
 
+// lê o PT_INTERP de um ELF 64 bits: o linker dinâmico que o sistema usa pra rodar esse binário.
+// usado no próprio fpbc("/proc/self/exe"): se ele roda aqui, o linker dele serve pros executáveis que ele gera.
+// devolve "" se o binário for estático ou não for ELF 64 bits.
+static std::string descobrirInterprete(const std::string& caminhoElf) {
+    std::ifstream arquivo(caminhoElf, std::ios::binary);
+    if(!arquivo) return "";
+    Elf64_Ehdr cabecalho;
+    if(!arquivo.read((char*)&cabecalho, sizeof(cabecalho))) return "";
+    if(memcmp(cabecalho.e_ident, ELFMAG, SELFMAG) != 0 || cabecalho.e_ident[EI_CLASS] != ELFCLASS64) return "";
+    for(int i = 0; i < cabecalho.e_phnum; i++) {
+        Elf64_Phdr programa;
+        arquivo.seekg(cabecalho.e_phoff + (std::streamoff)i * cabecalho.e_phentsize);
+        if(!arquivo.read((char*)&programa, sizeof(programa))) return "";
+        if(programa.p_type == PT_INTERP) {
+            std::string caminho(programa.p_filesz, '\0');
+            arquivo.seekg(programa.p_offset);
+            if(!arquivo.read(&caminho[0], programa.p_filesz)) return "";
+            return caminho.c_str();
+        }
+    }
+    return "";
+}
+
+static std::string descobrirPastasBiblis() {
+    std::string resultado;
+    const char* ambBiblis = getenv("LD_LIBRARY_PATH");
+    if(ambBiblis) {
+        std::stringstream fluxo(ambBiblis);
+        std::string pasta;
+        while(std::getline(fluxo, pasta, ':')) {
+            if(!pasta.empty()) resultado += "-L" + pasta + " ";
+        }
+    }
+    const char* ambCaminho = getenv("PATH");
+    if(ambCaminho) {
+        std::stringstream fluxo(ambCaminho);
+        std::string pasta;
+        while(std::getline(fluxo, pasta, ':')) {
+            if(pasta.empty()) continue;
+            std::error_code erro;
+            if(!std::filesystem::exists(std::filesystem::path(pasta) / ligador, erro)) continue;
+            std::filesystem::path pastaLib = std::filesystem::path(pasta).parent_path() / "lib";
+            if(std::filesystem::is_directory(pastaLib, erro)) resultado += "-L" + pastaLib.string() + " ";
+            break;
+        }
+    }
+    return resultado;
+}
+
 int main(int argc, char** argv) {
     if(argc < 2) {
-        std::cerr << "Uso: fpbc <arquivo.fpb> [--alvo arm64] [-s saida] [-asm]\n";
+        std::cerr << "Uso: fpbc <arquivo.fpb> [--alvo arm64] [-s saida] [-asm] [-pie] [-interp caminho]\n";
         std::cerr << "  -s saida      caminho do executavel final (padrão: nome do fonte sem extensão)\n";
-        std::cerr << "  -asm  gera so o .asm, não monta nem linka\n";
+        std::cerr << "  -asm          gera so o .asm, não monta nem linka\n";
+        std::cerr << "  -pie          gera executável PIE (necessário pra rodar no Android)\n";
+        std::cerr << "  -interp caminho  linker dinâmico do executável (padrão: o mesmo do próprio fpbc)\n";
+        std::cerr << "  -rota pasta   pasta de bibliotecas: usada no link e gravada no executável pra achá-las ao rodar\n";
         return 1;
     }
     std::string caminhoFonte = argv[1];
     std::string nomeArquitetura = "arm64";
     std::string caminhoSaida;
     bool manterAsm = false;
+    bool usarPie = false;
 
     for(int i = 1; i < argc; i++) {
         std::string argumento = argv[i];
@@ -67,6 +126,13 @@ int main(int argc, char** argv) {
             caminhoSaida = argv[++i];
         } else if(argumento == "-asm") {
             manterAsm = true;
+        } else if(argumento == "-pie") {
+            usarPie = true;
+        } else if(argumento == "-interp") {
+            interprete = argv[++i];
+        } else if(argumento == "-rota") {
+            std::string pasta = argv[++i];
+            pastasExtras += "-L" + pasta + " -rpath " + pasta + " ";
         }
     }
     std::filesystem::path caminhoBase(caminhoFonte);
@@ -93,7 +159,6 @@ int main(int argc, char** argv) {
             nomeArquitetura = programa.alvo;
             nomeArquitetura = nomeArquitetura.substr(0, nomeArquitetura.find('-'));
         }
-
         GeradorIR geradorIR(diretorioBase, &preprocessador);
         auto programaIR = geradorIR.gerar(programa);
 
@@ -124,7 +189,19 @@ int main(int argc, char** argv) {
         std::string comandoLigar = ligador + " ";
         std::string pasta;
         if(!ehBibli) {
-            comandoLigar += "-e inicio ";
+            comandoLigar += "-e inicio -z max-page-size=16384 --no-as-needed ";
+            if(interprete.empty()) interprete = descobrirInterprete("/proc/self/exe");
+            if(!interprete.empty()) comandoLigar += "-dynamic-linker " + interprete + " ";
+            
+            comandoLigar += descobrirPastasBiblis();
+            comandoLigar += pastasExtras;
+            
+            if(usarPie) comandoLigar += "-pie ";
+            for(int i = 0; i < geradorIR.ligacoes.tam; i++) {
+                int tam;
+                const char* texto = geradorIR.ligacoes.obter(i, &tam);
+                comandoLigar += "-l" + std::string(texto, tam) + " ";
+            }
         } else {
             pasta = nomeBase + "_ligacoes";
             std::filesystem::create_directories(pasta);

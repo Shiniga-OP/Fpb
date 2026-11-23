@@ -178,11 +178,13 @@ struct DeclaracaoVariavel {
     int tamArray;
     char* nomeEspaco; // dono: quem criou a declaracao(strdup). nome do #espaco quando tipo == ESPACO ou ESPACO_PONTEIRO, senao nullptr
     Vetor<Expressao> listaInicial; // usado so quando tipo == ESPACO e temLista == true: "Nome var = { e1, e2 };"
+    bool ehFinal; // true se declarada com "final": o valor é constante em tempo de compilação e a variável não ocupa slot
     bool temLista;
     
     void iniciar() {
         nome = nullptr;
         ehChamadaSistema = false;
+        ehFinal = false;
         ehArray = false;
         tamArray = 0;
         nomeEspaco = nullptr;
@@ -195,7 +197,7 @@ struct DeclaracaoVariavel {
         nome = nullptr;
         free(nomeEspaco);
         nomeEspaco = nullptr;
-        if(tipo == TipoVariavel::ESPACO) {
+        if(tipo == TipoVariavel::ESPACO || temLista) {
             for(int i = 0; i < listaInicial.tam; i++) listaInicial[i].liberar();
             listaInicial.liberar();
         } else if(ehChamadaSistema) chamadaSistemaInicial.liberar();
@@ -290,6 +292,14 @@ struct AtribuicaoCampo {
     }
 };
 
+struct ComandoApagar {
+    Expressao alvo;
+    
+    void liberar() {
+        alvo.liberar();
+    }
+};
+
 // propagação: Comando e ComandoSe se referenciam mutuamente. Os corpos de
 // ComandoSe sao guardados por ponteiro(alocados no heap) pra quebrar a
 // recursao de tamanho: Vetor<Comando> dentro de Comando não compila,
@@ -363,8 +373,8 @@ struct Comando {
     enum class Tipo {
         DECLARACAO_VARIAVEL, REATRIBUICAO,
         CHAMADA_FUNCAO, CHAMADA_SISTEMA_CRUA,
-        SE, ENQUANTO, POR, RETORNE, ATRIBUICAO_INDEXADA,
-        ATRIBUICAO_CAMPO
+        SE, ENQUANTO, POR, APAGAR,
+        RETORNE, ATRIBUICAO_INDEXADA, ATRIBUICAO_CAMPO
     } tipo;
     DeclaracaoVariavel declaracaoVariavel;
     Reatribuicao reatribuicao;
@@ -374,6 +384,7 @@ struct Comando {
     ComandoEnquanto comandoEnquanto;
     ComandoPor comandoPor;
     ComandoRetorne comandoRetorne;
+    ComandoApagar comandoApagar;
     AtribuicaoIndexada atribuicaoIndexada;
     AtribuicaoCampo atribuicaoCampo;
 
@@ -388,6 +399,7 @@ struct Comando {
         else if(tipo == Tipo::RETORNE) comandoRetorne.liberar();
         else if(tipo == Tipo::ATRIBUICAO_INDEXADA) atribuicaoIndexada.liberar();
         else if(tipo == Tipo::ATRIBUICAO_CAMPO) atribuicaoCampo.liberar();
+        else if(tipo == Tipo::APAGAR) comandoApagar.liberar();
     }
 };
 
@@ -483,20 +495,57 @@ struct CampoEspaco {
     }
 };
 
-// "#espaco Nome { int x; car* ptr; }": tipo composto(struct).
+// campo "estatico" de uma #classe: uma variável global com nome "Classe.campo". Não entra no layout do objeto. O valor inicial é sempre uma constante inteira(0 se omitido).
+struct CampoEstatico {
+    TipoVariavel tipo;
+    char* nome; // dono: quem criou o campo(strdup)
+    long valorInicial; // se tipo é flu/dobro(só com final), guarda o padrão de bits
+    bool ehFinal = false; // true se "estatico final": vira constante inline, sem variável global nem leitura
+
+    void liberar() {
+        free(nome);
+        nome = nullptr;
+    }
+};
+
+// método não estático declarado numa #classe. Guarda só o nome e se veio marcado com "@sobrepor"(a função em si vai pra Programa.funcoes como "Classe_nome").
+struct MetodoDeclarado {
+    char* nome; // dono: quem criou o método(strdup)
+    bool ehSobrepor;
+
+    void liberar() {
+        free(nome);
+        nome = nullptr;
+    }
+};
+
+// "#espaco Nome { int x; car* ptr; }": tipo composto(struct). Uma #classe vira um destes.
+// "#classe Nome herda Base": "base" guarda o nome de Base e os campos de Base vêm primeiro no layout.
 struct DeclaracaoEspaco {
     char* nome; // dono: quem criou a declaracao(strdup)
-    Vetor<CampoEspaco> campos;
+    Vetor<CampoEspaco> campos; // só os campos próprios: os da base ficam na base
+    char* base; // dono: quem criou a declaracao(strdup). nullptr se não herda
+    Vetor<CampoEstatico> estaticos;
+    Vetor<MetodoDeclarado> metodos; // só os não estáticos
 
     void iniciar() {
         nome = nullptr;
         campos.iniciar();
+        base = nullptr;
+        estaticos.iniciar();
+        metodos.iniciar();
     }
     void liberar() {
         free(nome);
         nome = nullptr;
         for(int i = 0; i < campos.tam; i++) campos[i].liberar();
         campos.liberar();
+        free(base);
+        base = nullptr;
+        for(int i = 0; i < estaticos.tam; i++) estaticos[i].liberar();
+        estaticos.liberar();
+        for(int i = 0; i < metodos.tam; i++) metodos[i].liberar();
+        metodos.liberar();
     }
 };
 

@@ -56,6 +56,7 @@ public:
     ChamadaFuncao analisarChamadaFuncao();
     bool ehChamadaMetodo();
     ChamadaFuncao analisarChamadaMetodo();
+    ComandoApagar analisarApagar();
 
     // === analisador_condicoes.h ===
     OperadorComparacao analisarOperadorComparacao(const char* nomeConstrucao);

@@ -1,18 +1,19 @@
-#incluir "./texs.fpb";
+#incluir "~biblis/texs.fpb"
+#incluir "~biblis/sischamada.fpb"
 
 nulo escrever(car* txt) {
-    #chamada_sistema 1, 1, txt, textam(txt);
+    #chamada_sistema ESCREVER, 1, txt, textam(txt);
 }
 
 nulo escreverl(car* txt) {
-    #chamada_sistema 1, 1, txt, textam(txt);
-    #chamada_sistema 1, 1, "\n", 1;
+    #chamada_sistema ESCREVER, 1, txt, textam(txt);
+    #chamada_sistema ESCREVER, 1, "\n", 1;
 }
 
 nulo escreverint(int num) {
     car[24] txt;
     inttex(num, txt);
-    #chamada_sistema 1, 1, txt, textam(txt);
+    #chamada_sistema ESCREVER, 1, txt, textam(txt);
 }
 
 nulo escreverhex(int num) {
@@ -22,7 +23,7 @@ nulo escreverhex(int num) {
         se(digito < 10) txt[i] = (car)(digito + 48);
         senao txt[i] = (car)(digito + 87);
     }
-    #chamada_sistema 1, 1, txt, 8;
+    #chamada_sistema ESCREVER, 1, txt, 8;
 }
 
 nulo escreverhex64(longo num) {
@@ -32,7 +33,7 @@ nulo escreverhex64(longo num) {
         se(digito < 10) txt[i] = (car)(digito + 48);
         senao txt[i] = (car)(digito + 87);
     }
-    #chamada_sistema 1, 1, txt, 16;
+    #chamada_sistema ESCREVER, 1, txt, 16;
 }
 
 // formato: %i(int), %h(hex de 8 dígitos), %t(texto), %c(caractere), %%(porcentagem).
@@ -78,9 +79,9 @@ nulo escreverf(car* fmt, longo... args) {
             i++;
         }
     }
-    #chamada_sistema 1, 1, (car*)((longo)fmt + inicio), i - inicio;
+    #chamada_sistema ESCREVER, 1, (car*)((longo)fmt + inicio), i - inicio;
 }
 
 nulo sair(int codigo) {
-    #chamada_sistema 2, codigo;
+    #chamada_sistema SAIR, codigo;
 }

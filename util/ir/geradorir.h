@@ -24,7 +24,26 @@ struct ContextoFuncao {
     Vetor<DadoEstaticoIR>& dados;
     TabelaVariaveisLocais variaveisLocais;
 
-    ContextoFuncao(const DeclaracaoFuncao& funcao, Vetor<DadoEstaticoIR>& dados) : funcao(funcao), dados(dados) {}
+    Vetor<int> liberarSlot; // variáveis por valor com "liberar", na ordem de declaração(liberadas em ordem inversa)
+    Vetor<int> liberarId;
+    Vetor<int> tempSlot; // temporários do comando atual(resultado de operador, texto literal convertido)
+    Vetor<int> tempId;
+    Vetor<bool> tempHeap; // true se a casca também mora no heap(resultado de operador)
+
+    ContextoFuncao(const DeclaracaoFuncao& funcao, Vetor<DadoEstaticoIR>& dados) : funcao(funcao), dados(dados) {
+        liberarSlot.iniciar();
+        liberarId.iniciar();
+        tempSlot.iniciar();
+        tempId.iniciar();
+        tempHeap.iniciar();
+    }
+    void liberar() {
+        liberarSlot.liberar();
+        liberarId.liberar();
+        tempSlot.liberar();
+        tempId.liberar();
+        tempHeap.liberar();
+    }
 };
 
 class GeradorIR {
@@ -37,6 +56,7 @@ public:
     int contadorSimbolos = 0;
     int bytesArraysAtual = 0;
     VetorStr ligacoes;
+    Vetor<VariavelGlobalIR> globais; // campos estaticos usados pelas funções geradas(sem repetir); passam pro ProgramaIR no fim de gerar()
 
     // diretorioBase: diretório a partir do qual os "#incluir" são resolvidos.
     explicit GeradorIR(const std::string& diretorioBase, Preprocessador* pre = nullptr) : diretorioBase(diretorioBase) {
@@ -45,6 +65,7 @@ public:
         corposFuncoesUsuario.iniciar();
         espacos.iniciar();
         ligacoes.iniciar();
+        globais.iniciar();
     }
 
     ~GeradorIR() {
@@ -52,6 +73,7 @@ public:
         corposFuncoesUsuario.liberar();
         espacos.liberar();
         ligacoes.liberar();
+        globais.liberar();
     }
 
     // ===== declarações: cada método é definido(inline) no leitor indicado =====
@@ -69,6 +91,7 @@ public:
     ArgumentoIR copiarArgumento(const ArgumentoIR& original);
     char* gerarNomeSimbolo(const char* textoOriginal);
     bool elementoEhFlutuante(TipoVariavel tipoPonteiro);
+    ArgumentoIR constanteDoTipo(long valor, TipoVariavel tipo);
 
     // === gerador_funcoes.h ===
     ProgramaIR gerar(const Programa& programa);
@@ -79,6 +102,7 @@ public:
     bool comandoCrahamadaTerminaProcesso(const ComandoIR& comandoIR);
     ComandoIR gerarSairImplicito();
     void registrarLigacoes(const Programa& programa);
+    void emitirConstrutorBase(const DeclaracaoFuncao& funcao, Vetor<ComandoIR>& saida);
 
     // === gerador_espacos.h ===
     void registrarEspacos(const Programa& programa, const std::string& origem = "programa principal");
@@ -88,6 +112,18 @@ public:
     ArgumentoIR resolverAcessoCampo(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void emitirEscritaCampo(const ArgumentoIR& base, int posCampo, TipoVariavel tipoCampo, ArgumentoIR valor, Vetor<ComandoIR>& saida);
     void gerarAtribuicaoCampo(const AtribuicaoCampo& atr, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    int baseDoEspaco(int idEspaco);
+    int totalCampos(int idEspaco);
+    const CampoEspaco& campoDoIndice(int idEspaco, int indice);
+    bool existeCampo(int idEspaco, const char* campo);
+    bool ehSubespaco(int idEspaco, int idBase);
+    bool buscarMetodo(int idEspaco, const char* metodo, std::string& nomeFuncao);
+    const CampoEstatico* buscarEstatico(int idEspaco, const char* campo, std::string& simbolo);
+    bool localizarEstatico(const char* nomeBase, const char* campo, ContextoFuncao& ctx, std::string& simbolo, const CampoEstatico** estatico);
+    void registrarGlobalUsada(const std::string& simbolo, int largura, long valorInicial);
+    ArgumentoIR enderecoDeGlobal(const std::string& simbolo, const CampoEstatico& estatico, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR resolverAcessoEstatico(const std::string& simbolo, const CampoEstatico& estatico, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    void validarHeranca();
 
     // === gerador_expressoes.h ===
     ArgumentoIR resolverExpressao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
@@ -124,6 +160,24 @@ public:
     void liberarDesdobramento(Vetor<Expressao>& novos, int totalOriginal);
     void copiarEspaco(const ArgumentoIR& origem, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR criarCopiaEspaco(const ArgumentoIR& origem, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    void gerarApagar(const ComandoApagar& comando, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    // === gerador_vida.h ===
+    ArgumentoIR argumentoEspaco(int slot, int idEspaco);
+    void emitirCriar(const ArgumentoIR& destino, ArgumentoIR valor, int idEspaco, Vetor<ComandoIR>& saida);
+    void emitirLiberar(const ArgumentoIR& alvo, int idEspaco, Vetor<ComandoIR>& saida);
+    void emitirMliberar(const ArgumentoIR& alvo, Vetor<ComandoIR>& saida);
+    void copiarObjeto(const ArgumentoIR& origem, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    void moverEspaco(const ArgumentoIR& temp, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    void zerarEspaco(const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida);
+    ArgumentoIR criarTemporarioDeValor(int idEspaco, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    void registrarLiberacaoAutomatica(int slot, int idEspaco, ContextoFuncao& ctx);
+    void emitirLiberacoesDeEscopo(int marca, bool truncar, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    void registrarTemporario(int slot, int idEspaco, bool heap, ContextoFuncao& ctx);
+    void removerTemporario(int slot, ContextoFuncao& ctx);
+    void emitirLiberacaoTemporarios(int marca, bool truncar, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    bool temConstrutor(int idEspaco);
+    void emitirAlocar(int slot, int idEspaco, Vetor<ComandoIR>& saida);
+    void emitirConstrutor(const DeclaracaoVariavel& decl, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
 };
 
 // definições dos métodos(cada arquivo inclui este de volta; #pragma once evita ciclo)
@@ -133,3 +187,4 @@ public:
 #include "gerador_condicoes.h"
 #include "gerador_comandos.h"
 #include "gerador_espacos.h"
+#include "gerador_vida.h"

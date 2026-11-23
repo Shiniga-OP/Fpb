@@ -22,9 +22,12 @@ inline void GeradorIR::gerarRetorne(const ComandoRetorne& comandoRetorne, Vetor<
     comandoIR.instrucaoRetorne.temValor = comandoRetorne.temValor;
     if(comandoRetorne.temValor) {
         ArgumentoIR valorRetorno = resolverExpressao(comandoRetorne.valor, saida, ctx);
+        if(valorRetorno.ehTemporario) removerTemporario(valorRetorno.registrador, ctx); // quem recebe vira dono
         TipoVariavel tipoRetorno = ctx.funcao.tipoRetorno.tipo;
         comandoIR.instrucaoRetorne.valor = converterParaTipo(valorRetorno, tipoEhFlutuante(tipoRetorno), larguraDoTipo(tipoRetorno), saida, ctx);
     }
+    emitirLiberacaoTemporarios(0, false, saida, ctx);
+    emitirLiberacoesDeEscopo(0, false, saida, ctx);
     saida.empurrar(comandoIR);
 }
 
@@ -67,7 +70,7 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
         // Cada valor da lista vira uma escrita em base + posicao do campo.
         int id = referenciaSlot.idEspaco;
         const DeclaracaoEspaco& espaco = *espacos.declaracoes[id];
-        if(decl.temLista && decl.listaInicial.tam != espaco.campos.tam) {
+        if(decl.temLista && !temConstrutor(id) && decl.listaInicial.tam != espaco.campos.tam) {
             std::string nomeStr = espaco.nome;
             throw std::runtime_error("Espaço '" + nomeStr + "' tem " + std::to_string(espaco.campos.tam) + " campo(s), mas a lista de inicialização tem " + std::to_string(decl.listaInicial.tam) + " valor(es)");
         }
@@ -81,32 +84,50 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
         comandoEndereco.instrucaoEnderecoFrame.slotDestino = slot;
         comandoEndereco.instrucaoEnderecoFrame.posArray = posArray;
         saida.empurrar(comandoEndereco);
-        if(!decl.temLista && decl.listaInicial.tam == 1) {
-            // "Nome x = expr;": se expr é um espaço do mesmo tipo, copia campo a campo; senão chama o construtor "Nome_criar(x, expr)".
-            ArgumentoIR valor = resolverExpressao(decl.listaInicial[0], saida, ctx);
-            if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.idEspaco == id) {
-                copiarEspaco(valor, referenciaSlot, id, saida, ctx);
-                return;
-            }
-            std::string nomeEspacoStr = espaco.nome;
-            std::string nomeCriar = nomeEspacoStr + "_criar";
-            int totalParametros;
-            if(!funcoesUsuario.buscar(nomeCriar.c_str(), &totalParametros)) {
-                throw std::runtime_error("Espaço '" + nomeEspacoStr + "' não tem o construtor '" + nomeCriar + "' (necessário pra '" + nomeEspacoStr + " x = valor;')");
-            }
-            if(totalParametros != 2) {
-                throw std::runtime_error("O construtor '" + nomeCriar + "' precisa ter exatamente 1 parâmetro além de 'este'");
-            }
-            ComandoIR comandoCriar;
-            comandoCriar.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-            comandoCriar.chamadaFuncaoUsuario.iniciar();
-            comandoCriar.chamadaFuncaoUsuario.nome = strdup(nomeCriar.c_str());
-            comandoCriar.chamadaFuncaoUsuario.argumentos.empurrar(copiarArgumento(referenciaSlot));
-            comandoCriar.chamadaFuncaoUsuario.argumentos.empurrar(valor);
-            saida.empurrar(comandoCriar);
+        registrarLiberacaoAutomatica(slot, id, ctx);
+        if(decl.temLista && temConstrutor(id)) {
+            emitirConstrutor(decl, id, saida, ctx);
             return;
         }
-        if(!decl.temLista) return;
+        if(!decl.temLista && decl.listaInicial.tam == 1) {
+            // "Nome x = expr;": se expr é um espaço do mesmo tipo, move(temporário) ou copia; senão chama o construtor "Nome_criar(x, expr)".
+            ArgumentoIR valor = resolverExpressao(decl.listaInicial[0], saida, ctx);
+            if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.idEspaco == id) {
+                if(valor.ehTemporario) moverEspaco(valor, referenciaSlot, id, saida, ctx);
+                else copiarObjeto(valor, referenciaSlot, id, saida, ctx);
+                return;
+            }
+            emitirCriar(referenciaSlot, valor, id, saida);
+            return;
+        }
+        if(!decl.temLista) {
+            zerarEspaco(referenciaSlot, id, saida);
+            return;
+        }
+        for(int i = 0; i < espaco.campos.tam; i++) {
+            int posCampo;
+            TipoVariavel tipoCampo;
+            posicaoDoCampo(id, espaco.campos[i].nome, &posCampo, &tipoCampo);
+            ArgumentoIR valor = resolverExpressao(decl.listaInicial[i], saida, ctx);
+            valor = converterParaTipo(valor, tipoEhFlutuante(tipoCampo), larguraDoTipo(tipoCampo), saida, ctx);
+            emitirEscritaCampo(referenciaSlot, posCampo, tipoCampo, valor, saida);
+        }
+        return;
+    }
+    if(decl.tipo == TipoVariavel::ESPACO_PONTEIRO && decl.temLista) {
+        // "Nome* x = { ... };": objeto no heap. Quem libera é o "apagar", então não entra na lista de liberação de escopo.
+        int id = referenciaSlot.idEspaco;
+        const DeclaracaoEspaco& espaco = *espacos.declaracoes[id];
+        if(!temConstrutor(id) && decl.listaInicial.tam != espaco.campos.tam) {
+            std::string nomeStr = espaco.nome;
+            throw std::runtime_error("Espaço '" + nomeStr + "' tem " + std::to_string(espaco.campos.tam) + " campo(s), mas a lista de inicialização tem " + std::to_string(decl.listaInicial.tam) + " valor(es)");
+        }
+        ctx.variaveisLocais.definirComSlot(decl.nome, referenciaSlot, slot);
+        emitirAlocar(slot, id, saida);
+        if(temConstrutor(id)) {
+            emitirConstrutor(decl, id, saida, ctx);
+            return;
+        }
         for(int i = 0; i < espaco.campos.tam; i++) {
             int posCampo;
             TipoVariavel tipoCampo;
@@ -139,11 +160,20 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
         return;
     }
     ArgumentoIR valor = resolverExpressao(decl.valorInicial, saida, ctx);
-    if(referenciaSlot.idEspaco >= 0 && valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.idEspaco >= 0 && valor.idEspaco != referenciaSlot.idEspaco) {
+    if(referenciaSlot.idEspaco >= 0 && valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.idEspaco >= 0 && !ehSubespaco(valor.idEspaco, referenciaSlot.idEspaco)) {
         std::string nomeStr = decl.nome;
         throw std::runtime_error("Variável '" + nomeStr + "' recebe um ponteiro de outro espaço");
     }
     valor = converterParaTipo(valor, referenciaSlot.ehFlutuante, larguraDoTipo(decl.tipo), saida, ctx);
+    if(decl.ehFinal) {
+        // constante: a entrada na tabela é o próprio IMEDIATO, então nenhum uso lê slot e nada é gravado
+        if(valor.tipo != ArgumentoIR::Tipo::IMEDIATO) {
+            std::string nomeStr = decl.nome;
+            throw std::runtime_error("'final' exige um valor constante em tempo de compilação (variável '" + nomeStr + "')");
+        }
+        ctx.variaveisLocais.definirComSlot(decl.nome, constanteDoTipo(valor.imediato, decl.tipo), slot);
+        return;
+    }
     int larguraDestino = larguraDoTipo(decl.tipo); // a largura da gravacao no slot segue o tipo declarado da variavel, não o tipo da expressão
     if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = larguraDestino; // imediato não tem slot de origem: monta direto na largura do destino. Registrador mantém largura e sinal de origem pra ser carregado com a extensão certa
 
@@ -171,14 +201,26 @@ inline void GeradorIR::gerarReatribuicao(const Reatribuicao& reat, Vetor<Comando
         std::string nomeStr = reat.nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
     }
-    if(existente.espacoPorValor) {
-        // "a = b" entre espaços: copia campo a campo pro corpo de "a"(o slot de "a" continua guardando o mesmo endereço base).
+    if(existente.tipo == ArgumentoIR::Tipo::IMEDIATO) {
         std::string nomeStr = reat.nome;
+        throw std::runtime_error("Variável '" + nomeStr + "' é final e não pode ser alterada");
+    }
+    if(existente.espacoPorValor) {
+        std::string nomeStr = reat.nome;
+        int id = existente.idEspaco;
         ArgumentoIR origem = resolverExpressao(reat.valor, saida, ctx);
-        if(origem.tipo != ArgumentoIR::Tipo::REGISTRADOR || origem.idEspaco != existente.idEspaco) {
+        if(origem.tipo == ArgumentoIR::Tipo::REGISTRADOR && origem.idEspaco >= 0 && origem.idEspaco != id) {
             throw std::runtime_error("Variável '" + nomeStr + "' só pode receber um espaço do mesmo tipo");
         }
-        copiarEspaco(origem, existente, existente.idEspaco, saida, ctx);
+        if(origem.tipo == ArgumentoIR::Tipo::REGISTRADOR && origem.idEspaco == id) {
+            if(origem.registrador == slot) return; // x = x
+            emitirLiberar(existente, id, saida);
+            if(origem.ehTemporario) moverEspaco(origem, existente, id, saida, ctx);
+            else copiarObjeto(origem, existente, id, saida, ctx);
+            return;
+        }
+        emitirLiberar(existente, id, saida); // texto = "literal"
+        emitirCriar(existente, origem, id, saida);
         return;
     }
     ArgumentoIR novoValor = resolverExpressao(reat.valor, saida, ctx);
@@ -241,6 +283,10 @@ inline void GeradorIR::gerarChamadaSistemaCrua(const ChamadaSistemaCrua& chamada
             std::string nomeStr = chamada.nomeDestino;
             throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
         }
+        if(existente.tipo == ArgumentoIR::Tipo::IMEDIATO) {
+            std::string nomeStr = chamada.nomeDestino;
+            throw std::runtime_error("Variável '" + nomeStr + "' é final e não pode ser alterada");
+        }
         comandoIR.chamadaSistemaCrua.capturaResultado = true;
         comandoIR.chamadaSistemaCrua.slotDestino = slot;
     }
@@ -258,7 +304,9 @@ inline void GeradorIR::gerarComandoSe(const ComandoSe& comandoSe, Vetor<ComandoI
     resolverCondicao(comandoSe.condicao, saida, ctx, comandoIR.instrucaoSe.esquerda, comandoIR.instrucaoSe.operador, comandoIR.instrucaoSe.direita);
     
     int marcaEntao = ctx.variaveisLocais.abrirEscopo();
+    int marcaLibEntao = ctx.liberarSlot.tam;
     gerarBlocoComandos(*comandoSe.entao, *comandoIR.instrucaoSe.entao, ctx);
+    emitirLiberacoesDeEscopo(marcaLibEntao, true, *comandoIR.instrucaoSe.entao, ctx);
     ctx.variaveisLocais.fecharEscopo(marcaEntao);
 
     if(comandoSe.temSenao) {
@@ -266,7 +314,9 @@ inline void GeradorIR::gerarComandoSe(const ComandoSe& comandoSe, Vetor<ComandoI
         comandoIR.instrucaoSe.senaoCorpo = new Vetor<ComandoIR>();
         comandoIR.instrucaoSe.senaoCorpo->iniciar();
         int marcaSenao = ctx.variaveisLocais.abrirEscopo();
+        int marcaLibSenao = ctx.liberarSlot.tam;
         gerarBlocoComandos(*comandoSe.senaoCorpo, *comandoIR.instrucaoSe.senaoCorpo, ctx);
+        emitirLiberacoesDeEscopo(marcaLibSenao, true, *comandoIR.instrucaoSe.senaoCorpo, ctx);
         ctx.variaveisLocais.fecharEscopo(marcaSenao);
     }
     saida.empurrar(comandoIR);
@@ -282,7 +332,9 @@ inline void GeradorIR::gerarComandoEnquanto(const ComandoEnquanto& comandoEnquan
     resolverCondicao(comandoEnquanto.condicao, *comandoIR.instrucaoEnquanto.comandosCondicao, ctx, comandoIR.instrucaoEnquanto.esquerda, comandoIR.instrucaoEnquanto.operador, comandoIR.instrucaoEnquanto.direita);
     
     int marca = ctx.variaveisLocais.abrirEscopo();
+    int marcaLib = ctx.liberarSlot.tam;
     gerarBlocoComandos(*comandoEnquanto.corpo, *comandoIR.instrucaoEnquanto.corpo, ctx);
+    emitirLiberacoesDeEscopo(marcaLib, true, *comandoIR.instrucaoEnquanto.corpo, ctx);
     ctx.variaveisLocais.fecharEscopo(marca);
     saida.empurrar(comandoIR);
 }
@@ -294,6 +346,7 @@ inline void GeradorIR::gerarComandoEnquanto(const ComandoEnquanto& comandoEnquan
 inline void GeradorIR::gerarBlocoComandos(const Vetor<Comando>& corpo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     for(int i = 0; i < corpo.tam; i++) {
         const Comando& comando = corpo[i];
+        int marcaTemp = ctx.tempSlot.tam;
         if(comando.tipo == Comando::Tipo::DECLARACAO_VARIAVEL) {
             gerarDeclaracaoVariavel(comando.declaracaoVariavel, saida, ctx);
         } else if(comando.tipo == Comando::Tipo::REATRIBUICAO) {
@@ -312,9 +365,12 @@ inline void GeradorIR::gerarBlocoComandos(const Vetor<Comando>& corpo, Vetor<Com
             gerarAtribuicaoIndexada(comando.atribuicaoIndexada, saida, ctx);
         } else if(comando.tipo == Comando::Tipo::ATRIBUICAO_CAMPO) {
             gerarAtribuicaoCampo(comando.atribuicaoCampo, saida, ctx);
+        } else if(comando.tipo == Comando::Tipo::APAGAR) {
+            gerarApagar(comando.comandoApagar, saida, ctx);
         } else {
             gerarChamadaFuncao(comando.chamadaFuncao, saida, ctx);
         }
+        emitirLiberacaoTemporarios(marcaTemp, true, saida, ctx);
     }
 }
 
@@ -368,17 +424,19 @@ inline bool GeradorIR::desdobrarChamadaMetodo(const char* nome, const Vetor<Expr
         if(variavel.idEspaco < 0) {
             throw std::runtime_error("Variável '" + base + "' não é um espaço, não tem métodos");
         }
-        std::string nomeClasse = espacos.declaracoes[variavel.idEspaco]->nome;
-        nomeFuncao = nomeClasse + "_" + metodo;
+        if(!buscarMetodo(variavel.idEspaco, metodo.c_str(), nomeFuncao)) {
+            nomeFuncao = std::string(espacos.declaracoes[variavel.idEspaco]->nome) + "_" + metodo;
+        }
         Expressao este;
         este.tipo = Expressao::Tipo::IDENTIFICADOR;
         este.valor = strdup(base.c_str());
         novos.empurrar(este);
     } else {
-        if(espacos.buscar(base.c_str()) < 0) {
+        int idClasse = espacos.buscar(base.c_str());
+        if(idClasse < 0) {
             throw std::runtime_error("'" + base + "' não é uma variável nem uma classe");
         }
-        nomeFuncao = base + "_" + metodo;
+        if(!buscarMetodo(idClasse, metodo.c_str(), nomeFuncao)) nomeFuncao = base + "_" + metodo;
     }
     for(int i = 0; i < argumentos.tam; i++) novos.empurrar(argumentos[i]);
     return true;
@@ -464,7 +522,9 @@ inline void GeradorIR::resolverArgumentosChamada(const char* nome, const Vetor<E
 // A variável declarada no inicio só existe dentro do "por"(escopo de bloco).
 inline void GeradorIR::gerarComandoPor(const ComandoPor& comandoPor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     int marca = ctx.variaveisLocais.abrirEscopo(); // a variável do inicio só existe dentro do "por"
+    int marcaPor = ctx.liberarSlot.tam;
     gerarBlocoComandos(*comandoPor.inicio, saida, ctx);
+    int marcaCorpo = ctx.liberarSlot.tam;
 
     ComandoIR comandoIR;
     comandoIR.tipo = ComandoIR::Tipo::ENQUANTO;
@@ -472,9 +532,11 @@ inline void GeradorIR::gerarComandoPor(const ComandoPor& comandoPor, Vetor<Coman
     resolverCondicao(comandoPor.condicao, *comandoIR.instrucaoEnquanto.comandosCondicao, ctx, comandoIR.instrucaoEnquanto.esquerda, comandoIR.instrucaoEnquanto.operador, comandoIR.instrucaoEnquanto.direita);
 
     gerarBlocoComandos(*comandoPor.corpo, *comandoIR.instrucaoEnquanto.corpo, ctx);
+    emitirLiberacoesDeEscopo(marcaCorpo, true, *comandoIR.instrucaoEnquanto.corpo, ctx);
     gerarBlocoComandos(*comandoPor.passo, *comandoIR.instrucaoEnquanto.corpo, ctx);
     ctx.variaveisLocais.fecharEscopo(marca);
     saida.empurrar(comandoIR);
+    emitirLiberacoesDeEscopo(marcaPor, true, saida, ctx);
 }
 // copia campo a campo o espaço cujo endereço base está em "origem" pro espaço cujo endereço base está em "destino". Cada campo vira
 // um par LEITURA_INDEXADA/ESCRITA_INDEXADA(mesmo mecanismo de resolverAcessoCampo e emitirEscritaCampo), então não precisa de
@@ -526,7 +588,7 @@ inline ArgumentoIR GeradorIR::criarCopiaEspaco(const ArgumentoIR& origem, int id
     ArgumentoIR copia = copiarArgumento(origem);
     copia.registrador = slot;
     copia.espacoPorValor = true;
-    copiarEspaco(origem, copia, idEspaco, saida, ctx);
+    copiarObjeto(origem, copia, idEspaco, saida, ctx);
     return copia;
 }
 
@@ -558,4 +620,19 @@ inline bool GeradorIR::prepararChamadaIndireta(const char* nome, const Vetor<Exp
         throw std::runtime_error("Chamada por '" + nomeStr + "' aceita no máximo 8 argumentos inteiros e 8 flutuantes");
     }
     return true;
+}
+
+// "apagar alvo;": chama "Nome_liberar(alvo)"(se existir) e devolve a casca com "mliberar". Se o alvo é um temporário
+// (ex: "apagar a + b;"), tira ele da lista de temporários: senão o fim do comando liberaria a mesma casca duas vezes.
+inline void GeradorIR::gerarApagar(const ComandoApagar& comando, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    ArgumentoIR alvo = resolverExpressao(comando.alvo, saida, ctx);
+    if(alvo.tipo != ArgumentoIR::Tipo::REGISTRADOR || alvo.idEspaco < 0) {
+        throw std::runtime_error("'apagar' só vale para um objeto (Nome*)");
+    }
+    if(alvo.espacoPorValor) {
+        throw std::runtime_error("'apagar' em variável por valor: o liberar já é automático no fim do escopo");
+    }
+    if(alvo.ehTemporario) removerTemporario(alvo.registrador, ctx);
+    emitirLiberar(alvo, alvo.idEspaco, saida);
+    emitirMliberar(alvo, saida);
 }

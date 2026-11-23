@@ -254,12 +254,28 @@ inline void ARM64::emitirEnderecoSimbolo(std::ostringstream& saida, const char* 
 }
 
 // carrega um argumento de chamada de funcao no proximo registrador da classe dele: inteiro/ponteiro/texto em x0..x7, flutuante em s0..s7/d0..d7
-// (contadores independentes, como a AAPCS64). x9 e o rascunho da ida e volta flutuante <-> inteiro.
-inline void ARM64::emitirArgumentoChamada(std::ostringstream& saida, const ArgumentoIR& arg, int& totalInteiros, int& totalFlutuantes) {
+// (contadores independentes, como a AAPCS64). Depois do 8o de cada classe, o argumento vai pra pilha em [sp, #totalPilha*8] (area de saida
+// no fundo do frame do chamador), 8 bytes por argumento, na ordem em que aparecem. x9 e o rascunho.
+inline void ARM64::emitirArgumentoChamada(std::ostringstream& saida, const ArgumentoIR& arg, int& totalInteiros, int& totalFlutuantes, int& totalPilha) {
     if(arg.ehFlutuante) {
         bool ehFlu = arg.larguraBytes == 4;
         emitirCarregarValorEm(saida, "x9", arg);
+        if(totalFlutuantes >= 8) {
+            totalFlutuantes++;
+            saida << "str x9, [sp, #" << (totalPilha++ * 8) << "]\n";
+            return;
+        }
         saida << "fmov " << (ehFlu ? "s" : "d") << totalFlutuantes++ << ", " << (ehFlu ? "w9" : "x9") << "\n";
+        return;
+    }
+    if(totalInteiros >= 8) {
+        totalInteiros++;
+        if(arg.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO) {
+            emitirEnderecoSimbolo(saida, "x9", arg.simbolo, arg.ehFuncao);
+        } else {
+            emitirCarregarValorEmComLargura(saida, "x9", arg, 8);
+        }
+        saida << "str x9, [sp, #" << (totalPilha++ * 8) << "]\n";
         return;
     }
     std::string registrador = "x" + std::to_string(totalInteiros++);

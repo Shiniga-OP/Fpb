@@ -49,11 +49,9 @@ inline void ARM64::emitirChamadaSistemaCrua(std::ostringstream& saida, const Ins
 inline void ARM64::emitirChamadaFuncaoUsuario(std::ostringstream& saida, const InstrucaoChamadaFuncaoUsuario& instrucao) {
     int totalInteiros = 0;
     int totalFlutuantes = 0;
+    int totalPilha = 0;
     for(int i = 0; i < instrucao.argumentos.tam; i++) {
-        emitirArgumentoChamada(saida, instrucao.argumentos[i], totalInteiros, totalFlutuantes);
-    }
-    if(totalInteiros > 8 || totalFlutuantes > 8) {
-        throw std::runtime_error("Arquitetura ARM64: chamada de função aceita no máximo 8 argumentos inteiros e 8 flutuantes");
+        emitirArgumentoChamada(saida, instrucao.argumentos[i], totalInteiros, totalFlutuantes, totalPilha);
     }
     if(instrucao.indireta) {
         // chamada por endereço: x16(IP0, rascunho de chamada da AAPCS64, fora dos que esta arquitetura usa) recebe o endereço DEPOIS dos

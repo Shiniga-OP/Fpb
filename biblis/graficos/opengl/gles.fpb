@@ -1,4 +1,158 @@
+// biblis/graficos/opengl/gles.fpb
 #ligar "GLESv2"
+
+#macro GL_COLOR_BUFFER_BIT 0x4000 #macrofim
+#macro GL_DEPTH_BUFFER_BIT 0x0100 #macrofim
+#macro GL_STENCIL_BUFFER_BIT 0x0400 #macrofim
 
 nulo glClearColor(flu r, flu g, flu b, flu a);
 nulo glClear(int mascara);
+
+#macro GL_VERTEX_SHADER 0x8B31 #macrofim
+#macro GL_FRAGMENT_SHADER 0x8B30 #macrofim
+#macro GL_COMPILE_STATUS 0x8B81 #macrofim
+#macro GL_LINK_STATUS 0x8B82 #macrofim
+
+int glCreateShader(int tipo);
+nulo glShaderSource(int shader, int qtd, longo* fontes, int* tams);
+nulo glCompileShader(int shader);
+nulo glGetShaderiv(int shader, int nome, int* params);
+nulo glGetShaderInfoLog(int shader, int max, int* tam, car* log);
+nulo glDeleteShader(int shader);
+int glCreateProgram();
+nulo glAttachShader(int programa, int shader);
+nulo glLinkProgram(int programa);
+nulo glGetProgramiv(int programa, int nome, int* params);
+nulo glGetProgramInfoLog(int programa, int max, int* tam, car* log);
+nulo glUseProgram(int programa);
+nulo glDeleteProgram(int programa);
+
+#macro GL_DEPTH_TEST 0x0B71 #macrofim
+#macro GL_TRIANGLES 0x0004 #macrofim
+#macro GL_FLOAT 0x1406 #macrofim
+#macro GL_RGBA 0x1908 #macrofim
+#macro GL_UNSIGNED_BYTE 0x1401 #macrofim
+
+nulo glViewport(int x, int y, int largura, int altura);
+nulo glEnable(int capacidade);
+int glGetAttribLocation(int programa, car* nome);
+int glGetUniformLocation(int programa, car* nome);
+nulo glUniform1f(int local, flu valor);
+nulo glEnableVertexAttribArray(int indice);
+nulo glVertexAttribPointer(int indice, int tam, int tipo, int normalizar, int passo, nulo* dados);
+nulo glDrawArrays(int modo, int inicio, int qtd);
+nulo glReadPixels(int x, int y, int largura, int altura, int formato, int tipo, nulo* dados);
+
+#classe GL20 {
+    // buffers:
+    estatico final int COR_BUFFER_BIT = GL_COLOR_BUFFER_BIT;
+    estatico final int PROF_BUFFER_BIT = GL_DEPTH_BUFFER_BIT;
+    estatico final int ESTENCIL_BUFFER_BIT = GL_STENCIL_BUFFER_BIT;
+    
+    estatico nulo limparCor(flu r, flu g, flu b, flu a) {
+        glClearColor(r, g, b, a);
+    }
+    estatico nulo limpar(int mascara) {
+        glClear(mascara);
+    }
+    // shaders:
+    estatico final int SHADER_VERTICES = GL_VERTEX_SHADER;
+    estatico final int SHADER_FRAGMENTO = GL_FRAGMENT_SHADER;
+    estatico final int STATUS_COMPILACAO = GL_COMPILE_STATUS;
+    estatico final int LIGAR_STATUS = GL_LINK_STATUS;
+    
+    estatico int criarShader(int tipo) {
+        retorne glCreateShader(tipo);
+    }
+    
+    estatico nulo fonteShader(int shader, int qtd, longo* fontes, int* tams) {
+        glShaderSource(shader, qtd, fontes, tams);
+    }
+    
+    estatico nulo compilarShader(int shader) {
+        glCompileShader(shader);
+    }
+    
+    estatico nulo obterShaderIV(int shader, int nome, int* params) {
+        glGetShaderiv(shader, nome, params);
+    }
+    
+    estatico nulo obterShaderInfo(int shader, int max, int* tam, car* log) {
+        glGetShaderInfoLog(shader, max, tam, log);
+    }
+    
+    estatico nulo apagarShader(int shader) {
+        glDeleteShader(shader);
+    }
+    
+    estatico int criarPrograma() {
+        retorne glCreateProgram();
+    }
+    
+    estatico nulo anexarShader(int programa, int shader) {
+        glAttachShader(programa, shader);
+    }
+    
+    estatico nulo ligarPrograma(int programa) {
+        glLinkProgram(programa);
+    }
+    
+    estatico nulo obterProgramaIV(int programa, int nome, int* params) {
+        glGetProgramiv(programa, nome, params);
+    }
+    
+    estatico nulo obterProgramaInfo(int programa, int max, int* tam, car* log) {
+        glGetProgramInfoLog(programa, max, tam, log);
+    }
+    
+    estatico nulo usarPrograma(int programa) {
+        glUseProgram(programa);
+    }
+    
+    estatico nulo apagarPrograma(int programa) {
+        glDeleteProgram(programa);
+    }
+
+    // desenho:
+    estatico final int TESTE_PROFUNDIDADE = GL_DEPTH_TEST;
+    estatico final int TRIANGULOS = GL_TRIANGLES;
+    estatico final int FLUTUANTE = GL_FLOAT;
+    estatico final int RGBA = GL_RGBA;
+    estatico final int BYTE_SEM_SINAL = GL_UNSIGNED_BYTE;
+
+    estatico nulo visualizacao(int x, int y, int largura, int altura) {
+        glViewport(x, y, largura, altura);
+    }
+
+    estatico nulo habilitar(int capacidade) {
+        glEnable(capacidade);
+    }
+
+    estatico int localAtributo(int programa, car* nome) {
+        retorne glGetAttribLocation(programa, nome);
+    }
+
+    estatico int localUniforme(int programa, car* nome) {
+        retorne glGetUniformLocation(programa, nome);
+    }
+
+    estatico nulo uniforme1f(int local, flu valor) {
+        glUniform1f(local, valor);
+    }
+
+    estatico nulo habilitarAtributo(int indice) {
+        glEnableVertexAttribArray(indice);
+    }
+
+    estatico nulo ponteiroAtributo(int indice, int tam, int tipo, int normalizar, int passo, nulo* dados) {
+        glVertexAttribPointer(indice, tam, tipo, normalizar, passo, dados);
+    }
+
+    estatico nulo desenharVetores(int modo, int inicio, int qtd) {
+        glDrawArrays(modo, inicio, qtd);
+    }
+
+    estatico nulo lerPixels(int x, int y, int largura, int altura, int formato, int tipo, nulo* dados) {
+        glReadPixels(x, y, largura, altura, formato, tipo, dados);
+    }
+}

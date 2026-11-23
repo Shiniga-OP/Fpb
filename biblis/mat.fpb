@@ -1,7 +1,9 @@
+#incluir "~biblis/sischamada.fpb"
+
 #classe Mat {
     estatico longo aleatorio() {
         longo semente = 0;
-        #chamada_sistema 5, @semente, 8, 0;
+        #chamada_sistema ALEATORIO, @semente, 8, 0;
         semente = Mat.proximo(semente);
         retorne semente;
     }

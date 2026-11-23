@@ -7,9 +7,9 @@
 enum class ChamadaSistemaId {
     ESCREVER = 1,
     SAIR = 2,
-    ALOCAR = 3,
-    LIBERAR = 4,
-    ALEATORIO = 5
+    ALOCAR = 3, LIBERAR = 4,
+    ALEATORIO = 5,
+    ABRIR = 6, FECHAR = 7, LER = 8, POSICIONAR = 9
 };
 
 // uma instrução IR genérica: "chame o sistema X com estes argumentos".
@@ -32,6 +32,7 @@ struct ArgumentoIR {
     bool ehPonteiro = false; // true se o slot guarda um endereço(variável/parâmetro ponteiro, array, ou resultado de "@"): "@nome" devolve o conteúdo do slot em vez do endereço do slot
     bool ehFlutuante = false; // true pra flu(4 bytes) e dobro(8 bytes): o valor(ou o imediato) guarda o padrão de bits do float/double, e a arquitetura opera nos registradores de ponto flutuante
     bool elementoFlutuante = false; // so quando este ArgumentoIR e um PONTEIRO: true se o elemento apontado é flu/dobro, aplicado ao resultado de "nome[indice]"
+    bool ehTemporario = false; // true se é o resultado de um operador de espaço(Nome* de heap ainda sem dono): quem recebe move o conteúdo e devolve a casca
     bool ehFuncao = false; // true se tipo == SIMBOLO_TEXTO guarda o símbolo de uma função("@funcao"): o endereço vem pela GOT, não por adrp/add direto
     
     void liberar() {
@@ -386,18 +387,34 @@ struct DadoEstaticoIR {
     }
 };
 
+// uma variável global(campo "estatico" de uma #classe): vai pra seção .data com "valorInicial", "largura" bytes
+struct VariavelGlobalIR {
+    char* simbolo; // dono: quem criou a variável(strdup)
+    int largura;
+    long valorInicial;
+
+    void liberar() {
+        free(simbolo);
+        simbolo = nullptr;
+    }
+};
+
 struct ProgramaIR {
     Vetor<DadoEstaticoIR> dados;
+    Vetor<VariavelGlobalIR> globais;
     Vetor<FuncaoIR> funcoes;
     bool ehBibli = false;
 
     void iniciar() {
         dados.iniciar();
+        globais.iniciar();
         funcoes.iniciar();
     }
     void liberar() {
         for(int i = 0; i < dados.tam; i++) dados[i].liberar();
         dados.liberar();
+        for(int i = 0; i < globais.tam; i++) globais[i].liberar();
+        globais.liberar();
         for(int i = 0; i < funcoes.tam; i++) funcoes[i].liberar();
         funcoes.liberar();
     }

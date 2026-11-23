@@ -18,6 +18,7 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
         registrarEspacos(*carregador.programas[i], carregador.origem(i));
         registrarLigacoes(*carregador.programas[i]);
     }
+    validarHeranca();
     // 3. gera FuncaoIR só pras funções alcancaveis a partir
     //    do programa principal(direta ou indiretamente via chamadas "bl"),
     //    evitando emitir codigo morto de bibliotecas incluídas mas não usadas.
@@ -29,6 +30,8 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
         gerarFuncaoAlcancavel(programa.funcoes[i].nome, ir, jaGeradas);
     }
     jaGeradas.liberar();
+    for(int i = 0; i < globais.tam; i++) ir.globais.empurrar(globais[i]);
+    globais.liberar(); // só o array: os símbolos agora são do ProgramaIR
     ir.ehBibli = true;
     for(int i = 0; i < programa.funcoes.tam; i++) {
         if(strcmp(programa.funcoes[i].nome, "inicio") == 0) ir.ehBibli = false;
@@ -105,16 +108,6 @@ inline void GeradorIR::coletarChamadasUsuario(const Vetor<ComandoIR>& bloco, Vet
 }
 
 inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<DadoEstaticoIR>& dados) {
-    int totalInteiros = 0;
-    int totalFlutuantes = 0;
-    for(int i = 0; i < funcao.parametros.tam; i++) {
-        if(tipoEhFlutuante(funcao.parametros[i].tipo)) totalFlutuantes++;
-        else totalInteiros++;
-    }
-    if(totalInteiros > 8 || totalFlutuantes > 8) {
-        std::string nomeStr = funcao.nome;
-        throw std::runtime_error("Função '" + nomeStr + "' aceita no máximo 8 parâmetros inteiros e 8 flutuantes");
-    }
     FuncaoIR funcaoIR;
     funcaoIR.iniciar();
     bytesArraysAtual = 0;
@@ -145,15 +138,18 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
         if(funcao.parametros[i].nomeEspaco) arg.idEspaco = obterIdEspaco(funcao.parametros[i].nomeEspaco);
         if(funcao.parametros[i].tipo == TipoVariavel::ESPACO) arg.espacoPorValor = true; // "Nome x" por valor: o chamador passa o endereço de uma cópia, então "x = y" aqui copia campo a campo
         ctx.variaveisLocais.definirComSlot(funcao.parametros[i].nome, arg, i);
+        if(funcao.parametros[i].tipo == TipoVariavel::ESPACO) registrarLiberacaoAutomatica(i, arg.idEspaco, ctx);
         funcaoIR.parametrosLargura.empurrar(arg.larguraBytes);
         funcaoIR.parametrosFlutuante.empurrar(arg.ehFlutuante);
     }
+    emitirConstrutorBase(funcao, funcaoIR.instrucoes);
     funcaoIR.retornoFlutuante = !funcao.tipoRetorno.ehNulo && tipoEhFlutuante(funcao.tipoRetorno.tipo);
     funcaoIR.retornoLargura = funcao.tipoRetorno.ehNulo ? 8 : larguraDoTipo(funcao.tipoRetorno.tipo);
     bool terminaComSair = false;
     bool terminaComRetorne = false;
     for(int i = 0; i < funcao.corpo.tam; i++) {
         const Comando& comando = funcao.corpo[i];
+        int marcaTemp = ctx.tempSlot.tam;
         terminaComSair = false;
         terminaComRetorne = false;
         if(comando.tipo == Comando::Tipo::DECLARACAO_VARIAVEL) {
@@ -172,6 +168,8 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
             gerarComandoEnquanto(comando.comandoEnquanto, funcaoIR.instrucoes, ctx);
         } else if(comando.tipo == Comando::Tipo::POR) {
             gerarComandoPor(comando.comandoPor, funcaoIR.instrucoes, ctx);
+        } else if(comando.tipo == Comando::Tipo::APAGAR) {
+            gerarApagar(comando.comandoApagar, funcaoIR.instrucoes, ctx);
         } else if(comando.tipo == Comando::Tipo::RETORNE) {
             gerarRetorne(comando.comandoRetorne, funcaoIR.instrucoes, ctx);
             terminaComRetorne = true;
@@ -182,7 +180,9 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
         } else {
             gerarChamadaFuncao(comando.chamadaFuncao, funcaoIR.instrucoes, ctx);
         }
+        emitirLiberacaoTemporarios(marcaTemp, true, funcaoIR.instrucoes, ctx);
     }
+    if(!terminaComRetorne && !terminaComSair) emitirLiberacoesDeEscopo(0, false, funcaoIR.instrucoes, ctx);
     // pode emitir "ret". Se o programador não terminou com SAIR
     // explícito, força um sair(0) implícito pra não cair em lixo.
     if(funcaoIR.ehInicio && !terminaComSair) {
@@ -202,6 +202,7 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
     // variáveis declaradas(variaveisLocais.proximoSlot já contabiliza os dois).
     funcaoIR.totalSlots = ctx.variaveisLocais.proximoSlot;
     ctx.variaveisLocais.liberar();
+    ctx.liberar();
 
     alocarRegistradores(funcaoIR);
     return funcaoIR;
@@ -250,4 +251,29 @@ inline void GeradorIR::registrarLigacoes(const Programa& programa) {
         }
         if(!jaTem) ligacoes.empurrar(nome);
     }
+}
+// "Nome_criar" de uma classe que herda: chama o "criar" da base(a mais próxima que tiver) antes do corpo, passando o próprio "este"(Nome* serve como Base*).
+// É automático, então esse "criar" da base só pode ter o parâmetro "este". Classe sem "criar" próprio não chama o da base.
+inline void GeradorIR::emitirConstrutorBase(const DeclaracaoFuncao& funcao, Vetor<ComandoIR>& saida) {
+    if(funcao.parametros.tam == 0 || !funcao.parametros[0].nomeEspaco) return;
+    if(strcmp(funcao.parametros[0].nome, "este") != 0) return;
+    std::string nomeEspacoStr = funcao.parametros[0].nomeEspaco;
+    if(nomeEspacoStr + "_criar" != funcao.nome) return;
+    int id = espacos.buscar(nomeEspacoStr.c_str());
+    if(id < 0) return;
+    int idBase = baseDoEspaco(id);
+    if(idBase < 0) return;
+    std::string nomeCriar;
+    if(!buscarMetodo(idBase, "criar", nomeCriar)) return;
+    int totalParametros;
+    funcoesUsuario.buscar(nomeCriar.c_str(), &totalParametros);
+    if(totalParametros != 1) {
+        throw std::runtime_error("O construtor '" + nomeCriar + "' da base de '" + nomeEspacoStr + "' tem parâmetros, mas o construtor da base é chamado automático e só pode ter 'este'");
+    }
+    ComandoIR comando;
+    comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
+    comando.chamadaFuncaoUsuario.iniciar();
+    comando.chamadaFuncaoUsuario.nome = strdup(nomeCriar.c_str());
+    comando.chamadaFuncaoUsuario.argumentos.empurrar(argumentoEspaco(0, idBase));
+    saida.empurrar(comando);
 }

@@ -237,6 +237,10 @@ public:
         else if(buf.igual("por")) t.tipo = TipoToken::POR;
         else if(buf.igual("retorne")) t.tipo = TipoToken::RETORNE;
         else if(buf.igual("sem_sinal")) t.tipo = TipoToken::SEM_SINAL;
+        else if(buf.igual("apagar")) t.tipo = TipoToken::APAGAR;
+        else if(buf.igual("herda")) t.tipo = TipoToken::HERDA;
+        else if(buf.igual("estatico")) t.tipo = TipoToken::ESTATICO;
+        else if(buf.igual("final")) t.tipo = TipoToken::FINAL;
         else t.tipo = TipoToken::IDENTIFICADOR;
         t.valor = buf.paraTokenTexto();
         buf.liberar();

@@ -146,3 +146,28 @@ inline char* GeradorIR::gerarNomeSimbolo(const char* textoOriginal) {
     base.liberar();
     return strdup(resultado.c_str());
 }
+
+// IMEDIATO que representa uma constante "final" do tipo dado(variável local final ou campo estatico final). Inteiros são truncados
+// na largura do tipo(com extensão de sinal quando é com sinal); flu/dobro já chegam como padrão de bits na largura certa.
+// Ler a constante não emite nada: o valor entra direto na instrução que usa.
+inline ArgumentoIR GeradorIR::constanteDoTipo(long valor, TipoVariavel tipo) {
+    int largura = larguraDoTipo(tipo);
+    bool sinal = tipoEhSinalizado(tipo);
+    if(!tipoEhFlutuante(tipo)) {
+        if(largura == 1) valor = sinal ? (long)(signed char)valor : (valor & 0xFF);
+        else if(largura == 2) valor = sinal ? (long)(short)valor : (valor & 0xFFFF);
+        else if(largura == 4) valor = sinal ? (long)(int)valor : (valor & 0xFFFFFFFFL);
+    }
+    ArgumentoIR arg;
+    arg.tipo = ArgumentoIR::Tipo::IMEDIATO;
+    arg.simbolo = nullptr;
+    arg.imediato = valor;
+    arg.larguraBytes = largura;
+    arg.sinalizado = sinal;
+    arg.elementoSinalizado = elementoEhSinalizado(tipo);
+    arg.larguraElemento = larguraElementoApontado(tipo);
+    arg.ehPonteiro = tipoEhPonteiro(tipo);
+    arg.ehFlutuante = tipoEhFlutuante(tipo);
+    arg.elementoFlutuante = elementoEhFlutuante(tipo);
+    return arg;
+}

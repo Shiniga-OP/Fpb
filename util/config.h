@@ -33,9 +33,9 @@ enum class TipoToken {
     OU_OU, TAMBEM_TAMBEM, MAIOR, MENOR, MAIOR_IGUAL,
     MENOR_IGUAL,
     // laço:
-    ENQUANTO, POR,
+    ENQUANTO, POR, APAGAR,
     // definição:
-    RETORNE, SEM_SINAL,
+    RETORNE, SEM_SINAL, HERDA, ESTATICO, FINAL,
     // fim:
     FIM_ARQUIVO
 };

@@ -10,6 +10,24 @@
 #include "config.h"
 #include "lexer.h"
 
+// raiz das bibliotecas: variável de ambiente FPB_RAIZ, ou "." se não existir.
+inline std::string raizBiblisPadrao() {
+    const char* env = getenv("FPB_RAIZ");
+    if(env && env[0]) return env;
+    return ".";
+}
+
+// única fonte de verdade pra resolver o caminho de um "#incluir"(usada aqui e no CarregadorBiblis).
+// "~caminho" e "~/caminho" são relativos a "raizBiblis"; qualquer outro é relativo a "diretorioAtual".
+inline std::filesystem::path resolverCaminhoInclusao(const char* caminhoRelativo, const std::string& diretorioAtual, const std::string& raizBiblis) {
+    if(caminhoRelativo[0] == '~') {
+        const char* resto = caminhoRelativo + 1;
+        while(*resto == '/') resto++;
+        return std::filesystem::path(raizBiblis) / resto;
+    }
+    return std::filesystem::path(diretorioAtual) / caminhoRelativo;
+}
+
 // roda entre o Lexer e o Analisador: guarda cada "#macro NOME ... #macrofim" numa tabela, troca cada uso de NOME pelo corpo e junta textos adjacentes ("a" "b" vira "ab").
 // a tabela é única: o arquivo principal e todas as bibliotecas usam a mesma instância, então uma macro definida numa biblioteca vale em quem a inclui.
 // pra isso, ao achar "#incluir", o pré-processador varre o arquivo incluído só pra coletar as macros(os tokens dele são descartados, o CarregadorBiblis lê o arquivo de novo).
@@ -19,6 +37,7 @@ public:
     Vetor<Vetor<Token>> corpos; // dono: Preprocessador. paralelo a nomes
     VetorStr arquivosVistos; // caminhos absolutos já varridos
     VetorStr pilha; // macros sendo expandidas agora, pra barrar recursão
+    std::string raizBiblis = raizBiblisPadrao(); // raiz das bibliotecas, usada nos "~caminho"
 
     Preprocessador() {
         nomes.iniciar();
@@ -214,7 +233,7 @@ private:
     // lê o arquivo incluído só pra registrar as macros dele(e das que ele inclui). Arquivo que não abre é ignorado aqui: o CarregadorBiblis reporta o erro.
     void varrerInclusao(const char* caminhoRelativo, const std::string& diretorio) {
         std::error_code erroCaminho;
-        std::filesystem::path caminhoAbsoluto = std::filesystem::canonical(std::filesystem::path(diretorio) / caminhoRelativo, erroCaminho);
+        std::filesystem::path caminhoAbsoluto = std::filesystem::canonical(resolverCaminhoInclusao(caminhoRelativo, diretorio, raizBiblis), erroCaminho);
         if(erroCaminho) return;
         std::string absolutoStr = caminhoAbsoluto.string();
         int tamAbsoluto = (int)absolutoStr.size();

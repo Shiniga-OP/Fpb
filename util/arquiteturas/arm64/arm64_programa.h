@@ -2,6 +2,31 @@
 #pragma once
 #include "arm64.h"
 
+// bytes de pilha que a MAIOR chamada do bloco precisa pra args alem de x0-x7/v0-v7 (8 bytes cada)
+inline int bytesArgsSaida(const Vetor<ComandoIR>& bloco) {
+    int maior = 0;
+    for(int i = 0; i < bloco.tam; i++) {
+        const ComandoIR& c = bloco[i];
+        int n = 0;
+        if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) {
+            int ints = 0, flus = 0, pilha = 0;
+            for(int a = 0; a < c.chamadaFuncaoUsuario.argumentos.tam; a++) {
+                if(c.chamadaFuncaoUsuario.argumentos[a].ehFlutuante) { if(flus++ >= 8) pilha++; }
+                else { if(ints++ >= 8) pilha++; }
+            }
+            n = pilha * 8;
+        } else if(c.tipo == ComandoIR::Tipo::SE) {
+            n = bytesArgsSaida(*c.instrucaoSe.entao);
+            if(c.instrucaoSe.temSenao) { int m = bytesArgsSaida(*c.instrucaoSe.senaoCorpo); if(m > n) n = m; }
+        } else if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
+            n = bytesArgsSaida(*c.instrucaoEnquanto.comandosCondicao);
+            int m = bytesArgsSaida(*c.instrucaoEnquanto.corpo); if(m > n) n = m;
+        }
+        if(n > maior) maior = n;
+    }
+    return maior;
+}
+
 inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
     std::ostringstream saida;
 
@@ -16,6 +41,16 @@ inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
     for(int i = 0; i < programa.dados.tam; i++) {
         const DadoEstaticoIR& dado = programa.dados[i];
         saida << dado.simbolo << ": .asciz \"" << escaparParaAsm(dado.valor, dado.tamanho) << "\"\n";
+    }
+    if(programa.globais.tam > 0) {
+        saida << "\n.section .data\n";
+        for(int i = 0; i < programa.globais.tam; i++) {
+            const VariavelGlobalIR& global = programa.globais[i];
+            const char* diretiva = global.largura == 1 ? ".byte" : global.largura == 2 ? ".hword" : global.largura == 4 ? ".word" : ".quad";
+            saida << ".weak " << global.simbolo << "\n";
+            saida << ".balign " << global.largura << "\n";
+            saida << global.simbolo << ": " << diretiva << " " << global.valorInicial << "\n";
+        }
     }
     saida << "\n.section .text\n";
     for(int i = 0; i < programa.funcoes.tam; i++) {
@@ -39,8 +74,9 @@ inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
         // layout do frame (do sp pra cima): x29/x30 em 0, callee-saved em 16,
         // slots depois deles, arrays por ultimo. Tudo que usa stp/ldp (alcance
         // maximo 504) fica nos primeiros bytes, longe do tamanho dos slots.
-        int posFp = 0;
-        int posSalvos = 16;
+        int bytesSaida = (bytesArgsSaida(funcao.instrucoes) + 15) & ~15;
+        int posFp = bytesSaida;
+        int posSalvos = bytesSaida + 16;
         baseSlots = posSalvos + espacoChamadaSalva;
         baseArrays = baseSlots + funcao.totalSlots * 16;
         int tamFrame = baseArrays + funcao.bytesArrays;
@@ -61,9 +97,17 @@ inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
             // inteiros e ponteiros chegam em x0..x7 e flutuantes em s0..s7/d0..d7, com contadores independentes(AAPCS64)
             int totalInteiros = 0;
             int totalFlutuantes = 0;
+            int totalPilha = 0;
             for(int p = 0; p < funcao.totalParametros; p++) {
                 int largura = funcao.parametrosLargura[p];
-                if(funcao.parametrosFlutuante[p]) {
+                bool flu = funcao.parametrosFlutuante[p];
+                int& contador = flu ? totalFlutuantes : totalInteiros;
+                if(contador >= 8) {
+                    contador++;
+                    // args alem do 8o ficam logo acima do frame, na area de saida do chamador
+                    saida << "ldr x9, [sp, #" << (tamFrame + totalPilha++ * 8) << "]\n";
+                    emitirGravarSlot(saida, "x9", p, largura);
+                } else if(flu) {
                     saida << "fmov " << (largura == 4 ? "w9, s" : "x9, d") << totalFlutuantes++ << "\n";
                     emitirGravarSlot(saida, "x9", p, largura);
                 } else {
@@ -106,6 +150,10 @@ inline long ARM64::numSistema(ChamadaSistemaId id) {
         case ChamadaSistemaId::ALOCAR: return 222; // mmap
         case ChamadaSistemaId::LIBERAR: return 215; // munmap
         case ChamadaSistemaId::ALEATORIO: return 278;
+        case ChamadaSistemaId::ABRIR: return 56;
+        case ChamadaSistemaId::FECHAR: return 57;
+        case ChamadaSistemaId::LER: return 63;
+        case ChamadaSistemaId::POSICIONAR: return 62;
         default: throw std::runtime_error("Arquitetura ARM64: chamada de sistema sem mapeamento");
     }
 }

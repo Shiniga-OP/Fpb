@@ -1,4 +1,4 @@
-#incluir "../mem.fpb"
+#incluir "~biblis/mem.fpb"
 // jni.fpb: abstração da JNI pra arm64-android
 // precisa de malocar/mliberar: se vêm de outra biblioteca, inclua ela aqui
 
@@ -27,7 +27,7 @@
     nulo* fNovoTexto;
 
     estatico JNI* novo(nulo* atividade) {
-        JNI* j = malocar(bytes(JNI));
+        JNI* j = Mem.alocar(bytes(JNI));
         longo* atv = (longo*)atividade;
         longo* amb = (longo*)atv[2];
         longo* tab = (longo*)amb[0];
@@ -45,6 +45,10 @@
         j.fCampoEstInt = @(tab[150]);
         j.fNovoTexto = @(tab[167]);
         retorne j;
+    }
+    
+    nulo liberar() {
+        Mem.liberar(este);
     }
 
     Classe* acharClasse(car* caminho) {
@@ -108,7 +112,7 @@
     longo cls;
 
     estatico Classe* novo(JNI* jni, car* caminho) {
-        Classe* c = malocar(bytes(Classe));
+        Classe* c = Mem.alocar(bytes(Classe));
         c.jni = jni;
         c.cls = jni.idClasse(caminho);
         retorne c;
@@ -128,6 +132,10 @@
         longo obj = j.chamarEstObjA(este.cls, id, args);
         retorne Objeto.novo(j, obj);
     }
+    
+    nulo liberar() {
+        Mem.liberar(este);
+    }
 }
 
 #classe Objeto {
@@ -135,7 +143,7 @@
     longo obj;
 
     estatico Objeto* novo(JNI* jni, longo obj) {
-        Objeto* o = malocar(bytes(Objeto));
+        Objeto* o = Mem.alocar(bytes(Objeto));
         o.jni = jni;
         o.obj = obj;
         retorne o;
@@ -156,5 +164,9 @@
         longo id = j.acharMetodo(cls, nome, assin);
         longo resultado = j.chamarObjA(este.obj, id, args);
         retorne Objeto.novo(j, resultado);
+    }
+    
+    nulo liberar() {
+        Mem.liberar(este);
     }
 }

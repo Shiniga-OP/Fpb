@@ -18,10 +18,8 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
         carregador.carregar(programa.inclusoes[i].caminho, diretorioBase);
     }
     for(int i = 0; i < carregador.programas.tam; i++) {
-        for(int j = 0; j < carregador.programas[i]->funcoes.tam; j++) {
-            const DeclaracaoFuncao& f = carregador.programas[i]->funcoes[j];
-            if(f.ehExportada || strcmp(f.nome, "inicio") == 0) gerarFuncaoAlcancavel(f.nome, ir, jaGeradas);
-        }
+        registrarFuncoes(*carregador.programas[i], carregador.origem(i));
+        registrarEspacos(*carregador.programas[i], carregador.origem(i));
     }
     validarHeranca();
     // 3. gera FuncaoIR só pras funções alcancaveis a partir
@@ -45,10 +43,8 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     for(int i = 0; i < globais.tam; i++) ir.globais.empurrar(globais[i]);
     globais.liberar(); // só o array: os símbolos agora são do ProgramaIR
     ir.ehBibli = true;
-    for(int i = 0; i < carregador.programas.tam; i++) {
-        for(int j = 0; j < carregador.programas[i]->funcoes.tam; j++) {
-            if(strcmp(carregador.programas[i]->funcoes[j].nome, "inicio") == 0) ir.ehBibli = false;
-        }
+    for(int i = 0; i < programa.funcoes.tam; i++) {
+        if(strcmp(programa.funcoes[i].nome, "inicio") == 0) ir.ehBibli = false;
     }
     return ir;
 }

@@ -12,39 +12,71 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     registrarEspacos(programa);
     registrarLigacoes(programa);
     // 2. o carregador resolve cada "#incluir"(dedupe por caminho absoluto) e
-    //    devolve a AST de cada biblioteca(ex: biblis/impressao.fpb); aqui
-    //    registramos assinatura + corpo de cada função delas.
+    //    devolve a AST de cada biblioteca; aqui registramos assinatura + corpo de cada função delas.
     for(int i = 0; i < programa.inclusoes.tam; i++) {
         carregador.carregar(programa.inclusoes[i].caminho, diretorioBase);
     }
     for(int i = 0; i < carregador.programas.tam; i++) {
         registrarFuncoes(*carregador.programas[i], carregador.origem(i));
         registrarEspacos(*carregador.programas[i], carregador.origem(i));
+        registrarLigacoes(*carregador.programas[i]);
     }
     validarHeranca();
-    // 3. gera FuncaoIR só pras funções alcancaveis a partir
-    //    do programa principal(direta ou indiretamente via chamadas "bl"),
-    //    evitando emitir codigo morto de bibliotecas incluídas mas não usadas.
+    // 3. gera FuncaoIR só pras funções alcançáveis a partir das raízes
+    //    ("inicio" ou "@exportar", no principal ou nos incluídos).
     ProgramaIR ir;
     ir.iniciar();
     VetorStr jaGeradas;
     jaGeradas.iniciar();
-    
     for(int i = 0; i < programa.funcoes.tam; i++) {
         const DeclaracaoFuncao& f = programa.funcoes[i];
         if(f.ehExportada || strcmp(f.nome, "inicio") == 0) gerarFuncaoAlcancavel(f.nome, ir, jaGeradas);
     }
     for(int i = 0; i < carregador.programas.tam; i++) {
         for(int j = 0; j < carregador.programas[i]->funcoes.tam; j++) {
-            if(carregador.programas[i]->funcoes[j].ehExportada) gerarFuncaoAlcancavel(carregador.programas[i]->funcoes[j].nome, ir, jaGeradas);
+            const DeclaracaoFuncao& f = carregador.programas[i]->funcoes[j];
+            if(f.ehExportada || strcmp(f.nome, "inicio") == 0) gerarFuncaoAlcancavel(f.nome, ir, jaGeradas);
         }
+    }
+    // 4. valida as funções do arquivo principal que não foram alcançadas: gera e descarta,
+    //    só pra acusar erro (tipo não declarado, função inexistente...). Roda depois da
+    //    geração real pra não mexer nos dados estáticos do resultado.
+    for(int i = 0; i < programa.funcoes.tam; i++) {
+        const DeclaracaoFuncao& f = programa.funcoes[i];
+        if(f.ehExterna) continue;
+        int tamNome = (int)strlen(f.nome);
+        bool jaFoi = false;
+        for(int k = 0; k < jaGeradas.tam; k++) {
+            int tamCandidato;
+            const char* candidato = jaGeradas.obter(k, &tamCandidato);
+            if(tamCandidato == tamNome && memcmp(candidato, f.nome, tamNome) == 0) {
+                jaFoi = true;
+                break;
+            }
+        }
+        if(jaFoi) continue;
+        Vetor<DadoEstaticoIR> descarte;
+        descarte.iniciar();
+        FuncaoIR teste = gerarFuncao(f, descarte);
+        teste.liberar();
+        for(int k = 0; k < descarte.tam; k++) descarte[k].liberar();
+        descarte.liberar();
     }
     jaGeradas.liberar();
     for(int i = 0; i < globais.tam; i++) ir.globais.empurrar(globais[i]);
     globais.liberar(); // só o array: os símbolos agora são do ProgramaIR
+    // 5. sem "inicio" (no principal ou nos incluídos) o resultado é uma biblioteca.
     ir.ehBibli = true;
     for(int i = 0; i < programa.funcoes.tam; i++) {
         if(strcmp(programa.funcoes[i].nome, "inicio") == 0) ir.ehBibli = false;
+    }
+    for(int i = 0; i < carregador.programas.tam; i++) {
+        for(int j = 0; j < carregador.programas[i]->funcoes.tam; j++) {
+            if(strcmp(carregador.programas[i]->funcoes[j].nome, "inicio") == 0) ir.ehBibli = false;
+        }
+    }
+    if(ir.funcoes.tam == 0) {
+        throw std::runtime_error("Nenhuma função raiz: o programa precisa de 'inicio' ou de uma função '@exportar'");
     }
     return ir;
 }

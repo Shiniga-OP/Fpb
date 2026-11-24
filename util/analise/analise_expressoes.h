@@ -82,8 +82,9 @@ inline Expressao Analisador::analisarExpressaoSemTernario() {
 }
 
 // analisa uma conversão de tipo(conversão): (car)expr, (int)expr, (car*)expr
-// ou (int*)expr. So chamada quando já detectamos "(" seguido de
-// "int/car"(distingue de uma expressão parentesizada comum, ver
+// analisa uma conversão de tipo(conversão): (car)expr, (int)expr, (car*)expr, (nulo*)expr
+// ou (Nome*)expr(ponteiro pra espaço). So chamada quando já detectamos "(" seguido de
+// um tipo(distingue de uma expressão parentesizada comum, ver
 // analisarExpressaoParentesizada logo abaixo).
 inline Expressao Analisador::analisarConversao() {
     consumir(TipoToken::ABRE_PARENTESE, "esperado '(' no inicio da conversao de tipo");
@@ -91,6 +92,11 @@ inline Expressao Analisador::analisarConversao() {
     if(verificar(TipoToken::NULO)) {
         pos++;
         consumir(TipoToken::VEZES, "esperado '*' apos 'nulo' na conversao de tipo(nulo sozinho nao e' um tipo de valor valido)");
+        tipoAlvo = TipoVariavel::NULO_PONTEIRO;
+    } else if(verificar(TipoToken::IDENTIFICADOR)) {
+        // "(Nome*)expr": ponteiro pra espaço. Em tempo de execução é só um endereço de 8 bytes, igual a "(nulo*)expr"
+        pos++;
+        consumir(TipoToken::VEZES, "esperado '*' apos o nome do espaço na conversao de tipo");
         tipoAlvo = TipoVariavel::NULO_PONTEIRO;
     } else {
         tipoAlvo = analisarTipoValor("esperado 'int', 'longo', 'car', 'bool', 'byte', 'curto' ou 'nulo' na conversao de tipo");
@@ -235,7 +241,8 @@ inline Expressao Analisador::analisarExpressaoPrimaria() {
         e.valor = strdup("0");
         return e;
     }
-    if(verificar(TipoToken::ABRE_PARENTESE) && (ehTokenTipoValor(tokens[pos + 1].tipo) || tokens[pos + 1].tipo == TipoToken::NULO)) {
+    bool ehConversaoEspaco = pos + 3 < tokens.tam && tokens[pos + 1].tipo == TipoToken::IDENTIFICADOR && tokens[pos + 2].tipo == TipoToken::VEZES && tokens[pos + 3].tipo == TipoToken::FECHA_PARENTESE;
+    if(verificar(TipoToken::ABRE_PARENTESE) && (ehTokenTipoValor(tokens[pos + 1].tipo) || tokens[pos + 1].tipo == TipoToken::NULO || ehConversaoEspaco)) {
         return analisarConversao();
     }
     if(verificar(TipoToken::ABRE_PARENTESE)) {

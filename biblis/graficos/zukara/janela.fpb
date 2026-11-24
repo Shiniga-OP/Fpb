@@ -1,0 +1,117 @@
+// graficos/zuraka/janela.fpb
+#incluir "~graficos/opengl/egl.fpb"
+#incluir "~mem.fpb"
+#incluir "~threads.fpb"
+
+#classe Janela {
+    nulo* tela;
+    nulo* superficie;
+    nulo* ctx;
+    nulo* nativa;
+    int largura;
+    int altura;
+    bool aberta;
+
+    nulo iniciarEGL(nulo* idTela, nulo* janelaNativa) {
+        nulo* t = EGL.obterTela(idTela);
+        int[1] maior;
+        int[1] menor;
+        EGL.iniciar(t, maior, menor);
+        EGL.vincularAPI(EGL.API_GLES);
+
+        int[13] atribs;
+        atribs[0] = EGL.TIPO_SUPERFICIE;
+        atribs[1] = 0x0004;
+        atribs[2] = EGL.TIPO_RENDER;
+        atribs[3] = EGL.GLES2_BIT;
+        atribs[4] = EGL.VERMELHO;
+        atribs[5] = 8;
+        atribs[6] = EGL.VERDE;
+        atribs[7] = 8;
+        atribs[8] = EGL.AZUL;
+        atribs[9] = 8;
+        atribs[10] = EGL.PROFUNDIDADE;
+        atribs[11] = 16;
+        atribs[12] = EGL.NENHUM;
+
+        longo[1] config;
+        int[1] qtd;
+        EGL.escolherConfig(t, atribs, config, 1, qtd);
+        se(qtd[0] == 0) {
+            retorne;
+        }
+        int[1] semAtribs;
+        semAtribs[0] = EGL.NENHUM;
+        nulo* sup = EGL.criarSuperficieJanela(t, (nulo*)config[0], janelaNativa, semAtribs);
+
+        int[3] atribsCtx;
+        atribsCtx[0] = EGL.VERSAO_CLIENTE;
+        atribsCtx[1] = 2;
+        atribsCtx[2] = EGL.NENHUM;
+        nulo* c = EGL.criarCtx(t, (nulo*)config[0], (nulo*)0, atribsCtx);
+        EGL.defAtual(t, sup, sup, c);
+        EGL.trocarIntervalo(t, 1);
+
+        este.tela = t;
+        este.superficie = sup;
+        este.ctx = c;
+        este.nativa = janelaNativa;
+        este.aberta = verdade;
+        este.atualizar();
+    }
+
+    nulo atualizar() {
+        int[1] dim;
+        EGL.consultarSuperficie(este.tela, este.superficie, EGL.LARGURA, dim);
+        este.largura = dim[0];
+        EGL.consultarSuperficie(este.tela, este.superficie, EGL.ALTURA, dim);
+        este.altura = dim[0];
+    }
+
+    nulo trocarBuffers() {
+        EGL.trocarBuffers(este.tela, este.superficie);
+        este.atualizar();
+    }
+}
+
+#se(__ANDROID__)
+
+// roda na thread de renderização, criada por thcriar (clone cru, sem libc)
+nulo* corpoThread(Janela* j) {
+    j.iniciarEGL((nulo*)0, j.nativa);
+    principal(j);
+    retorne (nulo*)0;
+}
+
+nulo aoCriarJanela(nulo* atividade, nulo* janela) {
+    Janela* j = malocar(bytes(Janela));
+    j.nativa = janela;
+    Thread* th = thcriar(@corpoThread, (longo)j);
+    se(th == (Thread*)0) {
+        sair(1);
+    }
+}
+
+@exportar
+nulo ANativeActivity_onCreate(nulo* atividade, nulo* estado, longo tam) {
+    longo* atv = (longo*)atividade;
+    longo* cb = (longo*)atv[0];
+    cb[7] = @aoCriarJanela;
+}
+#senaose(__LINUX__)
+#incluir "~linux/x11.fpb"
+
+nulo inicio() {
+    nulo* tela = X11.abrirTela((nulo*)0);
+    se(tela == (nulo*)0) {
+        sair(1);
+    }
+    longo raiz = X11.janelaRaizPadrao(tela);
+    longo janela = X11.criarJanelaSimples(tela, raiz, 0, 0, 640, 480, 0, 0, 0);
+    X11.mapaJanela(tela, janela);
+    X11.descarga(tela);
+    Janela* j = malocar(bytes(Janela));
+    j.iniciarEGL(tela, (nulo*)janela);
+    principal(j);
+}
+#sefim

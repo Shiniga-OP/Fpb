@@ -1,0 +1,37 @@
+#classe Liberavel {
+    bool liberado;
+    
+    nulo liberar() {
+        liberado = verdade;
+    }
+}
+
+#classe Vetor2 {
+    flu x, y;
+    
+    nulo criar(flu x, flu y) {
+        este.x = x;
+        este.y = y;
+    }
+    
+    nulo def(flu x, flu y) {
+        este.x = x;
+        este.y = y;
+    }
+}
+
+#classe Vetor3 {
+    flu x, y, z;
+    
+    nulo criar(flu x, flu y, flu z) {
+        este.x = x;
+        este.y = y;
+        este.z = z;
+    }
+    
+    nulo def(flu x, flu y, flu z) {
+        este.x = x;
+        este.y = y;
+        este.z = z;
+    }
+}

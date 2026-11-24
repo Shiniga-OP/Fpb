@@ -465,6 +465,7 @@ struct DeclaracaoFuncao {
     TipoRetorno tipoRetorno; // "nulo" ou int/car/car*
     bool ehVariadica = false; // true se o último parâmetro é "longo... nome"
     bool ehExterna = false;
+    bool ehExportada = false;
     
     void iniciar() {
         nome = nullptr;

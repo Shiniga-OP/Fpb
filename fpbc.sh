@@ -1,14 +1,20 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -e
 CODIGO=$1
-CODIGO2=$2
+SAIDA=$2
 OTIMI=$3
-if [ -d "$CASA/pacotes/fpb" ]; then
-    rm -rf fpb  # remove se existir(arquivo ou pasta)
-    cp -rf $CASA/pacotes/fpb .
-fi
+DESTINO=/data/data/com.termux/files/usr/bin/fpb
+
+rm -rf fpb
 cp -rf $CASA/pacotes/fpb .
 cd fpb
 clang++ fpbc.cpp -o fpbc $OTIMI
 cp $HOME/fpbc.sh $CASA/pacotes/fpb
 cp testes/$CODIGO.fpb .
+
+mkdir -p $DESTINO
+mv -f fpbc $DESTINO/
+cp -rf biblis $DESTINO/
+export FPB_RAIZ=$DESTINO/biblis
 echo tempo de compilação
-time ./fpbc $CODIGO.fpb -s $CODIGO2 -asm
+time $DESTINO/fpbc $CODIGO.fpb -s $SAIDA -asm

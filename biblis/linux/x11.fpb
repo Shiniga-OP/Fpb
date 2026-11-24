@@ -1,0 +1,62 @@
+// ~linux/x11.fpb
+#ligar "X11"
+
+nulo* XOpenDisplay(car* nome);
+longo XCreateSimpleWindow(
+    nulo* tela, longo pai, int x, int y,
+    int largura, int altura, int borda,
+    longo cor_fundo, longo cor_borda
+);
+nulo XMapWindow(nulo* tela, longo janela);
+nulo XFlush(nulo* tela);
+longo XDefaultRootWindow(nulo* tela);
+int XPending(nulo* tela);
+nulo XNextEvent(nulo* tela, nulo* evento);
+nulo XDestroyWindow(nulo* tela, longo janela);
+nulo XCloseDisplay(nulo* tela);
+
+#classe X11 {
+    estatico nulo* abrirTela(car* nome) {
+        retorne XOpenDisplay(nome);
+    }
+    
+    estatico longo criarJanelaSimples(
+        nulo* tela, longo pai, int x, int y,
+        int largura, int altura, int borda,
+        longo cor_fundo, longo cor_borda
+    ) {
+        retorne XCreateSimpleWindow(
+            tela, pai, x, y,
+            largura, altura, borda,
+            cor_fundo, cor_borda
+        );
+    }
+    
+    estatico nulo mapaJanela(nulo* tela, longo janela) {
+        XMapWindow(tela, janela);
+    }
+    
+    estatico nulo descarga(nulo* tela) {
+        XFlush(tela);
+    }
+    
+    estatico longo janelaRaizPadrao(nulo* tela) {
+        retorne XDefaultRootWindow(tela);
+    }
+    
+    estatico int pendente(nulo* tela) {
+        retorne XPending(tela);
+    }
+    
+    estatico nulo proximoEvento(nulo* tela, nulo* evento) {
+        XNextEvent(tela, evento);
+    }
+    
+    estatico nulo destruirJanela(nulo* tela, longo janela) {
+        XDestroyWindow(tela, janela);
+    }
+    
+    estatico nulo fecharTela(nulo* tela) {
+        XCloseDisplay(tela);
+    }
+}

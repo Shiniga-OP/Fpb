@@ -1,5 +1,6 @@
-#incluir "~biblis/mem.fpb"
-#incluir "~biblis/sischamada.fpb"
+// ~arquivos.fpb
+#incluir "mem.fpb"
+#incluir "sischamada.fpb"
 
 #classe Arquivo {
     int ad;

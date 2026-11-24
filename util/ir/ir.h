@@ -9,7 +9,8 @@ enum class ChamadaSistemaId {
     SAIR = 2,
     ALOCAR = 3, LIBERAR = 4,
     ALEATORIO = 5,
-    ABRIR = 6, FECHAR = 7, LER = 8, POSICIONAR = 9
+    ABRIR = 6, FECHAR = 7, LER = 8, POSICIONAR = 9,
+    CLONE = 10, FUTEX = 11
 };
 
 // uma instrução IR genérica: "chame o sistema X com estes argumentos".
@@ -348,6 +349,8 @@ struct FuncaoIR {
     Vetor<int> registradorDoSlot;
 
     int bytesArrays = 0;
+    
+    bool ehExportada = false;
 
     void iniciar() {
         nome = nullptr;

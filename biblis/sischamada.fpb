@@ -1,3 +1,4 @@
+// ~sischamada.fpb
 #macro ESCREVER 1 #macrofim
 #macro SAIR 2 #macrofim
 #macro ALOCAR 3 #macrofim
@@ -7,3 +8,5 @@
 #macro FECHAR 7 #macrofim
 #macro LER 8 #macrofim
 #macro POSICIONAR 9 #macrofim
+#macro CLONE 10 #macrofim
+#macro FUTEX 11 #macrofim

@@ -1,5 +1,5 @@
-#incluir "~biblis/texs.fpb"
-#incluir "~biblis/sischamada.fpb"
+#incluir "texs.fpb"
+#incluir "sischamada.fpb"
 
 nulo escrever(car* txt) {
     #chamada_sistema ESCREVER, 1, txt, textam(txt);

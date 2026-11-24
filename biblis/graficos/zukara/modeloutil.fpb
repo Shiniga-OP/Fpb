@@ -1,0 +1,98 @@
+#incluir "~mem.fpb"
+#incluir "util.fpb"
+
+#classe Modelo herda Liberavel {
+    flu* vertices;
+    
+    estatico Modelo* novo(flu* vertices) {
+        Modelo* m = malocar(bytes(Modelo));
+        m.liberado = falso;
+        m.vertices = vertices;
+        retorne m;
+    }
+    
+    @sobrepor
+    nulo liberar() {
+        mliberar(vertices);
+        Liberavel.liberar(este);
+    }
+}
+
+#classe ModeloUtil {
+    estatico nulo ponto(flu* v, int i, flu x, flu y, flu z) {
+        v[i] = x;
+        v[i + 1] = y;
+        v[i + 2] = z;
+    }
+
+    // dois triângulos a partir de 4 cantos(a, b, c, d)
+    estatico nulo quad(
+        flu* v, int i,
+        flu ax, flu ay, flu az,
+        flu bx, flu by, flu bz,
+        flu cx, flu cy, flu cz,
+        flu dx, flu dy, flu dz
+    ) {
+        ModeloUtil.ponto(v, i, ax, ay, az);
+        ModeloUtil.ponto(v, i + 3, bx, by, bz);
+        ModeloUtil.ponto(v, i + 6, cx, cy, cz);
+        ModeloUtil.ponto(v, i + 9, ax, ay, az);
+        ModeloUtil.ponto(v, i + 12, cx, cy, cz);
+        ModeloUtil.ponto(v, i + 15, dx, dy, dz);
+    }
+
+    estatico flu* criarCubo(flu dimX, flu dimY, flu dimZ) {
+        flu x = dimX / 2.0f;
+        flu y = dimY / 2.0f;
+        flu z = dimZ / 2.0f;
+        flu nx = -x;
+        flu ny = -y;
+        flu nz = -z;
+
+        flu* v = malocar(bytes(flu) * 108);
+
+        // frente(+Z)
+        ModeloUtil.quad(v, 0,
+            nx, ny, z,
+            x, ny, z,
+            x, y, z,
+            nx, y, z
+        );
+        // trás(-Z)
+        ModeloUtil.quad(v, 18,
+            x, ny, nz,
+            nx, ny, nz,
+            nx, y, nz,
+            x, y, nz
+        );
+        // direita(+X)
+        ModeloUtil.quad(v, 36,
+            x, ny, z,
+            x, ny, nz,
+            x, y, nz,
+            x, y, z
+        );
+        // esquerda(-X)
+        ModeloUtil.quad(v, 54,
+            nx, ny, nz,
+            nx, ny, z,
+            nx, y, z,
+            nx, y, nz
+        );
+        // topo(+Y)
+        ModeloUtil.quad(v, 72,
+            nx, y, z,
+            x, y, z,
+            x, y, nz,
+            nx, y, nz
+        );
+        // base(-Y)
+        ModeloUtil.quad(v, 90,
+            nx, ny, nz,
+            x, ny, nz,
+            x, ny, z,
+            nx, ny, z
+        );
+        retorne v;
+    }
+}

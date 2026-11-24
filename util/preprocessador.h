@@ -65,8 +65,62 @@ public:
         Vetor<Token> saida;
         saida.iniciar();
         int pos = 0;
+        
+        struct BlocoCond {
+            bool paiAtivo;
+            bool tomou;
+            bool temSenao;
+        };
+        Vetor<BlocoCond> conds;
+        conds.iniciar();
+        bool ativo = true;
+        
         while(pos < entrada.tam) {
             Token t = entrada[pos];
+            
+            if(t.tipo == TipoToken::PRE_SE) {
+                int linha = t.linha;
+                t.liberar();
+                pos++;
+                bool cond = lerCondicao(entrada, pos, linha);
+                conds.empurrar({ativo, ativo && cond, false});
+                ativo = ativo && cond;
+                continue;
+            }
+            if(t.tipo == TipoToken::PRE_SENAOSE) {
+                if(conds.tam == 0 || conds[conds.tam - 1].temSenao) throw std::runtime_error("'#senaose' inesperado na linha " + std::to_string(t.linha));
+                int linha = t.linha;
+                t.liberar();
+                pos++;
+                bool cond = lerCondicao(entrada, pos, linha);
+                BlocoCond& topo = conds[conds.tam - 1];
+                bool toma = topo.paiAtivo && !topo.tomou && cond;
+                topo.tomou = topo.tomou || toma;
+                ativo = toma;
+                continue;
+            }
+            if(t.tipo == TipoToken::PRE_SENAO) {
+                if(conds.tam == 0 || conds[conds.tam - 1].temSenao) throw std::runtime_error("'#senao' inesperado na linha " + std::to_string(t.linha));
+                BlocoCond& topo = conds[conds.tam - 1];
+                topo.temSenao = true;
+                ativo = topo.paiAtivo && !topo.tomou;
+                t.liberar();
+                pos++;
+                continue;
+            }
+            if(t.tipo == TipoToken::PRE_FIM) {
+                if(conds.tam == 0) throw std::runtime_error("'#sefim' sem '#se' na linha " + std::to_string(t.linha));
+                ativo = conds[conds.tam - 1].paiAtivo;
+                conds.tam--;
+                t.liberar();
+                pos++;
+                continue;
+            }
+            if(!ativo) {
+                t.liberar();
+                pos++;
+                continue;
+            }
             if(t.tipo == TipoToken::MACRO) {
                 pos = lerMacro(entrada, pos);
                 continue;
@@ -95,6 +149,8 @@ public:
             saida.empurrar(t);
             pos++;
         }
+        if(conds.tam > 0) throw std::runtime_error("'#se' sem '#sefim'");
+        conds.liberar();
         entrada.liberar(); // só o array: cada token já foi movido pra saida ou liberado
         return juntarTextos(saida);
     }
@@ -109,8 +165,42 @@ public:
         }
         return -1;
     }
-
+    
+    // macro do compilador: corpo é só o número "valor". Um "#macro" do usuário com o mesmo nome e corpo diferente dá erro de redefinição.
+    void defPredefinida(const char* nome, long valor) {
+        Vetor<Token> corpo;
+        corpo.iniciar();
+        Token t;
+        t.tipo = TipoToken::NUMERO;
+        t.valor = strdup(std::to_string(valor).c_str());
+        t.linha = 0;
+        corpo.empurrar(t);
+        def(nome, corpo, 0);
+    }
 private:
+    // "(NOME)" ou "(!NOME)" a partir de "pos", logo depois da diretiva. Libera os tokens e deixa "pos" depois do ')'.
+    bool lerCondicao(Vetor<Token>& e, int& pos, int linha) {
+        std::string erroFormato = "Esperado '(NOME)' ou '(!NOME)' após a diretiva na linha " + std::to_string(linha);
+        int i = pos;
+        
+        if(i >= e.tam || e[i].tipo != TipoToken::ABRE_PARENTESE) throw std::runtime_error(erroFormato);
+        i++;
+        
+        bool nega = i < e.tam && e[i].tipo == TipoToken::EXCLAMACAO;
+        if(nega) i++;
+        if(i >= e.tam || e[i].tipo != TipoToken::IDENTIFICADOR) throw std::runtime_error(erroFormato);
+        
+        bool definido = buscar(e[i].valor) >= 0;
+        i++;
+        
+        if(i >= e.tam || e[i].tipo != TipoToken::FECHA_PARENTESE) throw std::runtime_error(erroFormato);
+        i++;
+        
+        for(int k = pos; k < i; k++) e[k].liberar();
+        pos = i;
+        return definido != nega;
+    }
+    
     static Token copiarToken(const Token& t, int linha) {
         Token c;
         c.tipo = t.tipo;
@@ -169,12 +259,12 @@ private:
         }
         entrada[pos].liberar();
         pos++;
-        definir(nome, corpo, linha);
+        def(nome, corpo, linha);
         return pos;
     }
 
     // registra a macro. Repetir a mesma definição(biblioteca lida duas vezes) é aceito; corpo diferente é erro.
-    void definir(const std::string& nome, Vetor<Token>& corpo, int linha) {
+    void def(const std::string& nome, Vetor<Token>& corpo, int linha) {
         int indice = buscar(nome.c_str());
         if(indice >= 0) {
             bool igual = mesmoCorpo(corpos[indice], corpo);

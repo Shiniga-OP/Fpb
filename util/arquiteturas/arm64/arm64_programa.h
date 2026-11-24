@@ -30,12 +30,9 @@ inline int bytesArgsSaida(const Vetor<ComandoIR>& bloco) {
 inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
     std::ostringstream saida;
 
-    if(programa.ehBibli) {
-        for(int i = 0; i < programa.funcoes.tam; i++) {
-            saida << ".global " << programa.funcoes[i].nome << "\n.type " << programa.funcoes[i].nome << ", %function\n";
-        }
-    } else {
-        saida << ".global inicio\n";
+    for(int i = 0; i < programa.funcoes.tam; i++) {
+        const FuncaoIR& f = programa.funcoes[i];
+        if(programa.ehBibli || f.ehExportada || f.ehInicio) saida << ".global " << f.nome << "\n.type " << f.nome << ", %function\n";
     }
     saida << ".section .rodata\n";
     for(int i = 0; i < programa.dados.tam; i++) {
@@ -154,6 +151,8 @@ inline long ARM64::numSistema(ChamadaSistemaId id) {
         case ChamadaSistemaId::FECHAR: return 57;
         case ChamadaSistemaId::LER: return 63;
         case ChamadaSistemaId::POSICIONAR: return 62;
+        case ChamadaSistemaId::CLONE: return 220; // clone
+        case ChamadaSistemaId::FUTEX: return 98;
         default: throw std::runtime_error("Arquitetura ARM64: chamada de sistema sem mapeamento");
     }
 }

@@ -1,4 +1,5 @@
-#incluir "~biblis/mem.fpb";
+// ~texs.fpb
+#incluir "mem.fpb";
 
 #classe Texto {
     car* txt;

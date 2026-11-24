@@ -2,6 +2,10 @@
 #pragma once
 #include "geradorir.h"
 
+inline void coletarFuncaoReferenciada(const ArgumentoIR& arg, VetorStr& saida) {
+    if(arg.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO && arg.ehFuncao) saida.empurrar(arg.simbolo);
+}
+
 inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     // 1. registra a assinatura + corpo de cada função do programa principal.
     registrarFuncoes(programa);
@@ -14,9 +18,10 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
         carregador.carregar(programa.inclusoes[i].caminho, diretorioBase);
     }
     for(int i = 0; i < carregador.programas.tam; i++) {
-        registrarFuncoes(*carregador.programas[i], carregador.origem(i));
-        registrarEspacos(*carregador.programas[i], carregador.origem(i));
-        registrarLigacoes(*carregador.programas[i]);
+        for(int j = 0; j < carregador.programas[i]->funcoes.tam; j++) {
+            const DeclaracaoFuncao& f = carregador.programas[i]->funcoes[j];
+            if(f.ehExportada || strcmp(f.nome, "inicio") == 0) gerarFuncaoAlcancavel(f.nome, ir, jaGeradas);
+        }
     }
     validarHeranca();
     // 3. gera FuncaoIR só pras funções alcancaveis a partir
@@ -26,15 +31,24 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     ir.iniciar();
     VetorStr jaGeradas;
     jaGeradas.iniciar();
+    
     for(int i = 0; i < programa.funcoes.tam; i++) {
-        gerarFuncaoAlcancavel(programa.funcoes[i].nome, ir, jaGeradas);
+        const DeclaracaoFuncao& f = programa.funcoes[i];
+        if(f.ehExportada || strcmp(f.nome, "inicio") == 0) gerarFuncaoAlcancavel(f.nome, ir, jaGeradas);
+    }
+    for(int i = 0; i < carregador.programas.tam; i++) {
+        for(int j = 0; j < carregador.programas[i]->funcoes.tam; j++) {
+            if(carregador.programas[i]->funcoes[j].ehExportada) gerarFuncaoAlcancavel(carregador.programas[i]->funcoes[j].nome, ir, jaGeradas);
+        }
     }
     jaGeradas.liberar();
     for(int i = 0; i < globais.tam; i++) ir.globais.empurrar(globais[i]);
     globais.liberar(); // só o array: os símbolos agora são do ProgramaIR
     ir.ehBibli = true;
-    for(int i = 0; i < programa.funcoes.tam; i++) {
-        if(strcmp(programa.funcoes[i].nome, "inicio") == 0) ir.ehBibli = false;
+    for(int i = 0; i < carregador.programas.tam; i++) {
+        for(int j = 0; j < carregador.programas[i]->funcoes.tam; j++) {
+            if(strcmp(carregador.programas[i]->funcoes[j].nome, "inicio") == 0) ir.ehBibli = false;
+        }
     }
     return ir;
 }
@@ -96,7 +110,12 @@ inline void GeradorIR::coletarChamadasUsuario(const Vetor<ComandoIR>& bloco, Vet
     for(int i = 0; i < bloco.tam; i++) {
         const ComandoIR& c = bloco[i];
         if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) {
-            if(!c.chamadaFuncaoUsuario.indireta) saida.empurrar(c.chamadaFuncaoUsuario.nome); // chamada por endereço não tem nome de função
+            if(!c.chamadaFuncaoUsuario.indireta) saida.empurrar(c.chamadaFuncaoUsuario.nome);
+            for(int j = 0; j < c.chamadaFuncaoUsuario.argumentos.tam; j++) coletarFuncaoReferenciada(c.chamadaFuncaoUsuario.argumentos[j], saida);
+        } else if(c.tipo == ComandoIR::Tipo::REATRIBUICAO) {
+            coletarFuncaoReferenciada(c.instrucaoReatribuicao.valor, saida);
+        } else if(c.tipo == ComandoIR::Tipo::ESCRITA_INDEXADA) {
+            coletarFuncaoReferenciada(c.instrucaoEscritaIndexada.valor, saida);
         } else if(c.tipo == ComandoIR::Tipo::SE) {
             coletarChamadasUsuario(*c.instrucaoSe.entao, saida);
             if(c.instrucaoSe.temSenao) coletarChamadasUsuario(*c.instrucaoSe.senaoCorpo, saida);
@@ -112,6 +131,7 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
     funcaoIR.iniciar();
     bytesArraysAtual = 0;
     funcaoIR.nome = strdup(funcao.nome);
+    funcaoIR.ehExportada = funcao.ehExportada;
     funcaoIR.totalParametros = funcao.parametros.tam;
     funcaoIR.ehInicio = (strcmp(funcao.nome, "inicio") == 0);
     funcaoIR.temRetornoTipado = !funcao.tipoRetorno.ehNulo;

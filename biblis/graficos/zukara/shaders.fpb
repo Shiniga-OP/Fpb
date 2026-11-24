@@ -1,0 +1,64 @@
+#incluir "~graficos/opengl/gles.fpb"
+#incluir "~graficos/opengl/egl.fpb"
+#incluir "~mem.fpb"
+#incluir "util.fpb"
+#incluir "modeloutil.fpb"
+
+#classe Atributos {
+    
+}
+
+#classe Programa herda Liberavel {
+    int id;
+
+    estatico int compilar(int tipo, car* fonte) {
+        int s = GL20.criarShader(tipo);
+        longo[1] fontes;
+        fontes[0] = (longo)fonte;
+        GL20.fonteShader(s, 1, fontes, 0);
+        GL20.compilarShader(s);
+        int[1] status;
+        GL20.obterShaderIV(s, GL20.STATUS_COMPILACAO, status);
+        se(status[0] == 0) {
+            car[512] log;
+            GL20.obterShaderInfo(s, 512, 0, log);
+            // escrever(log);
+            GL20.apagarShader(s);
+            retorne 0;
+        }
+        retorne s;
+    }
+
+    estatico Programa* novo(car* vert, car* frag) {
+        int v = Programa.compilar(GL20.SHADER_VERTICES, vert);
+        int f = Programa.compilar(GL20.SHADER_FRAGMENTO, frag);
+        int prog = GL20.criarPrograma();
+        GL20.anexarShader(prog, v);
+        GL20.anexarShader(prog, f);
+        GL20.ligarPrograma(prog);
+        GL20.apagarShader(v);
+        GL20.apagarShader(f);
+        Programa* p = malocar(bytes(Programa));
+        p.liberado = falso;
+        p.id = prog;
+        retorne p;
+    }
+
+    nulo iniciar() {
+        GL20.usarPrograma(este.id);
+    }
+
+    nulo fim() {
+        GL20.usarPrograma(0);
+    }
+    
+    nulo render(Modelo* m) {
+        
+    }
+
+    @sobrepor
+    nulo liberar() {
+        GL20.apagarPrograma(este.id);
+        Liberavel.liberar(este);
+    }
+}

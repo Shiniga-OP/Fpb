@@ -11,6 +11,7 @@ int eglSwapBuffers(nulo* tela, nulo* superficie);
 nulo* eglCreatePbufferSurface(nulo* tela, nulo* config, int* atribs);
 int eglBindAPI(int api);
 nulo eglSwapInterval(nulo* tela, int ms);
+int eglQuerySurface(nulo* tela, nulo* superficie, int atrib, int* valor);
 
 #classe EGL {
     // atributos(pares nome, valor, terminados em NENHUM):
@@ -65,5 +66,9 @@ nulo eglSwapInterval(nulo* tela, int ms);
     
     estatico nulo trocarIntervalo(nulo* tela, int ms) {
         eglSwapInterval(tela, ms);
+    }
+    
+    estatico int consultarSuperficie(nulo* tela, nulo* superficie, int atrib, int* valor) {
+        retorne eglQuerySurface(tela, superficie, atrib, valor);
     }
 }

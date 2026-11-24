@@ -18,6 +18,11 @@ inline Programa Analisador::analisar() {
             analisarClasse(programa);
         } else if(verificar(TipoToken::NULO) || ehTokenTipoValor(atual().tipo) || (verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::VEZES)) {
             programa.funcoes.empurrar(analisarFuncao());
+        } else if(verificar(TipoToken::ARROBA) && tokens[pos + 1].tipo == TipoToken::IDENTIFICADOR && strcmp(tokens[pos + 1].valor, "exportar") == 0) {
+            pos += 2;
+            DeclaracaoFuncao funcao = analisarFuncao();
+            funcao.ehExportada = true;
+            programa.funcoes.empurrar(funcao);
         } else {
             erro("Esperado '#incluir' ou declaração de função");
         }

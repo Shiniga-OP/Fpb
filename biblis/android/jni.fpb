@@ -1,4 +1,4 @@
-#incluir "~biblis/mem.fpb"
+#incluir "~mem.fpb"
 // jni.fpb: abstração da JNI pra arm64-android
 // precisa de malocar/mliberar: se vêm de outra biblioteca, inclua ela aqui
 

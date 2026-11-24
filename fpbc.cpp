@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <cstdlib>
 #include <cstring>
+#include <cctype>
 #include <elf.h>
 #include "util/lexer.h"
 #include "util/analisador.h"
@@ -17,9 +18,24 @@
 
 // informações:
 static std::string versaoAtual = "0.0.1";
-static std::string sistemaAtual = "Linux";
+#define ARQ_PADRAO "arm64"
+
+#ifdef __ANDROID__
+    static std::string sistemaAtual = "Android";
+#elif defined(__linux__)
+    static std::string sistemaAtual = "Linux";
+#elif defined(_WIN32)
+    static std::string sistemaAtual = "Windows";
+#endif
+
 static std::string montador = "as";
 static std::string ligador = "ld";
+
+#ifdef __ANDROID__
+    static std::string alvoPadrao = ARQ_PADRAO "-android";
+#elif defined(__linux__)
+    static std::string alvoPadrao = ARQ_PADRAO "-linux";
+#endif
 
 // linker dinâmico dos executáveis gerados. Vazio = descobre sozinho(ver descobrirInterprete). "-interp" só serve de exceção.
 static std::string interprete;
@@ -97,7 +113,7 @@ static std::string descobrirPastasBiblis() {
 
 int main(int argc, char** argv) {
     if(argc < 2) {
-        std::cerr << "Uso: fpbc <arquivo.fpb> [--alvo arm64] [-s saida] [-asm] [-pie] [-interp caminho]\n";
+        std::cerr << "Uso: fpbc <arquivo.fpb> [--alvo arm64-linux] [-s saida] [-asm] [-pie] [-interp caminho]\n";
         std::cerr << "  -s saida      caminho do executavel final (padrão: nome do fonte sem extensão)\n";
         std::cerr << "  -asm          gera so o .asm, não monta nem linka\n";
         std::cerr << "  -pie          gera executável PIE (necessário pra rodar no Android)\n";
@@ -106,7 +122,8 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::string caminhoFonte = argv[1];
-    std::string nomeArquitetura = "arm64";
+    std::string nomeArquitetura = ARQ_PADRAO;
+    std::string alvoCompleto = alvoPadrao;
     std::string caminhoSaida;
     bool manterAsm = false;
     bool usarPie = false;
@@ -115,12 +132,12 @@ int main(int argc, char** argv) {
         std::string argumento = argv[i];
         if(argumento == "-v") {
             std::cout << "Versão: v" << versaoAtual << '\n' <<
-            "Arquitetura: " << nomeArquitetura << '\n' <<
+            "Arquitetura: " << alvoPadrao << '\n' <<
             "Sistema: " << sistemaAtual << '\n' <<
             "Implementação: Foca-do Estúdios\n";
             return 0;
         } else if(argumento == "--alvo") {
-            nomeArquitetura = argv[++i];
+            alvoCompleto = argv[++i];
         } else if(argumento == "-s") {
             caminhoFonte = argv[i-1];
             caminhoSaida = argv[++i];
@@ -150,15 +167,27 @@ int main(int argc, char** argv) {
         Lexer lexer(codigoFonte.c_str());
         auto tokens = lexer.tokenizar();
 
+        // "#alvo" do fonte vale mais que o "--alvo": precisa ser lido antes do pré-processador, que define as macros do alvo
+        for(int i = 0; i + 1 < tokens.tam; i++) {
+            if(tokens[i].tipo == TipoToken::ALVO && tokens[i + 1].tipo == TipoToken::TEXTO) alvoCompleto = tokens[i + 1].valor;
+        }
+        size_t traco = alvoCompleto.find('-');
+        nomeArquitetura = alvoCompleto.substr(0, traco);
+        std::string sistemaAlvo = traco == std::string::npos ? "linux" : alvoCompleto.substr(traco + 1);
+
         Preprocessador preprocessador;
+        std::string macroArquitetura = "__" + nomeArquitetura + "__";
+        for(char& c : macroArquitetura) c = toupper((unsigned char)c);
+        preprocessador.defPredefinida(macroArquitetura.c_str(), 1);
+        bool alvoAndroid = sistemaAlvo.find("android") != std::string::npos;
+        if(alvoAndroid) preprocessador.defPredefinida("__ANDROID__", 1);
+        if(alvoAndroid || sistemaAlvo.find("linux") != std::string::npos) preprocessador.defPredefinida("__LINUX__", 1);
+        if(sistemaAlvo.find("win") != std::string::npos) preprocessador.defPredefinida("__WIN__", 1);
+        
         tokens = preprocessador.processar(tokens, diretorioBase);
 
         Analisador analisador(tokens);
         auto programa = analisador.analisar();
-        if(programa.alvo) {
-            nomeArquitetura = programa.alvo;
-            nomeArquitetura = nomeArquitetura.substr(0, nomeArquitetura.find('-'));
-        }
         GeradorIR geradorIR(diretorioBase, &preprocessador);
         auto programaIR = geradorIR.gerar(programa);
 
@@ -179,6 +208,10 @@ int main(int argc, char** argv) {
         saidaAsm.close();
 
         bool ehBibli = programaIR.ehBibli;
+        bool temExportada = false;
+        for(int i = 0; i < programaIR.funcoes.tam; i++) {
+            if(programaIR.funcoes[i].ehExportada) temExportada = true;
+        }
         programaIR.liberar();
 
         // monta e linka de verdade, pra sair um binario executavel.
@@ -189,14 +222,20 @@ int main(int argc, char** argv) {
         std::string comandoLigar = ligador + " ";
         std::string pasta;
         if(!ehBibli) {
-            comandoLigar += "-e inicio -z max-page-size=16384 --no-as-needed ";
-            if(interprete.empty()) interprete = descobrirInterprete("/proc/self/exe");
-            if(!interprete.empty()) comandoLigar += "-dynamic-linker " + interprete + " ";
-            
-            comandoLigar += descobrirPastasBiblis();
-            comandoLigar += pastasExtras;
-            
+            comandoLigar += "-e inicio -z max-page-size=16384 ";
+            if(geradorIR.ligacoes.tam > 0) {
+                comandoLigar += "--no-as-needed ";
+                if(alvoAndroid) usarPie = true;
+                if(interprete.empty()) interprete = descobrirInterprete("/proc/self/exe");
+                if(!interprete.empty()) {
+                    comandoLigar += "-dynamic-linker " + interprete + " ";
+                    if(interprete.find("linker") != std::string::npos) usarPie = true;
+                }
+                comandoLigar += descobrirPastasBiblis();
+                comandoLigar += pastasExtras;
+            }
             if(usarPie) comandoLigar += "-pie ";
+            if(temExportada) comandoLigar += "--export-dynamic ";
             for(int i = 0; i < geradorIR.ligacoes.tam; i++) {
                 int tam;
                 const char* texto = geradorIR.ligacoes.obter(i, &tam);

@@ -1,5 +1,6 @@
-#incluir "~biblis/sischamada.fpb"
-#incluir "~biblis/impressao.fpb"
+// ~mem.fpb
+#incluir "sischamada.fpb"
+#incluir "impressao.fpb"
 
 nulo* malocar(longo bytes) {
     longo tam = bytes + 16;
@@ -9,8 +10,6 @@ nulo* malocar(longo bytes) {
     car* baseCar = (car*)bruto;
     car* usuario = baseCar + 16;
     
-    escreverf("%i bytes alocados\n", tam);
-    
     retorne (nulo*)usuario;
 }
 
@@ -19,8 +18,6 @@ bool mliberar(nulo* ptr) {
     car* baseCar = usuario + (-16);
     longo* bruto = (longo*)baseCar;
     longo tam = bruto[0] + 16;
-    
-    escreverf("%i bytes liberados\n", tam);
     
     retorne #chamada_sistema LIBERAR, bruto, tam;
 }

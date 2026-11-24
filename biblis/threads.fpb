@@ -1,0 +1,90 @@
+#incluir "sischamada.fpb"
+
+#macro THPILHA 0x200000 #macrofim
+#macro THBLOCO 128 #macrofim
+#macro THMARGEM 1152 #macrofim
+#macro THFLAGS 0x350F00 #macrofim
+
+#espaco Thread {
+    longo funcao;
+    longo arg;
+    longo bruto;
+    longo tls0;
+    longo tls1;
+    longo tls2;
+    longo tls3;
+    longo tls4;
+    longo tls5;
+    longo tls6;
+    longo tls7;
+    int tid;
+}
+
+// bloco da thread que está executando. Só vale em threads criadas por thcriar.
+Thread* thatual() {
+    longo ancora = 0;
+    longo m = (longo)@ancora;
+    retorne (Thread*)(m / THPILHA * THPILHA + THPILHA - THBLOCO);
+}
+
+// slots de TLS da thread atual: 8 slots (0..7), todos começam em zero.
+longo thtlsler(int indice) {
+    se(indice < 0) retorne 0;
+    se(indice >= 8) retorne 0;
+    Thread* b = thatual();
+    longo* slots = (longo*)@b.tls0;
+    retorne slots[indice];
+}
+
+nulo thtlsgravar(int indice, longo valor) {
+    se(indice < 0) retorne;
+    se(indice >= 8) retorne;
+    Thread* b = thatual();
+    longo* slots = (longo*)@b.tls0;
+    slots[indice] = valor;
+}
+
+// ponto de entrada do filho: roda a função e encerra SÓ esta thread
+// (SAIR = chamada 93 = exit, não exit_group).
+nulo thentrada() {
+    Thread* b = thatual();
+    nulo* f = @(b.funcao);
+    f(b.arg);
+    #chamada_sistema SAIR, 0;
+}
+
+Thread* thcriar(nulo* funcao, longo arg) {
+    longo bruto = #chamada_sistema ALOCAR, nulo, THPILHA * 2, 3, 34, -1, 0;
+    se(bruto < 0) retorne (Thread*)0;
+    longo base = (bruto + THPILHA - 1) / THPILHA * THPILHA;
+    Thread* b = (Thread*)(base + THPILHA - THBLOCO);
+    b.funcao = (longo)funcao;
+    b.arg = arg;
+    b.bruto = bruto;
+    b.tid = 0;
+    // ordem do clone no ARM64: flags, pilha, tid_pai, tls, tid_filho
+    longo r = #chamada_sistema CLONE, THFLAGS, base + THPILHA - THMARGEM, @b.tid, 0, @b.tid;
+    se(r == 0) {
+        thentrada();
+    }
+    se(r < 0) {
+        #chamada_sistema LIBERAR, bruto, THPILHA * 2;
+        retorne (Thread*)0;
+    }
+    retorne b;
+}
+
+int thid(Thread* th) {
+    retorne th.tid;
+}
+
+// espera a thread terminar (o núcleo zera tid e acorda o futex ao sair)
+// e devolve a memória dela. Só chame uma vez por thread.
+nulo thjuntar(Thread* th) {
+    int v = th.tid;
+    enquanto(v != 0) {
+        #chamada_sistema FUTEX, @th.tid, 0, v, 0, 0, 0;
+        v = th.tid;
+    }
+    #chamada_sistema LIBERAR, th.bruto, THPILHA * 2;
+}

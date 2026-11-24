@@ -164,14 +164,26 @@ public:
             buf.liberar();
             return t;
         }
-        if(buf.igual("#sedef")) {
-            t.tipo = TipoToken::SEDEF;
+        if(buf.igual("#se")) {
+            t.tipo = TipoToken::PRE_SE;
             t.valor = buf.paraTokenTexto();
             buf.liberar();
             return t;
         }
-        if(buf.igual("#senaodef")) {
-            t.tipo = TipoToken::SENAODEF;
+        if(buf.igual("#senaose")) {
+            t.tipo = TipoToken::PRE_SENAOSE;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
+        if(buf.igual("#senao")) {
+            t.tipo = TipoToken::PRE_SENAO;
+            t.valor = buf.paraTokenTexto();
+            buf.liberar();
+            return t;
+        }
+        if(buf.igual("#sefim")) {
+            t.tipo = TipoToken::PRE_FIM;
             t.valor = buf.paraTokenTexto();
             buf.liberar();
             return t;

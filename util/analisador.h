@@ -58,6 +58,7 @@ public:
     bool ehChamadaMetodo();
     ChamadaFuncao analisarChamadaMetodo();
     ComandoApagar analisarApagar();
+    Expressao montarOperacaoComposta(TipoToken op, const Expressao& lido);
 
     // === analisador_condicoes.h ===
     OperadorComparacao analisarOperadorComparacao(const char* nomeConstrucao);
@@ -81,6 +82,7 @@ public:
     Expressao analisarChamadaFuncaoComoExpressao();
     Expressao analisarChamadaMetodoComoExpressao();
     Expressao analisarExpressaoSemTernario();
+    void analisarArgumentos(Vetor<Expressao>& destino);
     Expressao analisarPosfixo(Expressao base);
     Expressao montarIncremento(const Expressao& destino, OperadorAritmetico op);
     Expressao analisarPrimariaSemPosfixo();
@@ -88,7 +90,7 @@ public:
     Comando analisarComandoCadeia();
 };
 
-// definições dos métodos (cada arquivo inclui este de volta; #pragma once evita ciclo)
+// definições dos métodos(cada arquivo inclui este de volta; #pragma once evita ciclo)
 #include "analise/analise_base.h"
 #include "analise/analise_funcoes.h"
 #include "analise/analise_espacos.h"

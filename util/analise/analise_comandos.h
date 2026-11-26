@@ -26,6 +26,20 @@ inline OperadorAritmetico operadorDaAtribuicaoComposta(TipoToken tipo) {
     return OperadorAritmetico::DESL_DIR;
 }
 
+// "x op= e", "x++" e "x--": devolve "lido OP operando", com o token do operador já consumido. Em "++"/"--" o operando é 1; senão é a expressão que vem a seguir.
+inline Expressao Analisador::montarOperacaoComposta(TipoToken op, const Expressao& lido) {
+    Expressao operando;
+    if(op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS) operando = montarNumeroLiteral("1");
+    else operando = analisarExpressaoAditiva();
+    Expressao binaria;
+    binaria.tipo = Expressao::Tipo::BINARIA;
+    binaria.valor = nullptr;
+    binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
+    binaria.esquerda = new Expressao(lido);
+    binaria.direita = new Expressao(operando);
+    return binaria;
+}
+
 // analisa um comando dentro do corpo de uma função: declaração de
 // variável(int/car*/nulo*), chamada de sistema crua(#chamada_sistema)
 // ou chamada de função normal(nome(...)).
@@ -138,17 +152,11 @@ inline Comando Analisador::analisarComandoCadeia() {
     } else {
         if(!ehExpressaoPura(alvo)) erro("operador composto exige destino sem efeito colateral");
         pos++;
-        Expressao binaria;
-        binaria.tipo = Expressao::Tipo::BINARIA;
-        binaria.valor = nullptr;
-        binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
-        binaria.esquerda = new Expressao(clonarExpressaoPura(alvo));
-        binaria.direita = new Expressao(analisarExpressaoAditiva());
         Expressao e;
         e.tipo = Expressao::Tipo::ATRIBUICAO;
         e.valor = nullptr;
         e.esquerda = new Expressao(alvo);
-        e.direita = new Expressao(binaria);
+        e.direita = new Expressao(montarOperacaoComposta(op, clonarExpressaoPura(alvo)));
         comando.expressao = e;
     }
     if(verificar(TipoToken::PONTO_VIRGULA)) consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após o comando");
@@ -178,9 +186,6 @@ inline AtribuicaoIndexada Analisador::analisarAtribuicaoIndexada() {
         // "a[i] += e" / "a[i]++" viram "a[i] = a[i] op e"
         if(!ehExpressaoPura(atr.indice)) erro("operador composto em posição de array exige índice sem efeito colateral");
         pos++;
-        Expressao operando;
-        if(op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS) operando = montarNumeroLiteral("1");
-        else operando = analisarExpressaoAditiva();
         Expressao ponteiro;
         if(atr.campo) {
             ponteiro = montarAcessoCampo(atr.nome, atr.campo);
@@ -193,13 +198,7 @@ inline AtribuicaoIndexada Analisador::analisarAtribuicaoIndexada() {
         lido.valor = nullptr;
         lido.esquerda = new Expressao(ponteiro);
         lido.direita = new Expressao(clonarExpressaoPura(atr.indice));
-        Expressao binaria;
-        binaria.tipo = Expressao::Tipo::BINARIA;
-        binaria.valor = nullptr;
-        binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
-        binaria.esquerda = new Expressao(lido);
-        binaria.direita = new Expressao(operando);
-        atr.valor = binaria;
+        atr.valor = montarOperacaoComposta(op, lido);
     } else {
         erro("esperado '=' ou operador composto na atribuição indexada");
     }
@@ -224,20 +223,7 @@ inline AtribuicaoCampo Analisador::analisarAtribuicaoCampo() {
         atr.valor = analisarExpressaoAditiva();
     } else if(ehTokenReatribuicao(op)) {
         pos++;
-        Expressao operando;
-        if(op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS) {
-            operando.tipo = Expressao::Tipo::NUMERO_LITERAL;
-            operando.valor = strdup("1");
-        } else {
-            operando = analisarExpressaoAditiva();
-        }
-        Expressao binaria;
-        binaria.tipo = Expressao::Tipo::BINARIA;
-        binaria.valor = nullptr;
-        binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
-        binaria.esquerda = new Expressao(montarAcessoCampo(atr.nome, atr.campo));
-        binaria.direita = new Expressao(operando);
-        atr.valor = binaria;
+        atr.valor = montarOperacaoComposta(op, montarAcessoCampo(atr.nome, atr.campo));
     } else {
         erro("esperado '=', '+=', '-=', '*=', '%=', '/=', '++', '--' ou operador de bit composto na atribuição de campo");
     }
@@ -257,26 +243,13 @@ inline Reatribuicao Analisador::analisarReatribuicao() {
     if(op == TipoToken::IGUAL) {
         pos++;
         reat.valor = analisarExpressaoAditiva();
-    } else if(op == TipoToken::MAIS_IGUAL || op == TipoToken::MENOS_IGUAL || op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS || ehAtribuicaoComposta(op)) {
+    } else if(ehTokenReatribuicao(op)) {
         // "x += e" vira "x = x + e"; "x++" vira "x = x + 1" (idem pra -=, -- e os de bit: &=, |=, ^=, <<=, >>=): sem nó novo na AST.
         pos++;
         Expressao variavel;
         variavel.tipo = Expressao::Tipo::IDENTIFICADOR;
         variavel.valor = strdup(reat.nome);
-        Expressao operando;
-        if(op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS) {
-            operando.tipo = Expressao::Tipo::NUMERO_LITERAL;
-            operando.valor = strdup("1");
-        } else {
-            operando = analisarExpressaoAditiva();
-        }
-        Expressao binaria;
-        binaria.tipo = Expressao::Tipo::BINARIA;
-        binaria.valor = nullptr;
-        binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
-        binaria.esquerda = new Expressao(variavel);
-        binaria.direita = new Expressao(operando);
-        reat.valor = binaria;
+        reat.valor = montarOperacaoComposta(op, variavel);
     } else {
         erro("esperado '=', '+=', '*=', '%=', '/=', '-=', '&=', '|=', '^=', '<<=', '>>=', '++' ou '--' na reatribuição");
     }
@@ -516,11 +489,7 @@ inline ChamadaFuncao Analisador::analisarChamadaFuncao() {
     chamada.nome = strdup(nome.valor);
 
     consumir(TipoToken::ABRE_PARENTESE, "esperado '(' após nome da função chamada");
-    while(!verificar(TipoToken::FECHA_PARENTESE)) {
-        chamada.argumentos.empurrar(analisarExpressaoAditiva());
-        if(verificar(TipoToken::VIRGULA)) pos++;
-    }
-    consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
+    analisarArgumentos(chamada.argumentos);
     if(verificar(TipoToken::PONTO_VIRGULA)) {
         consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após chamada de função");
     }
@@ -545,11 +514,7 @@ inline ChamadaFuncao Analisador::analisarChamadaMetodo() {
     chamada.iniciar();
     chamada.nome = strdup(nomeCompleto.c_str());
     consumir(TipoToken::ABRE_PARENTESE, "esperado '(' após nome do método");
-    while(!verificar(TipoToken::FECHA_PARENTESE)) {
-        chamada.argumentos.empurrar(analisarExpressaoAditiva());
-        if(verificar(TipoToken::VIRGULA)) pos++;
-    }
-    consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
+    analisarArgumentos(chamada.argumentos);
     if(verificar(TipoToken::PONTO_VIRGULA)) {
         consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após chamada de método");
     }

@@ -6,6 +6,39 @@
 // ArgumentoIR com seu valor final. "saida" recebe as instruções auxiliares que a resolução precisar emitir ANTES do
 // valor ficar pronto. É a ÚNICA rota de resolução de expressão do gerador.
 inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(expressao.tipo == Expressao::Tipo::NOVO) {
+        // "novo Nome(args)": malocar do corpo, depois "Nome_.criar(objeto, args...)". Sem construtor, zera os campos.
+        // Não é temporário: quem recebe o ponteiro é o dono e libera com "apagar".
+        int id = obterIdEspaco(expressao.nomeFuncao);
+        int slot = ctx.variaveisLocais.proximoSlot++;
+        emitirAlocar(slot, id, saida);
+        ArgumentoIR objeto = argumentoEspaco(slot, id);
+        if(!temConstrutor(id)) {
+            if(expressao.argumentosFuncao->tam > 0) {
+                std::string nomeStr = expressao.nomeFuncao;
+                throw std::runtime_error("Espaço '" + nomeStr + "' não tem construtor, mas 'novo' recebeu argumentos");
+            }
+            zerarEspaco(objeto, id, saida);
+            return objeto;
+        }
+        // nome interno(não escrevível no fonte) pra o "este" do construtor enxergar o slot
+        std::string nomeVar = "#novo" + std::to_string(slot);
+        ctx.variaveisLocais.definirComSlot(nomeVar.c_str(), copiarArgumento(objeto), slot);
+        std::string nomeCriar = std::string(espacos.declaracoes[id]->nome) + "_.criar";
+        Vetor<Expressao> args;
+        args.iniciar();
+        Expressao este;
+        este.tipo = Expressao::Tipo::IDENTIFICADOR;
+        este.valor = strdup(nomeVar.c_str());
+        args.empurrar(este);
+        for(int i = 0; i < expressao.argumentosFuncao->tam; i++) args.empurrar((*expressao.argumentosFuncao)[i]);
+        ComandoIR comando = montarChamada(nomeCriar.c_str(), {});
+        resolverArgumentosChamada(nomeCriar.c_str(), args, comando.chamadaFuncaoUsuario.argumentos, saida, ctx);
+        saida.empurrar(comando);
+        free(este.valor);
+        args.liberar();
+        return objeto;
+    }
     if(expressao.tipo == Expressao::Tipo::TERNARIA) {
         return resolverTernaria(expressao, saida, ctx);
     }
@@ -13,6 +46,37 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
         return resolverConversao(expressao, saida, ctx);
     }
     if(expressao.tipo == Expressao::Tipo::CHAMADA_FUNCAO) {
+        // "p.metodo(args)" com "p" campo de "este": reescreve como "este.p.metodo(args)"(forma ".metodo" com o receptor em argumentos[0])
+        const char* ponto = strchr(expressao.nomeFuncao, '.');
+        ArgumentoIR este;
+        if(ponto && ponto != expressao.nomeFuncao) {
+            std::string base(expressao.nomeFuncao, ponto - expressao.nomeFuncao);
+            ArgumentoIR local;
+            if(!ctx.variaveisLocais.buscar(base.c_str(), &local) && ctx.variaveisLocais.buscar("este", &este) && este.idEspaco >= 0 && existeCampo(este.idEspaco, base.c_str())) {
+                Expressao identificadorEste;
+                identificadorEste.tipo = Expressao::Tipo::IDENTIFICADOR;
+                identificadorEste.valor = strdup("este");
+                Expressao receptor;
+                receptor.tipo = Expressao::Tipo::ACESSO_CAMPO;
+                receptor.valor = strdup(base.c_str());
+                receptor.esquerda = new Expressao(identificadorEste);
+                receptor.direita = nullptr;
+                Expressao reescrita;
+                reescrita.tipo = Expressao::Tipo::CHAMADA_FUNCAO;
+                reescrita.valor = nullptr;
+                reescrita.nomeFuncao = strdup(ponto);
+                reescrita.argumentosFuncao = new Vetor<Expressao>();
+                reescrita.argumentosFuncao->iniciar();
+                reescrita.argumentosFuncao->empurrar(receptor);
+                for(int i = 0; i < expressao.argumentosFuncao->tam; i++) reescrita.argumentosFuncao->empurrar((*expressao.argumentosFuncao)[i]);
+                ArgumentoIR resultado = resolverChamadaFuncaoComoValor(reescrita, saida, ctx);
+                free(reescrita.nomeFuncao);
+                receptor.liberar();
+                reescrita.argumentosFuncao->liberar();
+                delete reescrita.argumentosFuncao;
+                return resultado;
+            }
+        }
         return resolverChamadaFuncaoComoValor(expressao, saida, ctx);
     }
     if(expressao.tipo == Expressao::Tipo::CHAMADA_SISTEMA) {
@@ -70,6 +134,14 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
         // identificador: precisa ser uma variável local já declarada.
         ArgumentoIR encontrado;
         if(!ctx.variaveisLocais.buscar(expressao.valor, &encontrado)) {
+            // nome solto dentro de um método: campo de instância ou estatico da classe de "este"
+            ArgumentoIR este;
+            if(ctx.variaveisLocais.buscar("este", &este) && este.idEspaco >= 0) {
+                if(existeCampo(este.idEspaco, expressao.valor)) return lerCampoDeBase(este, expressao.valor, saida, ctx);
+                std::string simbolo;
+                const CampoEstatico* estatico = buscarEstatico(este.idEspaco, expressao.valor, simbolo);
+                if(estatico) return resolverAcessoEstatico(simbolo, *estatico, saida, ctx);
+            }
             std::string nomeStr = expressao.valor;
             throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
         }
@@ -116,18 +188,11 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
     // os dois operandos(regra de promoção): car(1)+int(4)
     // vira int(4), int(4)+longo(8) vira longo(8), evitando truncar um
     // calculo por engano quando um dos lados e mais largo que o outro.
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    int larguraResultado = (esquerda.larguraBytes > direita.larguraBytes) ? esquerda.larguraBytes : direita.larguraBytes;
+        int larguraResultado = (esquerda.larguraBytes > direita.larguraBytes) ? esquerda.larguraBytes : direita.larguraBytes;
     // deslocamento: a largura do resultado e a do operando da esquerda(a quantidade deslocada nao promove nada). Tem que bater com a regra de emitirOperacaoAritmetica.
     if(expressao.operadorAritmetico == OperadorAritmetico::DESL_ESQ || expressao.operadorAritmetico == OperadorAritmetico::DESL_DIR) larguraResultado = esquerda.larguraBytes;
     if(larguraResultado < 4) larguraResultado = 4; // promoção pra int, como em Java: byte/curto/car/bool operados viram int
-    referenciaSlot.larguraBytes = larguraResultado;
-    referenciaSlot.ehFlutuante = ehFlutuante;
-    return referenciaSlot;
+    return argumentoSlotLargura(slot, larguraResultado, ehFlutuante);
 }
 
 // converte "valor" pro tipo numerico do destino(flutuante ou inteiro, na largura dada). Imediato converte em tempo de compilacao;
@@ -167,14 +232,7 @@ inline ArgumentoIR GeradorIR::converterParaTipo(ArgumentoIR valor, bool destinoF
     comando.instrucaoConversaoNumerica.larguraDestino = larguraDestino;
     comando.instrucaoConversaoNumerica.destinoFlutuante = destinoFlutuante;
     saida.empurrar(comando);
-    ArgumentoIR resultado;
-    resultado.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    resultado.simbolo = nullptr;
-    resultado.imediato = 0;
-    resultado.registrador = slot;
-    resultado.larguraBytes = larguraDestino;
-    resultado.ehFlutuante = destinoFlutuante;
-    return resultado;
+    return argumentoSlotLargura(slot, larguraDestino, destinoFlutuante);
 }
 
 // se um dos lados e flutuante, converte os dois pro mesmo tipo: dobro se algum for dobro, senao flu.
@@ -233,35 +291,12 @@ inline ArgumentoIR GeradorIR::resolverOperadorEspaco(OperadorAritmetico op, Argu
             direita = criarCopiaEspaco(direita, idParametro, saida, ctx);
         }
     }
-    ComandoIR comandoIR;
-    comandoIR.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comandoIR.chamadaFuncaoUsuario.iniciar();
-    comandoIR.chamadaFuncaoUsuario.nome = strdup(nomeFuncao.c_str());
-    comandoIR.chamadaFuncaoUsuario.argumentos.empurrar(esquerda);
-    comandoIR.chamadaFuncaoUsuario.argumentos.empurrar(direita);
-    int slot = ctx.variaveisLocais.proximoSlot++;
-    int larguraResultado = larguraDoTipo(tipoRetorno.tipo);
-    comandoIR.chamadaFuncaoUsuario.capturaResultado = true;
-    comandoIR.chamadaFuncaoUsuario.slotDestino = slot;
-    comandoIR.chamadaFuncaoUsuario.resultadoLargura = larguraResultado;
-    comandoIR.chamadaFuncaoUsuario.resultadoFlutuante = tipoEhFlutuante(tipoRetorno.tipo);
-    saida.empurrar(comandoIR);
-
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = larguraResultado;
-    referenciaSlot.ehFlutuante = tipoEhFlutuante(tipoRetorno.tipo);
-    referenciaSlot.sinalizado = tipoEhSinalizado(tipoRetorno.tipo);
-    referenciaSlot.elementoSinalizado = elementoEhSinalizado(tipoRetorno.tipo);
-    referenciaSlot.larguraElemento = larguraElementoApontado(tipoRetorno.tipo);
-    referenciaSlot.ehPonteiro = tipoEhPonteiro(tipoRetorno.tipo);
+    ComandoIR comandoIR = montarChamada(nomeFuncao.c_str(), {esquerda, direita});
+    ArgumentoIR referenciaSlot = capturarChamada(comandoIR, tipoRetorno.tipo, saida, ctx);
     if(tipoRetorno.tipo == TipoVariavel::ESPACO_PONTEIRO) {
         referenciaSlot.idEspaco = idEspaco;
         referenciaSlot.ehTemporario = true;
-        registrarTemporario(slot, idEspaco, true, ctx);
+        registrarTemporario(referenciaSlot.registrador, idEspaco, true, ctx);
     }
     return referenciaSlot;
 }
@@ -295,96 +330,6 @@ inline ArgumentoIR GeradorIR::resolverBytes(const Expressao& expressao, TabelaVa
     arg.simbolo = nullptr;
     arg.imediato = tamanho;
     return arg;
-}
-
-// devolve o ponteiro sendo indexado: a variável "nome" ou, se "campo" não é nullptr, o valor do campo ponteiro "nome.campo".
-// Pro campo, a largura do elemento vem do tipo declarado do campo.
-inline ArgumentoIR GeradorIR::resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    ArgumentoIR base;
-    if(!ctx.variaveisLocais.buscar(nome, &base)) {
-        std::string nomeStr = nome;
-        throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
-    }
-    if(!campo) return base;
-    if(base.idEspaco < 0) {
-        std::string nomeStr = nome;
-        throw std::runtime_error("Variável '" + nomeStr + "' não é um espaço, não tem campos");
-    }
-    int posCampo;
-    TipoVariavel tipoCampo;
-    posicaoDoCampo(base.idEspaco, campo, &posCampo, &tipoCampo);
-    if(!tipoEhPonteiro(tipoCampo)) {
-        std::string campoStr = campo;
-        throw std::runtime_error("O campo '" + campoStr + "' não é um ponteiro, não pode ser indexado");
-    }
-    // expressões temporárias na pilha: os char* são emprestados, então não chama liberar()
-    Expressao identificador;
-    identificador.tipo = Expressao::Tipo::IDENTIFICADOR;
-    identificador.valor = (char*)nome;
-    identificador.esquerda = nullptr;
-    identificador.direita = nullptr;
-    Expressao acesso;
-    acesso.tipo = Expressao::Tipo::ACESSO_CAMPO;
-    acesso.valor = (char*)campo;
-    acesso.esquerda = &identificador;
-    acesso.direita = nullptr;
-    ArgumentoIR ponteiro = resolverExpressao(acesso, saida, ctx);
-    ponteiro.ehPonteiro = true;
-    ponteiro.larguraElemento = larguraElementoApontado(tipoCampo);
-    ponteiro.elementoSinalizado = elementoEhSinalizado(tipoCampo);
-    ponteiro.elementoFlutuante = elementoEhFlutuante(tipoCampo);
-    return ponteiro;
-}
-
-// ponteiro sendo indexado em "alvo[i]": variável, "nome.campo" ou "qualquer.coisa.campo".
-inline ArgumentoIR GeradorIR::resolverPonteiroDaExpressao(const Expressao& e, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    if(e.tipo == Expressao::Tipo::IDENTIFICADOR) return resolverPonteiroIndexado(e.valor, nullptr, saida, ctx);
-    if(e.tipo != Expressao::Tipo::ACESSO_CAMPO) return resolverExpressao(e, saida, ctx);
-    if(e.esquerda->tipo == Expressao::Tipo::IDENTIFICADOR) return resolverPonteiroIndexado(e.esquerda->valor, e.valor, saida, ctx);
-    ArgumentoIR base = resolverExpressao(*e.esquerda, saida, ctx);
-    ArgumentoIR ponteiro = lerCampoDeBase(base, e.valor, saida, ctx);
-    int posCampo;
-    TipoVariavel tipoCampo;
-    posicaoDoCampo(base.idEspaco, e.valor, &posCampo, &tipoCampo);
-    if(!tipoEhPonteiro(tipoCampo)) {
-        std::string campoStr = e.valor;
-        throw std::runtime_error("O campo '" + campoStr + "' não é um ponteiro, não pode ser indexado");
-    }
-    ponteiro.ehPonteiro = true;
-    ponteiro.larguraElemento = larguraElementoApontado(tipoCampo);
-    ponteiro.elementoSinalizado = elementoEhSinalizado(tipoCampo);
-    ponteiro.elementoFlutuante = elementoEhFlutuante(tipoCampo);
-    return ponteiro;
-}
-
-// resolve "ponteiro[indice]" como valor de leitura: le "larguraElemento"
-// bytes(1, 8, ou qualquer largura futura), decidido pelo tipo declarado
-// do ponteiro(ver larguraElementoApontado()). Emite InstrucaoLeituraIndexada
-// (carrega em tempo de execucao o valor no endereco ponteiro+(indice*larguraElemento))
-// num slot temporario novo, e devolve uma referencia REGISTRADOR pra esse
-// slot(mesmo padrao de resolverExpressao pra BINARIA/chamada de funcao).
-// "ponteiro" precisa ser uma variavel já declarada(parâmetro ou local); indice pode ser qualquer expressão.
-inline ArgumentoIR GeradorIR::resolverIndexacao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    ArgumentoIR ponteiro = resolverPonteiroDaExpressao(*expressao.esquerda, saida, ctx);
-    ArgumentoIR indice = resolverExpressao(*expressao.direita, saida, ctx);
-
-    int slot = ctx.variaveisLocais.proximoSlot++;
-    ComandoIR comandoIR;
-    comandoIR.tipo = ComandoIR::Tipo::LEITURA_INDEXADA;
-    comandoIR.instrucaoLeituraIndexada.slotDestino = slot;
-    comandoIR.instrucaoLeituraIndexada.ponteiro = copiarArgumento(ponteiro);
-    comandoIR.instrucaoLeituraIndexada.indice = indice;
-    saida.empurrar(comandoIR);
-
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = ponteiro.larguraElemento; // largura do valor lido segue a largura do elemento apontado pelo ponteiro
-    referenciaSlot.sinalizado = ponteiro.elementoSinalizado;
-    referenciaSlot.ehFlutuante = ponteiro.elementoFlutuante;
-    return referenciaSlot;
 }
 
 // resolve uma conversão de tipo(conversão): (car)expr ou (int)expr. Resolve a
@@ -424,13 +369,7 @@ inline ArgumentoIR GeradorIR::resolverConversao(const Expressao& expressao, Veto
         comandoSe.instrucaoSe.direita = zero;
         atribuirMarcacao(slot, 1, *comandoSe.instrucaoSe.entao);
         saida.empurrar(comandoSe);
-        ArgumentoIR referenciaSlot;
-        referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-        referenciaSlot.simbolo = nullptr;
-        referenciaSlot.imediato = 0;
-        referenciaSlot.registrador = slot;
-        referenciaSlot.larguraBytes = 1;
-        return referenciaSlot;
+        return argumentoSlotLargura(slot, 1);
     }
     bool destinoFlutuante = tipoEhFlutuante(expressao.tipoConversao);
     if(destinoFlutuante || valor.ehFlutuante) {
@@ -486,103 +425,7 @@ inline ArgumentoIR GeradorIR::resolverChamadaSistemaComoValor(const Expressao& e
     comandoIR.chamadaSistemaCrua.slotDestino = slot;
     saida.empurrar(comandoIR);
 
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = 8; // retorno de chamada de sistema(ex: ponteiro do mmap, ou codigo de retorno) e sempre tratado como valor de 8 bytes
-    return referenciaSlot;
-}
-
-// resolve "f(arg1, ...)" usada DENTRO de uma expressão (ex: "int x = f();"), diferente de gerarChamadaFuncao (comando de
-// topo, valor descartado). Exige função de usuário não-"nulo". Emite "bl nome" com capturaResultado=true num slot novo
-// e devolve uma referência REGISTRADOR pra esse slot.
-inline ArgumentoIR GeradorIR::resolverChamadaFuncaoComoValor(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    if(expressao.nomeFuncao[0] == '.') {
-        Vetor<Expressao> restantes;
-        restantes.iniciar();
-        std::string nomeOculto = ocultarReceptor(expressao.nomeFuncao, (*expressao.argumentosFuncao)[0], saida, ctx);
-        for(int i = 1; i < expressao.argumentosFuncao->tam; i++) restantes.empurrar((*expressao.argumentosFuncao)[i]);
-        Expressao reescritaOculta;
-        reescritaOculta.tipo = Expressao::Tipo::CHAMADA_FUNCAO;
-        reescritaOculta.valor = nullptr;
-        reescritaOculta.nomeFuncao = strdup(nomeOculto.c_str());
-        reescritaOculta.argumentosFuncao = &restantes;
-        ArgumentoIR resultadoOculto = resolverChamadaFuncaoComoValor(reescritaOculta, saida, ctx);
-        free(reescritaOculta.nomeFuncao);
-        restantes.liberar();
-        return resultadoOculto;
-    }
-    std::string nomeMetodo;
-    Vetor<Expressao> novos;
-    novos.iniciar();
-    if(desdobrarChamadaMetodo(expressao.nomeFuncao, *expressao.argumentosFuncao, nomeMetodo, novos, ctx)) {
-        Expressao reescrita;
-        reescrita.tipo = Expressao::Tipo::CHAMADA_FUNCAO;
-        reescrita.valor = nullptr;
-        reescrita.nomeFuncao = strdup(nomeMetodo.c_str());
-        reescrita.argumentosFuncao = &novos;
-        ArgumentoIR resultado = resolverChamadaFuncaoComoValor(reescrita, saida, ctx);
-        free(reescrita.nomeFuncao);
-        liberarDesdobramento(novos, expressao.argumentosFuncao->tam);
-        return resultado;
-    }
-    novos.liberar();
-    std::string nomeStr = expressao.nomeFuncao;
-    int totalParametrosEsperado;
-    if(!funcoesUsuario.buscar(expressao.nomeFuncao, &totalParametrosEsperado)) {
-        // não é função de usuário: pode ser uma variável que guarda um endereço("f()" com "nulo* f = @(endereco);"). O retorno é tratado como longo(8 bytes).
-        ComandoIR comandoIndireto;
-        comandoIndireto.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-        comandoIndireto.chamadaFuncaoUsuario.iniciar();
-        if(!prepararChamadaIndireta(expressao.nomeFuncao, *expressao.argumentosFuncao, comandoIndireto.chamadaFuncaoUsuario, saida, ctx)) {
-            throw std::runtime_error("Função '" + nomeStr + "' não foi declarada (faltou #incluir a biblioteca correta?)");
-        }
-        int slotIndireto = ctx.variaveisLocais.proximoSlot++;
-        comandoIndireto.chamadaFuncaoUsuario.capturaResultado = true;
-        comandoIndireto.chamadaFuncaoUsuario.slotDestino = slotIndireto;
-        comandoIndireto.chamadaFuncaoUsuario.resultadoLargura = 8;
-        saida.empurrar(comandoIndireto);
-
-        ArgumentoIR resultadoIndireto;
-        resultadoIndireto.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-        resultadoIndireto.simbolo = nullptr;
-        resultadoIndireto.imediato = 0;
-        resultadoIndireto.registrador = slotIndireto;
-        resultadoIndireto.larguraBytes = 8;
-        return resultadoIndireto;
-    }
-    TipoRetorno tipoRetorno;
-    funcoesUsuario.buscarTipoRetorno(expressao.nomeFuncao, &tipoRetorno);
-    if(tipoRetorno.ehNulo) {
-        throw std::runtime_error("Função '" + nomeStr + "' é 'nulo' e não pode ser usada como valor de expressão");
-    }
-    ComandoIR comandoIR;
-    comandoIR.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comandoIR.chamadaFuncaoUsuario.iniciar();
-    comandoIR.chamadaFuncaoUsuario.nome = strdup(expressao.nomeFuncao);
-    resolverArgumentosChamada(expressao.nomeFuncao, *expressao.argumentosFuncao, comandoIR.chamadaFuncaoUsuario.argumentos, saida, ctx);
-    int slot = ctx.variaveisLocais.proximoSlot++;
-    int larguraResultado = larguraDoTipo(tipoRetorno.tipo);
-    comandoIR.chamadaFuncaoUsuario.capturaResultado = true;
-    comandoIR.chamadaFuncaoUsuario.slotDestino = slot;
-    comandoIR.chamadaFuncaoUsuario.resultadoLargura = larguraResultado;
-    comandoIR.chamadaFuncaoUsuario.resultadoFlutuante = tipoEhFlutuante(tipoRetorno.tipo);
-    saida.empurrar(comandoIR);
-
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = larguraResultado;
-    referenciaSlot.ehFlutuante = tipoEhFlutuante(tipoRetorno.tipo);
-    referenciaSlot.sinalizado = tipoEhSinalizado(tipoRetorno.tipo);
-    referenciaSlot.elementoSinalizado = elementoEhSinalizado(tipoRetorno.tipo);
-    referenciaSlot.larguraElemento = larguraElementoApontado(tipoRetorno.tipo); // relevante se o retorno for usado como ponteiro indexado(ex: "malocar(10)[0]")
-    referenciaSlot.elementoFlutuante = elementoEhFlutuante(tipoRetorno.tipo);
-    return referenciaSlot;
+    return argumentoSlotLargura(slot, 8); // retorno de chamada de sistema(ex: ponteiro do mmap, ou codigo de retorno) e sempre tratado como valor de 8 bytes
 }
 
 // resolve "cond ? a : b": emite um SE cujos dois blocos gravam o valor escolhido no mesmo slot temporario novo. Os dois lados vão pro mesmo tipo(flutuante se algum for, senao a MAIOR largura, no minimo 4 como nas operacoes aritmeticas). A conversao de cada lado é emitida dentro do bloco dele, então só o lado escolhido executa.
@@ -629,13 +472,7 @@ inline ArgumentoIR GeradorIR::resolverTernaria(const Expressao& expressao, Vetor
     blocoSenao.empurrar(atribuicaoSenao);
     saida.empurrar(comandoSe);
 
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = largura;
-    referenciaSlot.ehFlutuante = flutuante;
+    ArgumentoIR referenciaSlot = argumentoSlotLargura(slot, largura, flutuante);
     // se algum lado é ponteiro/espaço, o resultado herda o passo de indexação e o espaço dele
     const ArgumentoIR& modelo = (valorEntao.ehPonteiro || valorEntao.idEspaco >= 0) ? valorEntao : valorSenao;
     referenciaSlot.ehPonteiro = modelo.ehPonteiro;
@@ -644,119 +481,6 @@ inline ArgumentoIR GeradorIR::resolverTernaria(const Expressao& expressao, Vetor
     referenciaSlot.idEspaco = modelo.idEspaco;
     return referenciaSlot;
 }
-// resolve "@(expr)" e "@nome".
-// "@(expr)": o valor de expr passa a ser tratado como endereço(8 bytes), sem instrução nova: serve pra "nulo* f = @(0x1000);" e pra converter um número em endereço.
-// "@nome": se "nome" é ponteiro ou espaço, o slot dele já guarda um endereço, então o valor é o próprio conteúdo do slot. Se é escalar(int, car, longo...), o valor
-// é o endereço do slot na pilha: emite ENDERECO_SLOT, e o alocador de registradores deixa esse slot sempre na pilha(registrador físico não tem endereço).
-inline ArgumentoIR GeradorIR::resolverEndereco(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    if(expressao.enderecoDeValor) {
-        ArgumentoIR valor = resolverExpressao(*expressao.esquerda, saida, ctx);
-        if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.larguraBytes < 8) {
-            // alargar pra 64 bits: copia pra um slot novo, estendendo pelo sinal/largura de origem(mesmo caminho de resolverConversao)
-            int slot = ctx.variaveisLocais.proximoSlot++;
-            ComandoIR comandoCopia;
-            comandoCopia.tipo = ComandoIR::Tipo::REATRIBUICAO;
-            comandoCopia.instrucaoReatribuicao.slotDestino = slot;
-            comandoCopia.instrucaoReatribuicao.valor = valor;
-            comandoCopia.instrucaoReatribuicao.larguraDestino = 8;
-            saida.empurrar(comandoCopia);
-            valor.registrador = slot;
-        }
-        valor.larguraBytes = 8;
-        valor.idEspaco = -1;
-        valor.espacoPorValor = false;
-        valor.ehPonteiro = true;
-        return valor;
-    }
-    if(expressao.esquerda->tipo == Expressao::Tipo::ACESSO_CAMPO) {
-        // "@nome.campo": endereço base do espaço + posição do campo, via SOMA(mesmo caminho de "ponteiro + int")
-        const Expressao& acesso = *expressao.esquerda;
-        ArgumentoIR base;
-        if(!ctx.variaveisLocais.buscar(acesso.esquerda->valor, &base)) {
-            std::string nomeStr = acesso.esquerda->valor;
-            throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
-        }
-        if(base.idEspaco < 0) {
-            std::string nomeStr = acesso.esquerda->valor;
-            throw std::runtime_error("Variável '" + nomeStr + "' não é um espaço, não tem campos");
-        }
-        int posCampo;
-        TipoVariavel tipoCampo;
-        posicaoDoCampo(base.idEspaco, acesso.valor, &posCampo, &tipoCampo);
-        ArgumentoIR enderecoBase = copiarArgumento(base);
-        enderecoBase.larguraBytes = 8;
-        enderecoBase.espacoPorValor = false;
-        enderecoBase.ehPonteiro = true;
-        int slotCampo = ctx.variaveisLocais.proximoSlot++;
-        ComandoIR comandoSoma;
-        comandoSoma.tipo = ComandoIR::Tipo::OPERACAO_ARITMETICA;
-        comandoSoma.instrucaoOperacaoAritmetica.slotDestino = slotCampo;
-        comandoSoma.instrucaoOperacaoAritmetica.esquerda = enderecoBase;
-        comandoSoma.instrucaoOperacaoAritmetica.operador = OperadorAritmeticoIR::SOMA;
-        comandoSoma.instrucaoOperacaoAritmetica.direita = imediatoInt(posCampo);
-        saida.empurrar(comandoSoma);
-        
-        ArgumentoIR referenciaCampo;
-        referenciaCampo.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-        referenciaCampo.simbolo = nullptr;
-        referenciaCampo.imediato = 0;
-        referenciaCampo.registrador = slotCampo;
-        referenciaCampo.larguraBytes = 8;
-        referenciaCampo.ehPonteiro = true;
-        referenciaCampo.larguraElemento = larguraDoTipo(tipoCampo);
-        referenciaCampo.elementoSinalizado = tipoEhSinalizado(tipoCampo);
-        referenciaCampo.elementoFlutuante = tipoEhFlutuante(tipoCampo);
-        return referenciaCampo;
-    }
-    ArgumentoIR variavel;
-    int slotVariavel;
-    if(!ctx.variaveisLocais.buscar(expressao.esquerda->valor, &variavel, &slotVariavel)) {
-        int totalParametrosIgnorado;
-        if(funcoesUsuario.buscar(expressao.esquerda->valor, &totalParametrosIgnorado)) {
-            // "@funcao": endereço do símbolo da função(adrp/add, o mesmo caminho do endereço de um texto literal)
-            ArgumentoIR enderecoFuncao;
-            enderecoFuncao.tipo = ArgumentoIR::Tipo::SIMBOLO_TEXTO;
-            enderecoFuncao.simbolo = strdup(expressao.esquerda->valor);
-            enderecoFuncao.imediato = 0;
-            enderecoFuncao.larguraBytes = 8;
-            enderecoFuncao.ehPonteiro = true;
-            enderecoFuncao.ehFuncao = true;
-            return enderecoFuncao;
-        }
-        std::string nomeStr = expressao.esquerda->valor;
-        throw std::runtime_error("'" + nomeStr + "' não é uma variável nem uma função");
-    }
-    if(variavel.ehPonteiro || variavel.idEspaco >= 0) {
-        ArgumentoIR endereco = copiarArgumento(variavel);
-        endereco.larguraBytes = 8;
-        endereco.espacoPorValor = false;
-        endereco.ehPonteiro = true;
-        return endereco;
-    }
-    if(variavel.tipo == ArgumentoIR::Tipo::IMEDIATO) {
-        std::string nomeStr = expressao.esquerda->valor;
-        throw std::runtime_error("Variável '" + nomeStr + "' é final: constante não tem endereço");
-    }
-    int slotDestino = ctx.variaveisLocais.proximoSlot++;
-    ComandoIR comandoIR;
-    comandoIR.tipo = ComandoIR::Tipo::ENDERECO_SLOT;
-    comandoIR.instrucaoEnderecoSlot.slotDestino = slotDestino;
-    comandoIR.instrucaoEnderecoSlot.slotOrigem = slotVariavel;
-    saida.empurrar(comandoIR);
-
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slotDestino;
-    referenciaSlot.larguraBytes = 8;
-    referenciaSlot.ehPonteiro = true;
-    referenciaSlot.larguraElemento = variavel.larguraBytes; // "nome[i]" sobre o endereço de um escalar anda de largura em largura do próprio escalar
-    referenciaSlot.elementoSinalizado = variavel.sinalizado;
-    referenciaSlot.elementoFlutuante = variavel.ehFlutuante;
-    return referenciaSlot;
-}
-
 // copia um valor que mora em slot de variável pra um slot novo, senão "(a = b) + (b = 5)" leria o b já alterado.
 // Temporário já é slot exclusivo, não precisa copiar.
 inline ArgumentoIR GeradorIR::congelarValor(ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {

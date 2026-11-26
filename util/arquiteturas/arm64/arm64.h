@@ -9,16 +9,22 @@
 
 // traduz a IR genérica para assembly ARM64, convenção de
 // chamada do Linux(numero da chamada em x8, args em x0-x2, svc 0).
+//
+// registradores: x0-x7(args e retorno), x8(numero da chamada de sistema),
+// x9/x10/x11(rascunho das emissoes, caller-saved e fora do pool de slots:
+// so valem dentro de uma emissao), x16(endereço de
+// "blr"), v16/v17(rascunho de ponto flutuante), x19..x27(slots, callee-saved)
+// e x29/x30(frame).
 class ARM64 : public Arquitetura {
 public:
     std::string nome() const override { return "arm64"; }
-    int contadorRotulos = 0; // usado pra gerar labels unicos(ex: loops de strlen)
+    int contadorRotulos = 0; // usado pra gerar labels unicos(ex: desvios de se/enquanto)
     int baseArrays = 0;
     int baseSlots = 0;
 
     // funcao IR sendo emitida no momento: setada no inicio de cada função 
-    // em gerarAssembly() e consultada por emitirCarregarSlot/emitirGravarSlot/
-    // emitirCarregarParametro pra saber se um slot tem registrador fisico
+    // em gerarAssembly() e consultada por emitirCarregarSlot/emitirGravarSlot
+    // pra saber se um slot tem registrador fisico
     // atribuido(liberacao por ultimo uso) ou se ainda mora na pilha.
     const FuncaoIR* funcaoAtual = nullptr;
 
@@ -34,7 +40,6 @@ public:
     void calcularRegistradoresUsados(const FuncaoIR& funcao, int* saida, int* totalUsados);
     const char* registradorFisicoDoSlot(int slot);
     void emitirPuxarPegarSalvo(std::ostringstream& saida, const int* registradoresUsados, int totalRegistradoresUsados, int basePos, bool salvar);
-    void emitirCarregarParametro(std::ostringstream& saida, const char* registradorDestino, int indiceParametro);
     std::string paraRegistrador32(const char* registradorX);
     void emitirCarregarSlot(std::ostringstream& saida, const char* registradorDestino, int slot, int larguraBytes, bool sinalizado = true);
     void emitirGravarSlot(std::ostringstream& saida, const char* registradorOrigem, int slot, int larguraBytes);
@@ -51,7 +56,6 @@ public:
     void emitirConversaoNumerica(std::ostringstream& saida, const InstrucaoConversaoNumerica& instrucao);
 
     // === arm64_memoria.h ===
-    void emitirTexTam(std::ostringstream& saida, const ArgumentoIR& argumentoPonteiro);
     void emitirLeituraIndexada(std::ostringstream& saida, const InstrucaoLeituraIndexada& instrucao);
     void emitirEscritaIndexada(std::ostringstream& saida, const InstrucaoEscritaIndexada& instrucao);
     void emitirEnderecoFrame(std::ostringstream& saida, const InstrucaoEnderecoFrame& instrucao);

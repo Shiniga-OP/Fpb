@@ -9,22 +9,70 @@ enum class OperadorAritmetico { SOMA, SUBTRACAO, MULTIPLICACAO, DIVISAO, MODULO,
 // tipo declarado de uma variável: int(32 bits, 4 bytes), car(caractere/byte de 8 bits), longo(64 bits, 8 bytes) ou os respectivos ponteiros(car*, int*, longo*, sempre 8 bytes de endereco, mas indexando elementos de largura diferente). Declarado aqui em cima pois CONVERSAO referencia o tipo alvo.
 enum class TipoVariavel { INT, CAR, CAR_PONTEIRO, LONGO, LONGO_PONTEIRO, INT_PONTEIRO, NULO_PONTEIRO, BOOL, BOOL_PONTEIRO, BYTE, BYTE_PONTEIRO, CURTO, CURTO_PONTEIRO, ESPACO, ESPACO_PONTEIRO, FLUTUANTE, FLUTUANTE_PONTEIRO, DOBRO, DOBRO_PONTEIRO };
 
+// tudo que o compilador sabe de cada TipoVariavel, numa linha por tipo. Ponto ÚNICO de verdade: tipo novo = linha nova aqui(na mesma ordem do enum).
+// largura: bytes que o próprio VALOR ocupa(qualquer ponteiro = 8; ESPACO = 8, só por compatibilidade: espaço por valor não passa por aqui).
+// sinalizado: sinal do valor, só importa pra largura 1 e 2(car e bool zero-estendem, o resto estende o sinal).
+// ponteiro: o ponteiro desse tipo de valor(INT -> INT_PONTEIRO); quem não tem(ou já é ponteiro) aponta pra si mesmo.
+// elemento: o que um ponteiro tipado aponta(INT_PONTEIRO -> INT); quem não aponta nada tipado(valores, nulo*, Nome*) aponta pra si mesmo.
+struct InfoTipo {
+    TipoVariavel tipo;
+    int largura;
+    bool sinalizado;
+    bool flutuante;
+    bool ehPonteiro;
+    TipoVariavel ponteiro;
+    TipoVariavel elemento;
+};
+
+constexpr InfoTipo TABELA_TIPOS[] = {
+    {TipoVariavel::INT, 4, true, false, false, TipoVariavel::INT_PONTEIRO, TipoVariavel::INT},
+    {TipoVariavel::CAR, 1, false, false, false, TipoVariavel::CAR_PONTEIRO, TipoVariavel::CAR},
+    {TipoVariavel::CAR_PONTEIRO, 8, true, false, true, TipoVariavel::CAR_PONTEIRO, TipoVariavel::CAR},
+    {TipoVariavel::LONGO, 8, true, false, false, TipoVariavel::LONGO_PONTEIRO, TipoVariavel::LONGO},
+    {TipoVariavel::LONGO_PONTEIRO, 8, true, false, true, TipoVariavel::LONGO_PONTEIRO, TipoVariavel::LONGO},
+    {TipoVariavel::INT_PONTEIRO, 8, true, false, true, TipoVariavel::INT_PONTEIRO, TipoVariavel::INT},
+    {TipoVariavel::NULO_PONTEIRO, 8, true, false, true, TipoVariavel::NULO_PONTEIRO, TipoVariavel::NULO_PONTEIRO},
+    {TipoVariavel::BOOL, 1, false, false, false, TipoVariavel::BOOL_PONTEIRO, TipoVariavel::BOOL},
+    {TipoVariavel::BOOL_PONTEIRO, 8, true, false, true, TipoVariavel::BOOL_PONTEIRO, TipoVariavel::BOOL},
+    {TipoVariavel::BYTE, 1, true, false, false, TipoVariavel::BYTE_PONTEIRO, TipoVariavel::BYTE},
+    {TipoVariavel::BYTE_PONTEIRO, 8, true, false, true, TipoVariavel::BYTE_PONTEIRO, TipoVariavel::BYTE},
+    {TipoVariavel::CURTO, 2, true, false, false, TipoVariavel::CURTO_PONTEIRO, TipoVariavel::CURTO},
+    {TipoVariavel::CURTO_PONTEIRO, 8, true, false, true, TipoVariavel::CURTO_PONTEIRO, TipoVariavel::CURTO},
+    {TipoVariavel::ESPACO, 8, true, false, false, TipoVariavel::ESPACO, TipoVariavel::ESPACO},
+    {TipoVariavel::ESPACO_PONTEIRO, 8, true, false, true, TipoVariavel::ESPACO_PONTEIRO, TipoVariavel::ESPACO_PONTEIRO},
+    {TipoVariavel::FLUTUANTE, 4, true, true, false, TipoVariavel::FLUTUANTE_PONTEIRO, TipoVariavel::FLUTUANTE},
+    {TipoVariavel::FLUTUANTE_PONTEIRO, 8, true, false, true, TipoVariavel::FLUTUANTE_PONTEIRO, TipoVariavel::FLUTUANTE},
+    {TipoVariavel::DOBRO, 8, true, true, false, TipoVariavel::DOBRO_PONTEIRO, TipoVariavel::DOBRO},
+    {TipoVariavel::DOBRO_PONTEIRO, 8, true, false, true, TipoVariavel::DOBRO_PONTEIRO, TipoVariavel::DOBRO},
+};
+
+// confere em tempo de compilação que cada linha está na posição do seu tipo no enum(esquecer ou trocar uma linha não compila).
+constexpr bool tabelaTiposEmOrdem() {
+    if(sizeof(TABELA_TIPOS) / sizeof(TABELA_TIPOS[0]) != (int)TipoVariavel::DOBRO_PONTEIRO + 1) return false;
+    for(int i = 0; i < (int)(sizeof(TABELA_TIPOS) / sizeof(TABELA_TIPOS[0])); i++) {
+        if((int)TABELA_TIPOS[i].tipo != i) return false;
+    }
+    return true;
+}
+static_assert(tabelaTiposEmOrdem(), "TABELA_TIPOS fora da ordem do enum TipoVariavel");
+
+inline const InfoTipo& infoTipo(TipoVariavel tipo) {
+    return TABELA_TIPOS[(int)tipo];
+}
+
+// true se "tipo" é um ponteiro com elemento tipado(car*, int*, ...): nulo* e Nome* não contam.
+inline bool temElementoTipado(TipoVariavel tipo) {
+    return infoTipo(tipo).elemento != tipo;
+}
+
 // devolve o ponteiro do tipo de valor dado(ex: INT -> INT_PONTEIRO). Tipo que não tem ponteiro correspondente(ou já é ponteiro) volta igual.
 inline TipoVariavel ponteiroDoTipo(TipoVariavel tipo) {
-    if(tipo == TipoVariavel::INT) return TipoVariavel::INT_PONTEIRO;
-    if(tipo == TipoVariavel::CAR) return TipoVariavel::CAR_PONTEIRO;
-    if(tipo == TipoVariavel::LONGO) return TipoVariavel::LONGO_PONTEIRO;
-    if(tipo == TipoVariavel::BOOL) return TipoVariavel::BOOL_PONTEIRO;
-    if(tipo == TipoVariavel::BYTE) return TipoVariavel::BYTE_PONTEIRO;
-    if(tipo == TipoVariavel::CURTO) return TipoVariavel::CURTO_PONTEIRO;
-    if(tipo == TipoVariavel::FLUTUANTE) return TipoVariavel::FLUTUANTE_PONTEIRO;
-    if(tipo == TipoVariavel::DOBRO) return TipoVariavel::DOBRO_PONTEIRO;
-    return tipo;
+    return infoTipo(tipo).ponteiro;
 }
 
 // true se "tipo" é um ponteiro(car*, int*, ..., nulo*, Nome*). Arrays declarados já chegam aqui com o tipo ponteiro.
 inline bool tipoEhPonteiro(TipoVariavel tipo) {
-    return tipo == TipoVariavel::CAR_PONTEIRO || tipo == TipoVariavel::LONGO_PONTEIRO || tipo == TipoVariavel::INT_PONTEIRO || tipo == TipoVariavel::NULO_PONTEIRO || tipo == TipoVariavel::BOOL_PONTEIRO || tipo == TipoVariavel::BYTE_PONTEIRO || tipo == TipoVariavel::CURTO_PONTEIRO || tipo == TipoVariavel::ESPACO_PONTEIRO || tipo == TipoVariavel::FLUTUANTE_PONTEIRO || tipo == TipoVariavel::DOBRO_PONTEIRO;
+    return infoTipo(tipo).ehPonteiro;
 }
 
 // tipo de retorno de uma função: "nulo" continua significando "sem retorno"(mesma palavra chave usada hoje pra declarar função), os demais reusam TipoVariavel pra não duplicar o mesmo espaco de tipos.
@@ -56,7 +104,8 @@ struct Expressao {
         CHAMADA_FUNCAO, BYTES,
         INDEXACAO, CHAMADA_SISTEMA,
         ACESSO_CAMPO, ENDERECO,
-        TERNARIA, ATRIBUICAO
+        TERNARIA, ATRIBUICAO,
+        NOVO // "novo Nome(args)": nomeFuncao = nome da classe, argumentosFuncao = argumentos do construtor
     } tipo;
     char* valor; // dono: quem criou a expressao(strdup). usado quando tipo != BINARIA e tipo != CONVERSAO e tipo != CHAMADA_FUNCAO e tipo != BYTES e tipo != INDEXACAO e tipo != CHAMADA_SISTEMA
     OperadorAritmetico operadorAritmetico; // usado quando tipo == BINARIA
@@ -93,7 +142,7 @@ struct Expressao {
             direita->liberar();
             delete direita;
             direita = nullptr;
-        } else if(tipo == Tipo::CHAMADA_FUNCAO) {
+        } else if(tipo == Tipo::CHAMADA_FUNCAO || tipo == Tipo::NOVO) {
             free(nomeFuncao);
             nomeFuncao = nullptr;
             for(int i = 0; i < argumentosFuncao->tam; i++) (*argumentosFuncao)[i].liberar();

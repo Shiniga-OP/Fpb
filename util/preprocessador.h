@@ -161,13 +161,7 @@ public:
 
     // índice da macro "nome", ou -1.
     int buscar(const char* nome) const {
-        int tamNome = (int)strlen(nome);
-        for(int i = 0; i < nomes.tam; i++) {
-            int tamCandidato;
-            const char* candidato = nomes.obter(i, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) return i;
-        }
-        return -1;
+        return nomes.buscar(nome);
     }
     
     // macro do compilador: corpo é só o número "valor". Um "#macro" do usuário com o mesmo nome e corpo diferente dá erro de redefinição.
@@ -229,13 +223,7 @@ private:
     }
 
     bool pilhaTem(const char* nome) const {
-        int tamNome = (int)strlen(nome);
-        for(int i = 0; i < pilha.tam; i++) {
-            int tamCandidato;
-            const char* candidato = pilha.obter(i, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) return true;
-        }
-        return false;
+        return pilha.buscar(nome) >= 0;
     }
 
     // lê "#macro NOME corpo #macrofim" a partir de "pos"(no #macro), registra e devolve a posição depois do #macrofim.
@@ -338,12 +326,8 @@ private:
         std::filesystem::path caminhoAbsoluto = std::filesystem::canonical(resolverCaminhoInclusao(caminhoRelativo, diretorio, raizBiblis), erroCaminho);
         if(erroCaminho) return;
         std::string absolutoStr = caminhoAbsoluto.string();
-        int tamAbsoluto = (int)absolutoStr.size();
-        for(int i = 0; i < arquivosVistos.tam; i++) {
-            int tamCandidato;
-            const char* candidato = arquivosVistos.obter(i, &tamCandidato);
-            if(tamCandidato == tamAbsoluto && memcmp(candidato, absolutoStr.c_str(), tamAbsoluto) == 0) return;
-        }
+        
+        if(arquivosVistos.buscar(absolutoStr.c_str()) >= 0) return;
         arquivosVistos.empurrar(absolutoStr.c_str());
 
         std::ifstream arquivo(caminhoAbsoluto);

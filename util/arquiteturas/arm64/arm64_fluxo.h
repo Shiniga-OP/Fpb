@@ -24,7 +24,7 @@ inline const char* ARM64::mnemonicoSaltoSeFalso(OperadorComparacaoIR operador, b
 
 // emite "se(esquerda OP direita) { então } senao { senaoCorpo }".
 // usa x9/x10 como registradores de rascunho(fora da faixa x0-x5, mesma
-// reserva documentada em emitirTexTam) e rotulos unicos por chamada.
+// reserva documentada em arm64.h) e rotulos unicos por chamada.
 inline void ARM64::emitirSe(std::ostringstream& saida, const InstrucaoSe& instrucao, const ProgramaIR& programa) {
     int idRotulo = contadorRotulos++;
     std::string rotuloSenao = "_se_senao_" + std::to_string(idRotulo);

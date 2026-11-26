@@ -3,7 +3,7 @@
 #include "arm64.h"
 
 // emite "slot = esquerda OP direita": carrega os dois operandos em
-// x9/x10(mesmos registradores de rascunho documentados em emitirTexTam),
+// x9/x10(mesmos registradores de rascunho documentados em arm64.h),
 // calcula em x9 e grava no slot de 16 bytes do destino(temporário ou
 // variável, tanto faz: mesmo espaço de slots de emitirReatribuicao).
 // DIVISAO e MODULO checam o divisor antes de usar "sdiv": divisao por
@@ -73,7 +73,7 @@ inline void ARM64::emitirOperacaoAritmetica(std::ostringstream& saida, const Ins
 
 // emite a checagem "se x10(divisor) == 0, aborta o processo": usada por
 // DIVISAO e MODULO antes de qualquer "sdiv". Usa um rotulo unico por
-// chamada(mesmo padrao de emitirSe/emitirEnquanto/emitirTexTam) pra nao
+// chamada(mesmo padrao de emitirSe/emitirEnquanto) pra nao
 // colidir quando o programa tem mais de uma divisao/modulo. O código de
 // saída 1 segue a convenção Unix de "erro genérico"(0 == sucesso).
 inline void ARM64::emitirChecagemDivisorZero(std::ostringstream& saida) {

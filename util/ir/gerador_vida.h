@@ -14,10 +14,46 @@ inline ArgumentoIR GeradorIR::argumentoEspaco(int slot, int idEspaco) {
     return arg;
 }
 
+// monta a chamada de uma função de usuário("bl nome") com os argumentos dados(os ArgumentoIR passam a ser donos do que carregam).
+inline ComandoIR GeradorIR::montarChamada(const char* nome, std::initializer_list<ArgumentoIR> args) {
+    ComandoIR comando;
+    comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
+    comando.chamadaFuncaoUsuario.iniciar();
+    comando.chamadaFuncaoUsuario.nome = strdup(nome);
+    for(const ArgumentoIR& arg : args) comando.chamadaFuncaoUsuario.argumentos.empurrar(arg);
+    return comando;
+}
+
+inline void GeradorIR::emitirChamada(const char* nome, std::initializer_list<ArgumentoIR> args, Vetor<ComandoIR>& saida) {
+    saida.empurrar(montarChamada(nome, args));
+}
+
+// grava o retorno de "comando"(x0 ou s0/d0) num slot novo, empurra o comando e devolve o REGISTRADOR desse slot.
+inline ArgumentoIR GeradorIR::capturarChamada(ComandoIR& comando, TipoVariavel tipoRetorno, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    int slot = ctx.variaveisLocais.proximoSlot++;
+    comando.chamadaFuncaoUsuario.capturaResultado = true;
+    comando.chamadaFuncaoUsuario.slotDestino = slot;
+    comando.chamadaFuncaoUsuario.resultadoLargura = larguraDoTipo(tipoRetorno);
+    comando.chamadaFuncaoUsuario.resultadoFlutuante = tipoEhFlutuante(tipoRetorno);
+    saida.empurrar(comando);
+    return argumentoSlot(slot, tipoRetorno);
+}
+
+// reserva "bytes"(arredondado pra 16) na área de arrays do frame e deixa o endereço dela no slot.
+inline void GeradorIR::reservarNoFrame(int bytes, int slot, Vetor<ComandoIR>& saida) {
+    bytes = ((bytes + 15) / 16) * 16;
+    ComandoIR comando;
+    comando.tipo = ComandoIR::Tipo::ENDERECO_FRAME;
+    comando.instrucaoEnderecoFrame.slotDestino = slot;
+    comando.instrucaoEnderecoFrame.posArray = bytesArraysAtual;
+    bytesArraysAtual += bytes;
+    saida.empurrar(comando);
+}
+
 // "Nome_criar(destino, valor)": usada por "Nome x = valor;", "x = valor;" e pela conversão de texto literal em espaço.
 inline void GeradorIR::emitirCriar(const ArgumentoIR& destino, ArgumentoIR valor, int idEspaco, Vetor<ComandoIR>& saida) {
     std::string nomeEspacoStr = espacos.declaracoes[idEspaco]->nome;
-    std::string nomeCriar = nomeEspacoStr + "_criar";
+    std::string nomeCriar = nomeEspacoStr + "_.criar";
     int totalParametros;
     if(!funcoesUsuario.buscar(nomeCriar.c_str(), &totalParametros)) {
         throw std::runtime_error("Espaço '" + nomeEspacoStr + "' não tem o construtor '" + nomeCriar + "'");
@@ -25,25 +61,17 @@ inline void GeradorIR::emitirCriar(const ArgumentoIR& destino, ArgumentoIR valor
     if(totalParametros != 2) {
         throw std::runtime_error("O construtor '" + nomeCriar + "' precisa ter exatamente 1 parâmetro além de 'este'");
     }
-    ComandoIR comando;
-    comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comando.chamadaFuncaoUsuario.iniciar();
-    comando.chamadaFuncaoUsuario.nome = strdup(nomeCriar.c_str());
-    comando.chamadaFuncaoUsuario.argumentos.empurrar(copiarArgumento(destino));
-    comando.chamadaFuncaoUsuario.argumentos.empurrar(valor);
-    saida.empurrar(comando);
+    emitirChamada(nomeCriar.c_str(), {copiarArgumento(destino), valor}, saida);
 }
 
 // "Nome_liberar(alvo)", se o espaço tiver esse método.
 inline void GeradorIR::emitirLiberar(const ArgumentoIR& alvo, int idEspaco, Vetor<ComandoIR>& saida) {
-    std::string nome;
-    if(!buscarMetodo(idEspaco, "liberar", nome)) return;
-    ComandoIR comando;
-    comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comando.chamadaFuncaoUsuario.iniciar();
-    comando.chamadaFuncaoUsuario.nome = strdup(nome.c_str());
-    comando.chamadaFuncaoUsuario.argumentos.empurrar(copiarArgumento(alvo));
-    saida.empurrar(comando);
+    // destrutores encadeados: o da classe primeiro, depois o de cada base
+    for(int id = idEspaco; id >= 0; id = baseDoEspaco(id)) {
+        std::string nome = std::string(espacos.declaracoes[id]->nome) + "_.liberar";
+        int totalParametros;
+        if(funcoesUsuario.buscar(nome.c_str(), &totalParametros)) emitirChamada(nome.c_str(), {copiarArgumento(alvo)}, saida);
+    }
 }
 
 // "mliberar(alvo)": devolve a memória da casca de um temporário de heap.
@@ -52,12 +80,7 @@ inline void GeradorIR::emitirMliberar(const ArgumentoIR& alvo, Vetor<ComandoIR>&
     if(!funcoesUsuario.buscar("mliberar", &totalParametros)) {
         throw std::runtime_error("Operador de espaço exige 'mliberar' (faltou #incluir a biblioteca de memória?)");
     }
-    ComandoIR comando;
-    comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comando.chamadaFuncaoUsuario.iniciar();
-    comando.chamadaFuncaoUsuario.nome = strdup("mliberar");
-    comando.chamadaFuncaoUsuario.argumentos.empurrar(copiarArgumento(alvo));
-    saida.empurrar(comando);
+    emitirChamada("mliberar", {copiarArgumento(alvo)}, saida);
 }
 
 // cópia de verdade: "Nome_copiar(destino, origem)". Sem "copiar" e sem "liberar" é cópia rasa; com "liberar" e sem "copiar" é erro (dois donos do mesmo buffer).
@@ -69,17 +92,16 @@ inline void GeradorIR::copiarObjeto(const ArgumentoIR& origem, const ArgumentoIR
         if(totalParametros != 2) {
             throw std::runtime_error("O método '" + nomeCopiar + "' precisa ter exatamente 1 parâmetro além de 'este'");
         }
-        ComandoIR comando;
-        comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-        comando.chamadaFuncaoUsuario.iniciar();
-        comando.chamadaFuncaoUsuario.nome = strdup(nomeCopiar.c_str());
-        comando.chamadaFuncaoUsuario.argumentos.empurrar(copiarArgumento(destino));
-        comando.chamadaFuncaoUsuario.argumentos.empurrar(copiarArgumento(origem));
-        saida.empurrar(comando);
+        emitirChamada(nomeCopiar.c_str(), {copiarArgumento(destino), copiarArgumento(origem)}, saida);
         return;
     }
-    if(funcoesUsuario.buscar((nomeEspacoStr + "_liberar").c_str(), &totalParametros)) {
-        throw std::runtime_error("Espaço '" + nomeEspacoStr + "' tem 'liberar' mas não tem 'copiar': a cópia rasa liberaria o mesmo buffer duas vezes");
+    bool temDestrutor = false;
+    for(int id = idEspaco; id >= 0 && !temDestrutor; id = baseDoEspaco(id)) {
+        std::string candidato = std::string(espacos.declaracoes[id]->nome) + "_.liberar";
+        temDestrutor = funcoesUsuario.buscar(candidato.c_str(), &totalParametros);
+    }
+    if(temDestrutor) {
+        throw std::runtime_error("Espaço '" + nomeEspacoStr + "' tem destrutor mas não tem 'copiar': a cópia rasa liberaria o mesmo buffer duas vezes");
     }
     copiarEspaco(origem, destino, idEspaco, saida, ctx);
 }
@@ -104,15 +126,8 @@ inline void GeradorIR::zerarEspaco(const ArgumentoIR& destino, int idEspaco, Vet
 
 // texto literal (ou car*) usado onde se espera um espaço: constrói um espaço temporário no frame via "Nome_criar" e agenda o "liberar" dele pro fim do comando.
 inline ArgumentoIR GeradorIR::criarTemporarioDeValor(int idEspaco, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    int bytes = ((tamanhoDoEspaco(idEspaco) + 15) / 16) * 16;
-    int posArray = bytesArraysAtual;
-    bytesArraysAtual += bytes;
     int slot = ctx.variaveisLocais.proximoSlot++;
-    ComandoIR comandoEndereco;
-    comandoEndereco.tipo = ComandoIR::Tipo::ENDERECO_FRAME;
-    comandoEndereco.instrucaoEnderecoFrame.slotDestino = slot;
-    comandoEndereco.instrucaoEnderecoFrame.posArray = posArray;
-    saida.empurrar(comandoEndereco);
+    reservarNoFrame(tamanhoDoEspaco(idEspaco), slot, saida);
     ArgumentoIR temp = argumentoEspaco(slot, idEspaco);
     temp.espacoPorValor = true;
     emitirCriar(temp, valor, idEspaco, saida);
@@ -122,8 +137,13 @@ inline ArgumentoIR GeradorIR::criarTemporarioDeValor(int idEspaco, ArgumentoIR v
 
 // variável por valor cujo espaço tem "liberar": entra na lista de escopo.
 inline void GeradorIR::registrarLiberacaoAutomatica(int slot, int idEspaco, ContextoFuncao& ctx) {
-    std::string nome;
-    if(!buscarMetodo(idEspaco, "liberar", nome)) return;
+    bool temDestrutor = false;
+    for(int id = idEspaco; id >= 0 && !temDestrutor; id = baseDoEspaco(id)) {
+        std::string candidato = std::string(espacos.declaracoes[id]->nome) + "_.liberar";
+        int totalParametros;
+        temDestrutor = funcoesUsuario.buscar(candidato.c_str(), &totalParametros);
+    }
+    if(!temDestrutor) return;
     ctx.liberarSlot.empurrar(slot);
     ctx.liberarId.empurrar(idEspaco);
 }
@@ -175,7 +195,7 @@ inline void GeradorIR::emitirLiberacaoTemporarios(int marca, bool truncar, Vetor
 }
 
 inline bool GeradorIR::temConstrutor(int idEspaco) {
-    std::string nome = std::string(espacos.declaracoes[idEspaco]->nome) + "_criar";
+    std::string nome = std::string(espacos.declaracoes[idEspaco]->nome) + "_.criar";
     int totalParametros;
     return funcoesUsuario.buscar(nome.c_str(), &totalParametros);
 }
@@ -185,13 +205,9 @@ inline void GeradorIR::emitirAlocar(int slot, int idEspaco, Vetor<ComandoIR>& sa
     if(!funcoesUsuario.buscar("malocar", &totalParametros)) {
         throw std::runtime_error("Objeto no heap exige 'malocar' (faltou #incluir a biblioteca de memória?)");
     }
-    ComandoIR comando;
-    comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comando.chamadaFuncaoUsuario.iniciar();
-    comando.chamadaFuncaoUsuario.nome = strdup("malocar");
     ArgumentoIR tamanho = imediatoInt(tamanhoDoEspaco(idEspaco));
     tamanho.larguraBytes = 8;
-    comando.chamadaFuncaoUsuario.argumentos.empurrar(tamanho);
+    ComandoIR comando = montarChamada("malocar", {tamanho});
     comando.chamadaFuncaoUsuario.capturaResultado = true;
     comando.chamadaFuncaoUsuario.slotDestino = slot;
     comando.chamadaFuncaoUsuario.resultadoLargura = 8;
@@ -200,7 +216,7 @@ inline void GeradorIR::emitirAlocar(int slot, int idEspaco, Vetor<ComandoIR>& sa
 
 // "Nome_criar(variavel, args...)": a variável já precisa estar definida na tabela
 inline void GeradorIR::emitirConstrutor(const DeclaracaoVariavel& decl, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    std::string nomeCriar = std::string(espacos.declaracoes[idEspaco]->nome) + "_criar";
+    std::string nomeCriar = std::string(espacos.declaracoes[idEspaco]->nome) + "_.criar";
     Vetor<Expressao> args;
     args.iniciar();
     Expressao este;
@@ -208,12 +224,47 @@ inline void GeradorIR::emitirConstrutor(const DeclaracaoVariavel& decl, int idEs
     este.valor = strdup(decl.nome);
     args.empurrar(este);
     for(int i = 0; i < decl.listaInicial.tam; i++) args.empurrar(decl.listaInicial[i]);
-    ComandoIR comando;
-    comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comando.chamadaFuncaoUsuario.iniciar();
-    comando.chamadaFuncaoUsuario.nome = strdup(nomeCriar.c_str());
+    ComandoIR comando = montarChamada(nomeCriar.c_str(), {});
     resolverArgumentosChamada(nomeCriar.c_str(), args, comando.chamadaFuncaoUsuario.argumentos, saida, ctx);
     saida.empurrar(comando);
     free(este.valor);
     args.liberar();
+}
+
+// copia campo a campo o espaço cujo endereço base está em "origem" pro espaço cujo endereço base está em "destino". Cada campo vira
+// um par LEITURA_INDEXADA/ESCRITA_INDEXADA(mesmo mecanismo de resolverAcessoCampo e emitirEscritaCampo), então não precisa de
+// instrução nova no IR e o padding não é copiado. Serve pra "a = b", pro argumento por valor e, no futuro, pro retorno de espaço.
+inline void GeradorIR::copiarEspaco(const ArgumentoIR& origem, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    const DeclaracaoEspaco& espaco = *espacos.declaracoes[idEspaco];
+    for(int i = 0; i < espaco.campos.tam; i++) {
+        int posCampo;
+        TipoVariavel tipoCampo;
+        posicaoDoCampo(idEspaco, espaco.campos[i].nome, &posCampo, &tipoCampo);
+        int largura = larguraDoTipo(tipoCampo);
+
+        int slot = ctx.variaveisLocais.proximoSlot++;
+        ComandoIR leitura;
+        leitura.tipo = ComandoIR::Tipo::LEITURA_INDEXADA;
+        leitura.instrucaoLeituraIndexada.slotDestino = slot;
+        leitura.instrucaoLeituraIndexada.ponteiro = copiarArgumento(origem);
+        leitura.instrucaoLeituraIndexada.ponteiro.larguraElemento = largura;
+        leitura.instrucaoLeituraIndexada.indice = imediatoInt(posCampo / largura);
+        saida.empurrar(leitura);
+
+        ArgumentoIR valor = argumentoSlot(slot, tipoCampo);
+        emitirEscritaCampo(destino, posCampo, tipoCampo, valor, saida);
+    }
+}
+
+// reserva um corpo novo do espaço "idEspaco" na área de arrays do frame de quem chama(mesmo mecanismo de gerarDeclaracaoVariavel),
+// copia o conteúdo de "origem" pra lá e devolve o argumento com o endereço base da cópia. É o que o "Nome x" por valor recebe.
+inline ArgumentoIR GeradorIR::criarCopiaEspaco(const ArgumentoIR& origem, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    int slot = ctx.variaveisLocais.proximoSlot++;
+    reservarNoFrame(tamanhoDoEspaco(idEspaco), slot, saida);
+
+    ArgumentoIR copia = copiarArgumento(origem);
+    copia.registrador = slot;
+    copia.espacoPorValor = true;
+    copiarObjeto(origem, copia, idEspaco, saida, ctx);
+    return copia;
 }

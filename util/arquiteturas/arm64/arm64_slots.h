@@ -77,18 +77,6 @@ inline void ARM64::emitirPuxarPegarSalvo(std::ostringstream& saida, const int* r
     }
 }
 
-// carrega o valor de um parametro(guardado na pilha pelo prologo da funcao atual, ou no proprio registrador fisico se o
-// slot ganhou um via "liberacao por ultimo uso") no registrador de destino. Nunca assume que o valor ainda esta no
-// registrador xN original de chamada(x0-x5): qualquer chamada dentro do corpo(svc, bl) pode ter sujado x0-x5 nesse meio tempo.
-inline void ARM64::emitirCarregarParametro(std::ostringstream& saida, const char* registradorDestino, int indiceParametro) {
-    const char* fisico = registradorFisicoDoSlot(indiceParametro);
-    if(fisico) {
-        if(std::string(fisico) != registradorDestino) saida << "mov " << registradorDestino << ", " << fisico << "\n";
-        return;
-    }
-    saida << "ldr " << registradorDestino << ", [sp, #" << (baseSlots + indiceParametro * 16) << "]\n";
-}
-
 // converte o nome de um registrador de 64 bits("x9") pro seu equivalente
 // de 32 bits("w9"), usado quando o valor envolvido e do tipo "car"(1
 // byte): a ALU do ARM64 so opera em w(32 bits) ou x(64 bits) inteiros,
@@ -227,7 +215,7 @@ inline void ARM64::emitirCarregarValorEmComLargura(std::ostringstream& saida, co
     }
 }
 
-// emite "slot = valor": materializa "valor" em x9(registrador de rascunho, mesma reserva documentada em emitirTexTam) e grava no slot
+// emite "slot = valor": materializa "valor" em x9(registrador de rascunho, mesma reserva documentada em arm64.h) e grava no slot
 // de 16 bytes da variável(seja declaração inicial ou reatribuição).
 inline void ARM64::emitirReatribuicao(std::ostringstream& saida, const InstrucaoReatribuicao& instrucao) {
     const ArgumentoIR& valor = instrucao.valor;

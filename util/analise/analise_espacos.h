@@ -57,6 +57,8 @@ inline DeclaracaoEspaco Analisador::analisarEspaco() {
 // analisa: #classe Nome [herda Base] { campos e métodos }
 // vira um #espaco Nome(só os campos) + uma função "Nome_metodo" por método, com "este"(Nome*) como parâmetro 0, exceto nos "estatico".
 // Campo: "tipo nome;". Campo estático: "estatico tipo nome [= constante];"(variável global, não entra no espaço). Método: "[@sobrepor] [estatico] tipoRetorno nome(params) { corpo }".
+// Construtor: "Nome(params) { corpo }" vira o método ".criar". Destrutor: "~Nome() { corpo }" vira o método ".liberar".
+// Nomes com '#' não podem ser escritos no fonte, então nunca conflitam com um método do usuário.
 // Empurra o espaço e as funções direto em "programa".
 inline void Analisador::analisarClasse(Programa& programa) {
     consumir(TipoToken::CLASSE, "esperado #classe");
@@ -89,20 +91,42 @@ inline void Analisador::analisarClasse(Programa& programa) {
                 break;
             }
         }
-        TipoRetorno tipo = analisarTipoRetorno();
-        const Token& nomeMembro = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo ou do método");
+        TipoRetorno tipo;
+        tipo.ehNulo = false;
+        tipo.tipo = TipoVariavel::INT;
+        tipo.nomeEspaco = nullptr;
+        std::string nomeMembro;
+        bool ehConstrutor = false;
+        bool ehDestrutor = false;
+        if(verificar(TipoToken::IDENTIFICADOR) && strcmp(atual().valor, nomeClasse.c_str()) == 0 && tokens[pos + 1].tipo == TipoToken::ABRE_PARENTESE) {
+            // "Nome(...)": construtor, vira o método ".criar"
+            pos++;
+            ehConstrutor = true;
+            tipo.ehNulo = true;
+            nomeMembro = ".criar";
+        } else if(verificar(TipoToken::TIL) && tokens[pos + 1].tipo == TipoToken::IDENTIFICADOR && strcmp(tokens[pos + 1].valor, nomeClasse.c_str()) == 0 && tokens[pos + 2].tipo == TipoToken::ABRE_PARENTESE) {
+            // "~Nome(...)": destrutor, vira o método ".liberar"
+            pos += 2;
+            ehDestrutor = true;
+            tipo.ehNulo = true;
+            nomeMembro = ".liberar";
+        } else {
+            tipo = analisarTipoRetorno();
+            nomeMembro = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo ou do método").valor;
+        }
         if(verificar(TipoToken::ABRE_PARENTESE)) {
+            if((ehConstrutor || ehDestrutor) && (ehEstatico || ehSobrepor || ehFinal)) erro("construtor e destrutor não aceitam 'estatico', 'final' nem '@sobrepor'");
             if(ehSobrepor && ehEstatico) erro("'@sobrepor' não vale para método estatico");
             if(ehFinal) erro("'final' não vale para método");
             if(!ehEstatico) {
                 MetodoDeclarado metodo;
-                metodo.nome = strdup(nomeMembro.valor);
+                metodo.nome = strdup(nomeMembro.c_str());
                 metodo.ehSobrepor = ehSobrepor;
                 espaco.metodos.empurrar(metodo);
             }
             DeclaracaoFuncao funcao;
             funcao.iniciar();
-            std::string nomeFuncao = nomeClasse + "_" + nomeMembro.valor;
+            std::string nomeFuncao = nomeClasse + "_" + nomeMembro;
             funcao.nome = strdup(nomeFuncao.c_str());
             funcao.tipoRetorno = tipo;
             if(!ehEstatico) {
@@ -114,6 +138,7 @@ inline void Analisador::analisarClasse(Programa& programa) {
                 funcao.parametros.empurrar(este);
             }
             analisarParametrosECorpo(funcao);
+            if(ehDestrutor && funcao.parametros.tam != 1) erro("destrutor não recebe parâmetros");
             programa.funcoes.empurrar(funcao);
         } else if(ehEstatico) {
             if(ehSobrepor) erro("'@sobrepor' só vale para método");
@@ -122,7 +147,7 @@ inline void Analisador::analisarClasse(Programa& programa) {
             if(ehFlu && !ehFinal) erro("campo estatico só aceita flu/dobro com 'final'");
             CampoEstatico estatico;
             estatico.tipo = tipo.tipo;
-            estatico.nome = strdup(nomeMembro.valor);
+            estatico.nome = strdup(nomeMembro.c_str());
             estatico.valorInicial = 0;
             estatico.ehFinal = ehFinal;
             if(ehFinal && !verificar(TipoToken::IGUAL)) erro("campo estatico final precisa de valor inicial");
@@ -160,7 +185,7 @@ inline void Analisador::analisarClasse(Programa& programa) {
             CampoEspaco campo;
             campo.tipo = tipo.tipo;
             campo.nomeEspaco = tipo.nomeEspaco;
-            campo.nome = strdup(nomeMembro.valor);
+            campo.nome = strdup(nomeMembro.c_str());
             espaco.campos.empurrar(campo);
 
             while(verificar(TipoToken::VIRGULA)) {

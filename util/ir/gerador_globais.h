@@ -32,6 +32,8 @@ inline void GeradorIR::registrarGlobaisDeclaradas(const Programa& programa) {
 inline void GeradorIR::vincularGlobais(ContextoFuncao& ctx, Vetor<ComandoIR>& saida) {
     for(int i = 0; i < globaisDeclarados.tam; i++) {
         const DeclaracaoVariavel& g = *globaisDeclarados[i];
+        ArgumentoIR jaExiste;
+        if(ctx.variaveisLocais.buscar(g.nome, &jaExiste)) continue; // parâmetro sombreia a global
         int slot = ctx.variaveisLocais.proximoSlot++;
         if(g.ehFinal) {
             ArgumentoIR valor = resolverExpressao(g.valorInicial, saida, ctx);

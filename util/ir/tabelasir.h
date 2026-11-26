@@ -32,38 +32,22 @@ struct TabelaFuncoesUsuario {
         variadicas.empurrar(ehVariadica);
     }
     bool ehVariadica(const char* nome) const {
-        int tamNome = (int)strlen(nome);
-        for(int i = 0; i < nomes.tam; i++) {
-            int tamCandidato;
-            const char* candidato = nomes.obter(i, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) return variadicas[i];
-        }
-        return false;
+        int i = nomes.buscar(nome);
+        return i >= 0 && variadicas[i];
     }
+    
     bool buscar(const char* nome, int* saida) const {
-        int tamNome = (int)strlen(nome);
-        for(int i = 0; i < nomes.tam; i++) {
-            int tamCandidato;
-            const char* candidato = nomes.obter(i, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) {
-                *saida = totaisParametros[i];
-                return true;
-            }
-        }
-        return false;
+        int i = nomes.buscar(nome);
+        if(i < 0) return false;
+        *saida = totaisParametros[i];
+        return true;
     }
     // retorna true e preenche *saida com o tipo de retorno se encontrar; false caso contrario.
     bool buscarTipoRetorno(const char* nome, TipoRetorno* saida) const {
-        int tamNome = (int)strlen(nome);
-        for(int i = 0; i < nomes.tam; i++) {
-            int tamCandidato;
-            const char* candidato = nomes.obter(i, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) {
-                *saida = tiposRetorno[i];
-                return true;
-            }
-        }
-        return false;
+        int i = nomes.buscar(nome);
+        if(i < 0) return false;
+        *saida = tiposRetorno[i];
+        return true;
     }
 };
 
@@ -87,17 +71,12 @@ struct TabelaCorposFuncoesUsuario {
         nomes.empurrar(nome);
         corpos.empurrar(corpo);
     }
+    
     bool buscar(const char* nome, const DeclaracaoFuncao** saida) const {
-        int tamNome = (int)strlen(nome);
-        for(int i = 0; i < nomes.tam; i++) {
-            int tamCandidato;
-            const char* candidato = nomes.obter(i, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) {
-                *saida = corpos[i];
-                return true;
-            }
-        }
-        return false;
+        int i = nomes.buscar(nome);
+        if(i < 0) return false;
+        *saida = corpos[i];
+        return true;
     }
 };
 
@@ -130,12 +109,6 @@ struct TabelaVariaveisLocais {
         valores.empurrar(valor);
         slots.empurrar(slot);
     }
-    // usado por declaração de variável: aloca o próximo slot livre e o retorna.
-    int definir(const char* nome, ArgumentoIR valor) {
-        int slot = proximoSlot++;
-        definirComSlot(nome, valor, slot);
-        return slot;
-    }
     // escopo de bloco("se"/"senao"/"enquanto"/"por"): abrirEscopo() devolve uma marca, e
     // fecharEscopo(marca) esquece todas as variáveis declaradas depois dela. proximoSlot NÃO
     // volta atrás de propósito: slots nunca são reaproveitados, então o alocador de
@@ -151,17 +124,11 @@ struct TabelaVariaveisLocais {
     // devolve a declaração MAIS RECENTE com esse nome(varre de trás pra frente): uma variável de
     // bloco interno sombreia a de mesmo nome de um bloco externo enquanto o escopo interno existir.
     bool buscar(const char* nome, ArgumentoIR* saida, int* saidaSlot = nullptr) const {
-        int tamNome = (int)strlen(nome);
-        for(int i = nomes.tam - 1; i >= 0; i--) {
-            int tamCandidato;
-            const char* candidato = nomes.obter(i, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) {
-                *saida = valores[i];
-                if(saidaSlot) *saidaSlot = slots[i];
-                return true;
-            }
-        }
-        return false;
+        int i = nomes.buscarUltimo(nome);
+        if(i < 0) return false;
+        *saida = valores[i];
+        if(saidaSlot) *saidaSlot = slots[i];
+        return true;
     }
 };
 
@@ -185,12 +152,6 @@ struct TabelaEspacos {
     }
     // devolve o id(indice) do espaco, ou -1 se nao existir.
     int buscar(const char* nome) const {
-        int tamNome = (int)strlen(nome);
-        for(int i = 0; i < nomes.tam; i++) {
-            int tamCandidato;
-            const char* candidato = nomes.obter(i, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) return i;
-        }
-        return -1;
+        return nomes.buscar(nome);
     }
 };

@@ -29,13 +29,13 @@ nulo* mrealocar(nulo* ptr, longo bytes) {
     longo* bruto = (longo*)baseCar;
     longo n = bruto[0];
     se(bytes < n) n = bytes;
-    nulo* novo = malocar(bytes);
-    car* destino = (car*)novo;
+    nulo* nov = malocar(bytes);
+    car* destino = (car*)nov;
     longo i = 0;
     enquanto(i < n) {
         destino[i] = origem[i];
         i++;
     }
     mliberar(ptr);
-    retorne novo;
+    retorne nov;
 }

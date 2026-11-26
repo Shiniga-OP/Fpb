@@ -6,6 +6,24 @@ inline void coletarFuncaoReferenciada(const ArgumentoIR& arg, VetorStr& saida) {
     if(arg.tipo == ArgumentoIR::Tipo::SIMBOLO_TEXTO && arg.ehFuncao) saida.empurrar(arg.simbolo);
 }
 
+// varre um bloco de ComandoIR ja gerado(incluindo recursivamente dentro
+// de "se"/"enquanto") coletando o nome de toda funcao de usuario chamada
+// via CHAMADA_FUNCAO_USUARIO. Usado pela eliminação sob demanda em gerarFuncaoAlcancavel.
+inline void coletarChamadasUsuario(const Vetor<ComandoIR>& bloco, VetorStr& saida) {
+    for(int i = 0; i < bloco.tam; i++) {
+        const ComandoIR& c = bloco[i];
+        if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) {
+            if(!c.chamadaFuncaoUsuario.indireta) saida.empurrar(c.chamadaFuncaoUsuario.nome);
+            for(int j = 0; j < c.chamadaFuncaoUsuario.argumentos.tam; j++) coletarFuncaoReferenciada(c.chamadaFuncaoUsuario.argumentos[j], saida);
+        } else if(c.tipo == ComandoIR::Tipo::REATRIBUICAO) {
+            coletarFuncaoReferenciada(c.instrucaoReatribuicao.valor, saida);
+        } else if(c.tipo == ComandoIR::Tipo::ESCRITA_INDEXADA) {
+            coletarFuncaoReferenciada(c.instrucaoEscritaIndexada.valor, saida);
+        }
+        paraCadaFilho(c, coletarChamadasUsuario, saida);
+    }
+}
+
 inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     // 1. registra a assinatura + corpo de cada função do programa principal.
     registrarFuncoes(programa);
@@ -64,17 +82,7 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     for(int i = 0; i < programa.funcoes.tam; i++) {
         const DeclaracaoFuncao& f = programa.funcoes[i];
         if(f.ehExterna) continue;
-        int tamNome = (int)strlen(f.nome);
-        bool jaFoi = false;
-        for(int k = 0; k < jaGeradas.tam; k++) {
-            int tamCandidato;
-            const char* candidato = jaGeradas.obter(k, &tamCandidato);
-            if(tamCandidato == tamNome && memcmp(candidato, f.nome, tamNome) == 0) {
-                jaFoi = true;
-                break;
-            }
-        }
-        if(jaFoi) continue;
+        if(jaGeradas.buscar(f.nome) >= 0) continue;
         Vetor<DadoEstaticoIR> descarte;
         descarte.iniciar();
         FuncaoIR teste = gerarFuncao(f, descarte);
@@ -123,12 +131,7 @@ inline void GeradorIR::registrarFuncoes(const Programa& programa, const std::str
 // dela. "jaGeradas" evita reprocessar a mesma função mais de uma vez
 // (tanto por seguranca contra recursão infinita quanto por eficiência).
 inline void GeradorIR::gerarFuncaoAlcancavel(const char* nome, ProgramaIR& ir, VetorStr& jaGeradas) {
-    int tamNome = (int)strlen(nome);
-    for(int i = 0; i < jaGeradas.tam; i++) {
-        int tamCandidato;
-        const char* candidato = jaGeradas.obter(i, &tamCandidato);
-        if(tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0) return; // ja gerada
-    }
+    if(jaGeradas.buscar(nome) >= 0) return; // ja gerada
     jaGeradas.empurrar(nome);
 
     const DeclaracaoFuncao* corpo;
@@ -151,29 +154,6 @@ inline void GeradorIR::gerarFuncaoAlcancavel(const char* nome, ProgramaIR& ir, V
     chamadasEncontradas.liberar();
 }
 
-// varre um bloco de ComandoIR ja gerado(incluindo recursivamente dentro
-// de "se"/"enquanto") coletando o nome de toda funcao de usuario chamada
-// via CHAMADA_FUNCAO_USUARIO. Usado pela eliminação sob demanda em gerarFuncaoAlcancavel.
-inline void GeradorIR::coletarChamadasUsuario(const Vetor<ComandoIR>& bloco, VetorStr& saida) {
-    for(int i = 0; i < bloco.tam; i++) {
-        const ComandoIR& c = bloco[i];
-        if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) {
-            if(!c.chamadaFuncaoUsuario.indireta) saida.empurrar(c.chamadaFuncaoUsuario.nome);
-            for(int j = 0; j < c.chamadaFuncaoUsuario.argumentos.tam; j++) coletarFuncaoReferenciada(c.chamadaFuncaoUsuario.argumentos[j], saida);
-        } else if(c.tipo == ComandoIR::Tipo::REATRIBUICAO) {
-            coletarFuncaoReferenciada(c.instrucaoReatribuicao.valor, saida);
-        } else if(c.tipo == ComandoIR::Tipo::ESCRITA_INDEXADA) {
-            coletarFuncaoReferenciada(c.instrucaoEscritaIndexada.valor, saida);
-        } else if(c.tipo == ComandoIR::Tipo::SE) {
-            coletarChamadasUsuario(*c.instrucaoSe.entao, saida);
-            if(c.instrucaoSe.temSenao) coletarChamadasUsuario(*c.instrucaoSe.senaoCorpo, saida);
-        } else if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
-            coletarChamadasUsuario(*c.instrucaoEnquanto.comandosCondicao, saida);
-            coletarChamadasUsuario(*c.instrucaoEnquanto.corpo, saida);
-        }
-    }
-}
-
 inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<DadoEstaticoIR>& dados) {
     FuncaoIR funcaoIR;
     funcaoIR.iniciar();
@@ -191,18 +171,7 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
     ContextoFuncao ctx(funcao, dados);
     ctx.variaveisLocais.iniciar(funcao.parametros.tam);
     for(int i = 0; i < funcao.parametros.tam; i++) {
-        ArgumentoIR arg;
-        arg.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-        arg.simbolo = nullptr;
-        arg.imediato = 0;
-        arg.registrador = i;
-        arg.larguraBytes = larguraDoTipo(funcao.parametros[i].tipo);
-        arg.larguraElemento = larguraElementoApontado(funcao.parametros[i].tipo);
-        arg.sinalizado = tipoEhSinalizado(funcao.parametros[i].tipo);
-        arg.elementoSinalizado = elementoEhSinalizado(funcao.parametros[i].tipo);
-        arg.ehPonteiro = tipoEhPonteiro(funcao.parametros[i].tipo);
-        arg.ehFlutuante = tipoEhFlutuante(funcao.parametros[i].tipo);
-        arg.elementoFlutuante = elementoEhFlutuante(funcao.parametros[i].tipo);
+        ArgumentoIR arg = argumentoSlot(i, funcao.parametros[i].tipo);
         if(funcao.parametros[i].nomeEspaco) arg.idEspaco = obterIdEspaco(funcao.parametros[i].nomeEspaco);
         if(funcao.parametros[i].tipo == TipoVariavel::ESPACO) arg.espacoPorValor = true; // "Nome x" por valor: o chamador passa o endereço de uma cópia, então "x = y" aqui copia campo a campo
         ctx.variaveisLocais.definirComSlot(funcao.parametros[i].nome, arg, i);
@@ -211,55 +180,17 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
         funcaoIR.parametrosFlutuante.empurrar(arg.ehFlutuante);
     }
     if(funcaoIR.ehInicio && globaisDeclarados.tam > 0) {
-        ComandoIR chamadaIni;
-        chamadaIni.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-        chamadaIni.chamadaFuncaoUsuario.iniciar();
-        chamadaIni.chamadaFuncaoUsuario.nome = strdup("_iniciar_globais");
-        funcaoIR.instrucoes.empurrar(chamadaIni);
+        emitirChamada("_iniciar_globais", {}, funcaoIR.instrucoes);
     }
     vincularGlobais(ctx, funcaoIR.instrucoes);
     emitirConstrutorBase(funcao, funcaoIR.instrucoes);
     funcaoIR.retornoFlutuante = !funcao.tipoRetorno.ehNulo && tipoEhFlutuante(funcao.tipoRetorno.tipo);
     funcaoIR.retornoLargura = funcao.tipoRetorno.ehNulo ? 8 : larguraDoTipo(funcao.tipoRetorno.tipo);
-    bool terminaComSair = false;
-    bool terminaComRetorne = false;
-    for(int i = 0; i < funcao.corpo.tam; i++) {
-        const Comando& comando = funcao.corpo[i];
-        int marcaTemp = ctx.tempSlot.tam;
-        terminaComSair = false;
-        terminaComRetorne = false;
-        if(comando.tipo == Comando::Tipo::DECLARACAO_VARIAVEL) {
-            gerarDeclaracaoVariavel(comando.declaracaoVariavel, funcaoIR.instrucoes, ctx);
-        } else if(comando.tipo == Comando::Tipo::REATRIBUICAO) {
-            gerarReatribuicao(comando.reatribuicao, funcaoIR.instrucoes, ctx);
-        } else if(comando.tipo == Comando::Tipo::CHAMADA_SISTEMA_CRUA) {
-            gerarChamadaSistemaCrua(comando.chamadaSistemaCrua, funcaoIR.instrucoes, ctx);
-            // o proprio ComandoIR::CHAMADA_SISTEMA_CRUA e sempre o
-            // ULTIMO empurrado(qualquer auxiliar de argumento vem antes),
-            // entao esta no topo da lista neste ponto.
-            terminaComSair = comandoCrahamadaTerminaProcesso(funcaoIR.instrucoes[funcaoIR.instrucoes.tam - 1]);
-        } else if(comando.tipo == Comando::Tipo::SE) {
-            gerarComandoSe(comando.comandoSe, funcaoIR.instrucoes, ctx);
-        } else if(comando.tipo == Comando::Tipo::ENQUANTO) {
-            gerarComandoEnquanto(comando.comandoEnquanto, funcaoIR.instrucoes, ctx);
-        } else if(comando.tipo == Comando::Tipo::POR) {
-            gerarComandoPor(comando.comandoPor, funcaoIR.instrucoes, ctx);
-        } else if(comando.tipo == Comando::Tipo::APAGAR) {
-            gerarApagar(comando.comandoApagar, funcaoIR.instrucoes, ctx);
-        } else if(comando.tipo == Comando::Tipo::RETORNE) {
-            gerarRetorne(comando.comandoRetorne, funcaoIR.instrucoes, ctx);
-            terminaComRetorne = true;
-        } else if(comando.tipo == Comando::Tipo::ATRIBUICAO_INDEXADA) {
-            gerarAtribuicaoIndexada(comando.atribuicaoIndexada, funcaoIR.instrucoes, ctx);
-        } else if(comando.tipo == Comando::Tipo::ATRIBUICAO_CAMPO) {
-            gerarAtribuicaoCampo(comando.atribuicaoCampo, funcaoIR.instrucoes, ctx);
-        } else if(comando.tipo == Comando::Tipo::EXPRESSAO) {
-            resolverExpressao(comando.expressao, funcaoIR.instrucoes, ctx);
-        } else {
-            gerarChamadaFuncao(comando.chamadaFuncao, funcaoIR.instrucoes, ctx);
-        }
-        emitirLiberacaoTemporarios(marcaTemp, true, funcaoIR.instrucoes, ctx);
-    }
+    gerarBlocoComandos(funcao.corpo, funcaoIR.instrucoes, ctx);
+    const Comando* ultimo = funcao.corpo.tam > 0 ? &funcao.corpo[funcao.corpo.tam - 1] : nullptr;
+    bool terminaComRetorne = ultimo && ultimo->tipo == Comando::Tipo::RETORNE;
+    // o ultimo ComandoIR emitido por uma chamada de sistema e a propria chamada(os auxiliares vem antes)
+    bool terminaComSair = ultimo && ultimo->tipo == Comando::Tipo::CHAMADA_SISTEMA_CRUA && funcaoIR.instrucoes.tam > 0 && comandoCrahamadaTerminaProcesso(funcaoIR.instrucoes[funcaoIR.instrucoes.tam - 1]);
     if(!terminaComRetorne && !terminaComSair) emitirLiberacoesDeEscopo(0, false, funcaoIR.instrucoes, ctx);
     // pode emitir "ret". Se o programador não terminou com SAIR
     // explícito, força um sair(0) implícito pra não cair em lixo.
@@ -320,14 +251,7 @@ inline ComandoIR GeradorIR::gerarSairImplicito() {
 inline void GeradorIR::registrarLigacoes(const Programa& programa) {
     for(int i = 0; i < programa.ligacoes.tam; i++) {
         const char* nome = programa.ligacoes[i].caminho;
-        int tamNome = (int)strlen(nome);
-        bool jaTem = false;
-        for(int j = 0; j < ligacoes.tam && !jaTem; j++) {
-            int tamCandidato;
-            const char* candidato = ligacoes.obter(j, &tamCandidato);
-            jaTem = tamCandidato == tamNome && memcmp(candidato, nome, tamNome) == 0;
-        }
-        if(!jaTem) ligacoes.empurrar(nome);
+        if(ligacoes.buscar(nome) < 0) ligacoes.empurrar(nome);
     }
 }
 // "Nome_criar" de uma classe que herda: chama o "criar" da base(a mais próxima que tiver) antes do corpo, passando o próprio "este"(Nome* serve como Base*).
@@ -348,10 +272,5 @@ inline void GeradorIR::emitirConstrutorBase(const DeclaracaoFuncao& funcao, Veto
     if(totalParametros != 1) {
         throw std::runtime_error("O construtor '" + nomeCriar + "' da base de '" + nomeEspacoStr + "' tem parâmetros, mas o construtor da base é chamado automático e só pode ter 'este'");
     }
-    ComandoIR comando;
-    comando.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comando.chamadaFuncaoUsuario.iniciar();
-    comando.chamadaFuncaoUsuario.nome = strdup(nomeCriar.c_str());
-    comando.chamadaFuncaoUsuario.argumentos.empurrar(argumentoEspaco(0, idBase));
-    saida.empurrar(comando);
+    emitirChamada(nomeCriar.c_str(), {argumentoEspaco(0, idBase)}, saida);
 }

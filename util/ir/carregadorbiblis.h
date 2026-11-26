@@ -81,11 +81,8 @@ public:
             falharAbrir("não foi possível achar a biblioteca '" + caminho.string() + "'", inclusao);
         }
         std::string absolutoStr = absoluto.string();
-        for(int i = 0; i < caminhosJaIncluidos.tam; i++) {
-            int tamCandidato;
-            const char* candidato = caminhosJaIncluidos.obter(i, &tamCandidato);
-            if(tamCandidato == (int)absolutoStr.size() && memcmp(candidato, absolutoStr.c_str(), tamCandidato) == 0) return false;
-        }
+        if(caminhosJaIncluidos.buscar(absolutoStr.c_str()) >= 0) return false;
+        
         caminhosJaIncluidos.empurrar(absolutoStr.c_str());
         std::ifstream arquivo(absoluto);
         if(!arquivo) {

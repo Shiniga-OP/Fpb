@@ -243,6 +243,15 @@ inline Expressao Analisador::analisarBytes() {
     return e;
 }
 
+// lê "a, b, c)" a partir do que vem depois do '(' (já consumido por quem chama) e consome o ')'. Cada argumento vai pra "destino".
+inline void Analisador::analisarArgumentos(Vetor<Expressao>& destino) {
+    while(!verificar(TipoToken::FECHA_PARENTESE)) {
+        destino.empurrar(analisarExpressaoAditiva());
+        if(verificar(TipoToken::VIRGULA)) pos++;
+    }
+    consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
+}
+
 // "base.campo", "base.campo[i]" e "base.metodo(args)" encadeados sobre qualquer expressão (a.b.c, a.b.dados[i], a.b.metodo()).
 // Método sobre expressão vira CHAMADA_FUNCAO de nome ".metodo" com o receptor em argumentosFuncao[0].
 inline Expressao Analisador::continuarCadeia(Expressao base) {
@@ -259,11 +268,7 @@ inline Expressao Analisador::continuarCadeia(Expressao base) {
             e.argumentosFuncao->iniciar();
             e.argumentosFuncao->empurrar(base);
             pos++;
-            while(!verificar(TipoToken::FECHA_PARENTESE)) {
-                e.argumentosFuncao->empurrar(analisarExpressaoAditiva());
-                if(verificar(TipoToken::VIRGULA)) pos++;
-            }
-            consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
+            analisarArgumentos(*e.argumentosFuncao);
         } else {
             e.tipo = Expressao::Tipo::ACESSO_CAMPO;
             e.valor = strdup(membro.valor);
@@ -286,6 +291,23 @@ inline Expressao Analisador::continuarCadeia(Expressao base) {
 }
 
 inline Expressao Analisador::analisarPrimariaSemPosfixo() {
+    if(verificar(TipoToken::NOVO)) {
+        // "novo Nome(args)" ou "novo Nome": objeto no heap. O GeradorIR aloca e chama o construtor.
+        pos++;
+        const Token& nomeClasse = consumir(TipoToken::IDENTIFICADOR, "esperado nome da classe após 'novo'");
+        if(verificar(TipoToken::MENOR)) erro("tipos genéricos (Nome<tipo>) ainda não são suportados");
+        Expressao e;
+        e.tipo = Expressao::Tipo::NOVO;
+        e.valor = nullptr;
+        e.nomeFuncao = strdup(nomeClasse.valor);
+        e.argumentosFuncao = new Vetor<Expressao>();
+        e.argumentosFuncao->iniciar();
+        if(verificar(TipoToken::ABRE_PARENTESE)) {
+            pos++;
+            analisarArgumentos(*e.argumentosFuncao);
+        }
+        return continuarCadeia(e);
+    }
     if(verificar(TipoToken::CHAMADA_SISTEMA)) {
         Expressao e;
         e.tipo = Expressao::Tipo::CHAMADA_SISTEMA;
@@ -485,11 +507,7 @@ inline Expressao Analisador::analisarChamadaFuncaoComoExpressao() {
     e.argumentosFuncao->iniciar();
 
     consumir(TipoToken::ABRE_PARENTESE, "esperado '(' após nome da função chamada");
-    while(!verificar(TipoToken::FECHA_PARENTESE)) {
-        e.argumentosFuncao->empurrar(analisarExpressaoAditiva());
-        if(verificar(TipoToken::VIRGULA)) pos++;
-    }
-    consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
+    analisarArgumentos(*e.argumentosFuncao);
     return e;
 }
 
@@ -507,11 +525,7 @@ inline Expressao Analisador::analisarChamadaMetodoComoExpressao() {
     e.argumentosFuncao = new Vetor<Expressao>();
     e.argumentosFuncao->iniciar();
     consumir(TipoToken::ABRE_PARENTESE, "esperado '(' após nome do método");
-    while(!verificar(TipoToken::FECHA_PARENTESE)) {
-        e.argumentosFuncao->empurrar(analisarExpressaoAditiva());
-        if(verificar(TipoToken::VIRGULA)) pos++;
-    }
-    consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
+    analisarArgumentos(*e.argumentosFuncao);
     return e;
 }
 

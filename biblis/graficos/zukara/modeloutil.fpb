@@ -4,15 +4,14 @@
 #classe Modelo herda Liberavel {
     flu* vertices;
     
-    estatico Modelo* novo(flu* vertices) {
+    Modelo(flu* vertices) {
         Modelo* m = malocar(bytes(Modelo));
         m.liberado = falso;
         m.vertices = vertices;
         retorne m;
     }
     
-    @sobrepor
-    nulo liberar() {
+    ~Modelo() {
         mliberar(vertices);
         Liberavel.liberar(este);
     }

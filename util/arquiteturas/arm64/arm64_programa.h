@@ -2,28 +2,26 @@
 #pragma once
 #include "arm64.h"
 
-// bytes de pilha que a MAIOR chamada do bloco precisa pra args alem de x0-x7/v0-v7 (8 bytes cada)
-inline int bytesArgsSaida(const Vetor<ComandoIR>& bloco) {
-    int maior = 0;
+// sobe "maior" pros bytes de pilha da maior chamada do bloco(e dos aninhados) que passa dos x0-x7/v0-v7 (8 bytes cada)
+inline void acumularBytesArgsSaida(const Vetor<ComandoIR>& bloco, int& maior) {
     for(int i = 0; i < bloco.tam; i++) {
         const ComandoIR& c = bloco[i];
-        int n = 0;
         if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) {
             int ints = 0, flus = 0, pilha = 0;
             for(int a = 0; a < c.chamadaFuncaoUsuario.argumentos.tam; a++) {
                 if(c.chamadaFuncaoUsuario.argumentos[a].ehFlutuante) { if(flus++ >= 8) pilha++; }
                 else { if(ints++ >= 8) pilha++; }
             }
-            n = pilha * 8;
-        } else if(c.tipo == ComandoIR::Tipo::SE) {
-            n = bytesArgsSaida(*c.instrucaoSe.entao);
-            if(c.instrucaoSe.temSenao) { int m = bytesArgsSaida(*c.instrucaoSe.senaoCorpo); if(m > n) n = m; }
-        } else if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
-            n = bytesArgsSaida(*c.instrucaoEnquanto.comandosCondicao);
-            int m = bytesArgsSaida(*c.instrucaoEnquanto.corpo); if(m > n) n = m;
+            if(pilha * 8 > maior) maior = pilha * 8;
         }
-        if(n > maior) maior = n;
+        paraCadaFilho(c, acumularBytesArgsSaida, maior);
     }
+}
+
+// bytes de pilha que a MAIOR chamada do bloco precisa pra args alem de x0-x7/v0-v7 (8 bytes cada)
+inline int bytesArgsSaida(const Vetor<ComandoIR>& bloco) {
+    int maior = 0;
+    acumularBytesArgsSaida(bloco, maior);
     return maior;
 }
 

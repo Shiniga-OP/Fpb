@@ -37,32 +37,13 @@ inline void GeradorIR::gerarRetorne(const ComandoRetorne& comandoRetorne, Vetor<
 // execução), nunca o literal resolvido: reatribuições futuras precisam ser enxergadas.
 inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     int slot = ctx.variaveisLocais.proximoSlot++; // reserva já: temporários da expressão não podem pegar o mesmo slot
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = larguraDoTipo(decl.tipo);
-    referenciaSlot.sinalizado = tipoEhSinalizado(decl.tipo);
-    referenciaSlot.elementoSinalizado = elementoEhSinalizado(decl.tipo);
-    referenciaSlot.larguraElemento = larguraElementoApontado(decl.tipo); // so relevante se esta variavel for usada como ponteiro numa indexacao(nome[i]); ver comentario de larguraElementoApontado()
-    referenciaSlot.ehPonteiro = tipoEhPonteiro(decl.tipo);
-    referenciaSlot.ehFlutuante = tipoEhFlutuante(decl.tipo);
-    referenciaSlot.elementoFlutuante = elementoEhFlutuante(decl.tipo);
+    ArgumentoIR referenciaSlot = argumentoSlot(slot, decl.tipo);
     
     if(decl.nomeEspaco) referenciaSlot.idEspaco = obterIdEspaco(decl.nomeEspaco);
     if(decl.ehArray) {
         if(decl.tamArray <= 0) throw std::runtime_error("Array precisa ter tamanho maior que zero");
-        int bytes = decl.tamArray * larguraElementoApontado(decl.tipo);
-        bytes = ((bytes + 15) / 16) * 16;
-        int posArray = bytesArraysAtual;
-        bytesArraysAtual += bytes;
         ctx.variaveisLocais.definirComSlot(decl.nome, referenciaSlot, slot);
-        ComandoIR comandoArray;
-        comandoArray.tipo = ComandoIR::Tipo::ENDERECO_FRAME;
-        comandoArray.instrucaoEnderecoFrame.slotDestino = slot;
-        comandoArray.instrucaoEnderecoFrame.posArray = posArray;
-        saida.empurrar(comandoArray);
+        reservarNoFrame(decl.tamArray * larguraElementoApontado(decl.tipo), slot, saida);
         if(decl.temLista) {
             // "tipo[N] nome = { v0, v1, ... };": um ESCRITA_INDEXADA por elemento; os que a lista não cobre são zerados
             for(int i = 0; i < decl.tamArray; i++) {
@@ -91,18 +72,18 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
             throw std::runtime_error("Espaço '" + nomeStr + "' tem " + std::to_string(espaco.campos.tam) + " campo(s), mas a lista de inicialização tem " + std::to_string(decl.listaInicial.tam) + " valor(es)");
         }
         referenciaSlot.espacoPorValor = true;
-        int bytes = ((tamanhoDoEspaco(id) + 15) / 16) * 16;
-        int posArray = bytesArraysAtual;
-        bytesArraysAtual += bytes;
         ctx.variaveisLocais.definirComSlot(decl.nome, referenciaSlot, slot);
-        ComandoIR comandoEndereco;
-        comandoEndereco.tipo = ComandoIR::Tipo::ENDERECO_FRAME;
-        comandoEndereco.instrucaoEnderecoFrame.slotDestino = slot;
-        comandoEndereco.instrucaoEnderecoFrame.posArray = posArray;
-        saida.empurrar(comandoEndereco);
+        reservarNoFrame(tamanhoDoEspaco(id), slot, saida);
         registrarLiberacaoAutomatica(slot, id, ctx);
         if(decl.temLista && temConstrutor(id)) {
             emitirConstrutor(decl, id, saida, ctx);
+            return;
+        }
+        if(!decl.temLista && decl.listaInicial.tam == 1 && decl.listaInicial[0].tipo == Expressao::Tipo::NOVO && obterIdEspaco(decl.listaInicial[0].nomeFuncao) == id && temConstrutor(id)) {
+            // "Nome x = novo Nome(args);": constrói direto na variável(sem alocar no heap nem copiar), igual a "Nome x = { args };"
+            DeclaracaoVariavel construcao = decl;
+            construcao.listaInicial = *decl.listaInicial[0].argumentosFuncao;
+            emitirConstrutor(construcao, id, saida, ctx);
             return;
         }
         if(!decl.temLista && decl.listaInicial.tam == 1) {
@@ -117,6 +98,13 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
             return;
         }
         if(!decl.temLista) {
+            // "Nome x;": chama o construtor sem argumentos, se existir(só o "este"); senão zera os campos
+            int totalParametrosCriar = 0;
+            std::string nomeCriar = std::string(espacos.declaracoes[id]->nome) + "_.criar";
+            if(funcoesUsuario.buscar(nomeCriar.c_str(), &totalParametrosCriar) && totalParametrosCriar == 1) {
+                emitirConstrutor(decl, id, saida, ctx);
+                return;
+            }
             zerarEspaco(referenciaSlot, id, saida);
             return;
         }
@@ -213,6 +201,14 @@ inline ArgumentoIR GeradorIR::gravarEmVariavel(const char* nome, ArgumentoIR val
     ArgumentoIR existente;
     int slot;
     if(!ctx.variaveisLocais.buscar(nome, &existente, &slot)) {
+        // nome solto dentro de um método: campo de instância ou estatico da classe de "este"
+        ArgumentoIR este;
+        if(ctx.variaveisLocais.buscar("este", &este) && este.idEspaco >= 0) {
+            std::string simbolo;
+            if(existeCampo(este.idEspaco, nome) || buscarEstatico(este.idEspaco, nome, simbolo)) {
+                return gravarEmCampo("este", nome, valor, saida, ctx);
+            }
+        }
         std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
     }
@@ -271,7 +267,16 @@ inline ArgumentoIR GeradorIR::gravarEmIndexacao(const ArgumentoIR& ponteiro, con
 
 // "nome[indice] = expr;"
 inline void GeradorIR::gerarAtribuicaoIndexada(const AtribuicaoIndexada& atr, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    ArgumentoIR ponteiro = resolverPonteiroIndexado(atr.nome, atr.campo, saida, ctx);
+    // "p[i] = e" com "p" campo de "este": vira "este.p[i] = e"
+    const char* nomeBase = atr.nome;
+    const char* campoBase = atr.campo;
+    ArgumentoIR local;
+    ArgumentoIR este;
+    if(!atr.campo && !ctx.variaveisLocais.buscar(atr.nome, &local) && ctx.variaveisLocais.buscar("este", &este) && este.idEspaco >= 0 && existeCampo(este.idEspaco, atr.nome)) {
+        nomeBase = "este";
+        campoBase = atr.nome;
+    }
+    ArgumentoIR ponteiro = resolverPonteiroIndexado(nomeBase, campoBase, saida, ctx);
     ArgumentoIR indice = resolverExpressao(atr.indice, saida, ctx);
     ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
     gravarEmIndexacao(ponteiro, indice, valor, saida, ctx);
@@ -389,174 +394,41 @@ inline void GeradorIR::gerarBlocoComandos(const Vetor<Comando>& corpo, Vetor<Com
         } else if(comando.tipo == Comando::Tipo::EXPRESSAO) {
             resolverExpressao(comando.expressao, saida, ctx);
         } else {
-            gerarChamadaFuncao(comando.chamadaFuncao, saida, ctx);
+            // "p.metodo(args);" com "p" campo de "este": reescreve como "este.p.metodo(args);"
+            const ChamadaFuncao& original = comando.chamadaFuncao;
+            const char* ponto = strchr(original.nome, '.');
+            ArgumentoIR este;
+            bool reescrever = false;
+            std::string base;
+            if(ponto && ponto != original.nome) {
+                base = std::string(original.nome, ponto - original.nome);
+                ArgumentoIR local;
+                reescrever = !ctx.variaveisLocais.buscar(base.c_str(), &local) && ctx.variaveisLocais.buscar("este", &este) && este.idEspaco >= 0 && existeCampo(este.idEspaco, base.c_str());
+            }
+            if(reescrever) {
+                Expressao identificadorEste;
+                identificadorEste.tipo = Expressao::Tipo::IDENTIFICADOR;
+                identificadorEste.valor = strdup("este");
+                Expressao receptor;
+                receptor.tipo = Expressao::Tipo::ACESSO_CAMPO;
+                receptor.valor = strdup(base.c_str());
+                receptor.esquerda = new Expressao(identificadorEste);
+                receptor.direita = nullptr;
+                ChamadaFuncao reescrita;
+                reescrita.iniciar();
+                reescrita.nome = strdup(ponto);
+                reescrita.argumentos.empurrar(receptor);
+                for(int a = 0; a < original.argumentos.tam; a++) reescrita.argumentos.empurrar(original.argumentos[a]);
+                gerarChamadaFuncao(reescrita, saida, ctx);
+                free(reescrita.nome);
+                receptor.liberar();
+                reescrita.argumentos.liberar();
+            } else {
+                gerarChamadaFuncao(comando.chamadaFuncao, saida, ctx);
+            }
         }
         emitirLiberacaoTemporarios(marcaTemp, true, saida, ctx);
     }
-}
-
-// "X.metodo(args)" com X qualquer expressão (o parser manda ".metodo" e X em argumentos[0]): resolve X uma vez, guarda numa
-// variável oculta e devolve "oculta.metodo", que segue o caminho normal de desdobrarChamadaMetodo.
-inline std::string GeradorIR::ocultarReceptor(const char* nome, const Expressao& receptor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    ArgumentoIR valor = resolverExpressao(receptor, saida, ctx);
-    if(valor.tipo != ArgumentoIR::Tipo::REGISTRADOR || valor.idEspaco < 0) {
-        throw std::runtime_error(std::string("O valor à esquerda de '") + nome + "' não é um espaço, não tem métodos");
-    }
-    std::string oculto = "$r" + std::to_string(valor.registrador);
-    ctx.variaveisLocais.definirComSlot(oculto.c_str(), valor, valor.registrador);
-    return oculto + nome;
-}
-
-// gera IR pra uma chamada de função de usuário usada como COMANDO de
-// topo(valor de retorno, se houver, e descartado): "bl nome". "saida"
-// recebe os comandos auxiliares de cada argumento(ex: chamada de funcao
-// aninhada) antes do comando final.
-inline void GeradorIR::gerarChamadaFuncao(const ChamadaFuncao& chamada, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    if(chamada.nome[0] == '.') {
-        ChamadaFuncao oculta;
-        oculta.iniciar();
-        std::string nomeOculto = ocultarReceptor(chamada.nome, chamada.argumentos[0], saida, ctx);
-        oculta.nome = strdup(nomeOculto.c_str());
-        for(int i = 1; i < chamada.argumentos.tam; i++) oculta.argumentos.empurrar(chamada.argumentos[i]);
-        gerarChamadaFuncao(oculta, saida, ctx);
-        free(oculta.nome);
-        oculta.argumentos.liberar();
-        return;
-    }
-    std::string nomeMetodo;
-    ChamadaFuncao reescrita;
-    reescrita.iniciar();
-    if(desdobrarChamadaMetodo(chamada.nome, chamada.argumentos, nomeMetodo, reescrita.argumentos, ctx)) {
-        reescrita.nome = strdup(nomeMetodo.c_str());
-        gerarChamadaFuncao(reescrita, saida, ctx);
-        free(reescrita.nome);
-        liberarDesdobramento(reescrita.argumentos, chamada.argumentos.tam);
-        return;
-    }
-    reescrita.argumentos.liberar();
-    int totalParametrosEsperado;
-    if(!funcoesUsuario.buscar(chamada.nome, &totalParametrosEsperado)) {
-        // não é função de usuário: pode ser uma variável que guarda um endereço("f();" com "nulo* f = @(endereco);")
-        ComandoIR comandoIndireto;
-        comandoIndireto.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-        comandoIndireto.chamadaFuncaoUsuario.iniciar();
-        if(prepararChamadaIndireta(chamada.nome, chamada.argumentos, comandoIndireto.chamadaFuncaoUsuario, saida, ctx)) {
-            saida.empurrar(comandoIndireto);
-            return;
-        }
-        std::string nomeStr = chamada.nome;
-        throw std::runtime_error("Função '" + nomeStr + "' não foi declarada (faltou #incluir a biblioteca correta?)");
-    }
-    ComandoIR comandoIR;
-    comandoIR.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
-    comandoIR.chamadaFuncaoUsuario.iniciar();
-    comandoIR.chamadaFuncaoUsuario.nome = strdup(chamada.nome);
-    resolverArgumentosChamada(chamada.nome, chamada.argumentos, comandoIR.chamadaFuncaoUsuario.argumentos, saida, ctx);
-    saida.empurrar(comandoIR);
-}
-
-// "nome.metodo(args)": se "nome" é uma variável de espaço, vira "Classe_metodo(nome, args)"; se "nome" é o nome de um espaço(classe), vira
-// "Classe_metodo(args)"(método estático). Devolve false se "nome" não tem '.'(chamada normal). "novos" já deve estar iniciado: recebe cópias
-// rasas das expressões(não é dono delas, só do identificador injetado, ver liberarDesdobramento).
-inline bool GeradorIR::desdobrarChamadaMetodo(const char* nome, const Vetor<Expressao>& argumentos, std::string& nomeFuncao, Vetor<Expressao>& novos, ContextoFuncao& ctx) {
-    const char* ponto = strchr(nome, '.');
-    if(!ponto) return false;
-    std::string base(nome, ponto - nome);
-    std::string metodo = ponto + 1;
-    ArgumentoIR variavel;
-    if(ctx.variaveisLocais.buscar(base.c_str(), &variavel)) {
-        if(variavel.idEspaco < 0) {
-            throw std::runtime_error("Variável '" + base + "' não é um espaço, não tem métodos");
-        }
-        if(!buscarMetodo(variavel.idEspaco, metodo.c_str(), nomeFuncao)) {
-            nomeFuncao = std::string(espacos.declaracoes[variavel.idEspaco]->nome) + "_" + metodo;
-        }
-        Expressao este;
-        este.tipo = Expressao::Tipo::IDENTIFICADOR;
-        este.valor = strdup(base.c_str());
-        novos.empurrar(este);
-    } else {
-        int idClasse = espacos.buscar(base.c_str());
-        if(idClasse < 0) {
-            throw std::runtime_error("'" + base + "' não é uma variável nem uma classe");
-        }
-        if(!buscarMetodo(idClasse, metodo.c_str(), nomeFuncao)) nomeFuncao = base + "_" + metodo;
-    }
-    for(int i = 0; i < argumentos.tam; i++) novos.empurrar(argumentos[i]);
-    return true;
-}
-
-// libera o que desdobrarChamadaMetodo criou: o identificador injetado(se houve) e o vetor. As demais expressões são do chamador.
-inline void GeradorIR::liberarDesdobramento(Vetor<Expressao>& novos, int totalOriginal) {
-    if(novos.tam > totalOriginal) free(novos[0].valor);
-    novos.liberar();
-}
-
-// valida a contagem de argumentos contra a assinatura de "nome" e resolve todos pra "destino"(usada por
-// gerarChamadaFuncao e resolverChamadaFuncaoComoValor). Função variádica("longo... args" no fim): os argumentos fixos
-// são resolvidos normalmente, e os extras são empacotados num array de longo(8 bytes cada) na área de arrays do frame;
-// o endereço desse array vira o último argumento. Cada extra é gravado logo depois de resolvido, então chamadas dentro
-// dos argumentos funcionam. Os comandos auxiliares vão em "saida", antes do comando da chamada.
-inline void GeradorIR::resolverArgumentosChamada(const char* nome, const Vetor<Expressao>& argumentos, Vetor<ArgumentoIR>& destino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    std::string nomeStr = nome;
-    int totalParametros = 0;
-    funcoesUsuario.buscar(nome, &totalParametros);
-    bool variadica = funcoesUsuario.ehVariadica(nome);
-    int fixos = variadica ? totalParametros - 1 : totalParametros;
-    bool contagemOk = variadica ? (argumentos.tam >= fixos) : (argumentos.tam == fixos);
-    if(!contagemOk) {
-        throw std::runtime_error("Função '" + nomeStr + "' espera " + std::string(variadica ? "pelo menos " : "") + std::to_string(fixos) + " argumento(s), recebeu " + std::to_string(argumentos.tam));
-    }
-    const DeclaracaoFuncao* declaracao = nullptr;
-    corposFuncoesUsuario.buscar(nome, &declaracao);
-    for(int j = 0; j < fixos; j++) {
-        ArgumentoIR arg = resolverExpressao(argumentos[j], saida, ctx);
-        if(declaracao) arg = converterParaTipo(arg, tipoEhFlutuante(declaracao->parametros[j].tipo), larguraDoTipo(declaracao->parametros[j].tipo), saida, ctx);
-        if(declaracao && declaracao->parametros[j].tipo == TipoVariavel::ESPACO) {
-            // parâmetro "Nome x"(por valor, como em C): a função recebe o endereço de uma CÓPIA no frame de quem chama.
-            int idParametro = obterIdEspaco(declaracao->parametros[j].nomeEspaco);
-            if(arg.tipo != ArgumentoIR::Tipo::REGISTRADOR || arg.idEspaco != idParametro) {
-                throw std::runtime_error("Função '" + nomeStr + "': o argumento " + std::to_string(j + 1) + " precisa ser um espaço do tipo esperado");
-            }
-            arg = criarCopiaEspaco(arg, idParametro, saida, ctx);
-        }
-        destino.empurrar(arg);
-    }
-    if(!variadica) return;
-
-    int extras = argumentos.tam - fixos;
-    int bytes = ((extras * 8 + 15) / 16) * 16; // mesma regra de arredondamento dos arrays declarados(gerarDeclaracaoVariavel)
-    int posArray = bytesArraysAtual;
-    bytesArraysAtual += bytes;
-    int slot = ctx.variaveisLocais.proximoSlot++;
-
-    ComandoIR comandoEndereco;
-    comandoEndereco.tipo = ComandoIR::Tipo::ENDERECO_FRAME;
-    comandoEndereco.instrucaoEnderecoFrame.slotDestino = slot;
-    comandoEndereco.instrucaoEnderecoFrame.posArray = posArray;
-    saida.empurrar(comandoEndereco);
-
-    ArgumentoIR pacote; // ponteiro pro array de longo: serve de base das escritas e de último argumento da chamada
-    pacote.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    pacote.simbolo = nullptr;
-    pacote.imediato = 0;
-    pacote.registrador = slot;
-    pacote.larguraBytes = 8;
-    pacote.larguraElemento = 8;
-    pacote.elementoSinalizado = true;
-
-    for(int i = 0; i < extras; i++) {
-        ArgumentoIR valor = resolverExpressao(argumentos[fixos + i], saida, ctx);
-        if(valor.ehFlutuante) valor = converterParaTipo(valor, true, 8, saida, ctx); // como em C: flu nos extras vira dobro
-        if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = 8; // monta o imediato direto em 64 bits
-        ComandoIR comandoEscrita;
-        comandoEscrita.tipo = ComandoIR::Tipo::ESCRITA_INDEXADA;
-        comandoEscrita.instrucaoEscritaIndexada.ponteiro = copiarArgumento(pacote);
-        comandoEscrita.instrucaoEscritaIndexada.indice = imediatoInt(i);
-        comandoEscrita.instrucaoEscritaIndexada.valor = valor;
-        saida.empurrar(comandoEscrita);
-    }
-    destino.empurrar(pacote);
 }
 
 // gera IR pra "por(inicio; condicao; passo) { corpo }" desdobrando em
@@ -582,90 +454,6 @@ inline void GeradorIR::gerarComandoPor(const ComandoPor& comandoPor, Vetor<Coman
     saida.empurrar(comandoIR);
     emitirLiberacoesDeEscopo(marcaPor, true, saida, ctx);
 }
-// copia campo a campo o espaço cujo endereço base está em "origem" pro espaço cujo endereço base está em "destino". Cada campo vira
-// um par LEITURA_INDEXADA/ESCRITA_INDEXADA(mesmo mecanismo de resolverAcessoCampo e emitirEscritaCampo), então não precisa de
-// instrução nova no IR e o padding não é copiado. Serve pra "a = b", pro argumento por valor e, no futuro, pro retorno de espaço.
-inline void GeradorIR::copiarEspaco(const ArgumentoIR& origem, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    const DeclaracaoEspaco& espaco = *espacos.declaracoes[idEspaco];
-    for(int i = 0; i < espaco.campos.tam; i++) {
-        int posCampo;
-        TipoVariavel tipoCampo;
-        posicaoDoCampo(idEspaco, espaco.campos[i].nome, &posCampo, &tipoCampo);
-        int largura = larguraDoTipo(tipoCampo);
-
-        int slot = ctx.variaveisLocais.proximoSlot++;
-        ComandoIR leitura;
-        leitura.tipo = ComandoIR::Tipo::LEITURA_INDEXADA;
-        leitura.instrucaoLeituraIndexada.slotDestino = slot;
-        leitura.instrucaoLeituraIndexada.ponteiro = copiarArgumento(origem);
-        leitura.instrucaoLeituraIndexada.ponteiro.larguraElemento = largura;
-        leitura.instrucaoLeituraIndexada.indice = imediatoInt(posCampo / largura);
-        saida.empurrar(leitura);
-
-        ArgumentoIR valor;
-        valor.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-        valor.simbolo = nullptr;
-        valor.imediato = 0;
-        valor.registrador = slot;
-        valor.larguraBytes = largura;
-        valor.sinalizado = tipoEhSinalizado(tipoCampo);
-        valor.elementoSinalizado = elementoEhSinalizado(tipoCampo);
-        valor.larguraElemento = larguraElementoApontado(tipoCampo);
-        emitirEscritaCampo(destino, posCampo, tipoCampo, valor, saida);
-    }
-}
-
-// reserva um corpo novo do espaço "idEspaco" na área de arrays do frame de quem chama(mesmo mecanismo de gerarDeclaracaoVariavel),
-// copia o conteúdo de "origem" pra lá e devolve o argumento com o endereço base da cópia. É o que o "Nome x" por valor recebe.
-inline ArgumentoIR GeradorIR::criarCopiaEspaco(const ArgumentoIR& origem, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    int bytes = ((tamanhoDoEspaco(idEspaco) + 15) / 16) * 16;
-    int posArray = bytesArraysAtual;
-    bytesArraysAtual += bytes;
-    int slot = ctx.variaveisLocais.proximoSlot++;
-
-    ComandoIR comandoEndereco;
-    comandoEndereco.tipo = ComandoIR::Tipo::ENDERECO_FRAME;
-    comandoEndereco.instrucaoEnderecoFrame.slotDestino = slot;
-    comandoEndereco.instrucaoEnderecoFrame.posArray = posArray;
-    saida.empurrar(comandoEndereco);
-
-    ArgumentoIR copia = copiarArgumento(origem);
-    copia.registrador = slot;
-    copia.espacoPorValor = true;
-    copiarObjeto(origem, copia, idEspaco, saida, ctx);
-    return copia;
-}
-
-// monta a chamada de uma função por endereço: "nome" é uma variável local de 8 bytes que guarda o endereço da função(ex: "nulo* f = @(endereco); f();").
-// Devolve false se "nome" não é variável. Os argumentos vão em x0..x5, como no "bl"; não há assinatura pra conferir, então só o máximo de 6 é validado.
-// O endereço fica em "enderecoAlvo" e a arquitetura emite "blr" em vez de "bl nome".
-inline bool GeradorIR::prepararChamadaIndireta(const char* nome, const Vetor<Expressao>& argumentos, InstrucaoChamadaFuncaoUsuario& chamada, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    ArgumentoIR variavel;
-    if(!ctx.variaveisLocais.buscar(nome, &variavel)) return false;
-    std::string nomeStr = nome;
-    if(variavel.larguraBytes != 8) {
-        throw std::runtime_error("Variável '" + nomeStr + "' não pode ser chamada como função: precisa guardar um endereço de 8 bytes");
-    }
-    int totalInteiros = 0;
-    int totalFlutuantes = 0;
-    if(argumentos.tam > 16) {
-        throw std::runtime_error("Chamada por '" + nomeStr + "' aceita no máximo 8 argumentos inteiros e 8 flutuantes");
-    }
-    chamada.indireta = true;
-    chamada.enderecoAlvo = copiarArgumento(variavel);
-    chamada.enderecoAlvo.ehPonteiro = variavel.ehPonteiro;
-    for(int i = 0; i < argumentos.tam; i++) {
-        ArgumentoIR arg = resolverExpressao(argumentos[i], saida, ctx);
-        if(arg.ehFlutuante) totalFlutuantes++;
-        else totalInteiros++;
-        chamada.argumentos.empurrar(arg);
-    }
-    if(totalInteiros > 8 || totalFlutuantes > 8) {
-        throw std::runtime_error("Chamada por '" + nomeStr + "' aceita no máximo 8 argumentos inteiros e 8 flutuantes");
-    }
-    return true;
-}
-
 // "apagar alvo;": chama "Nome_liberar(alvo)"(se existir) e devolve a casca com "mliberar". Se o alvo é um temporário
 // (ex: "apagar a + b;"), tira ele da lista de temporários: senão o fim do comando liberaria a mesma casca duas vezes.
 inline void GeradorIR::gerarApagar(const ComandoApagar& comando, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {

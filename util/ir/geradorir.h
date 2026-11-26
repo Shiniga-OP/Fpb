@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <initializer_list>
 #include "../config.h"
 #include "../ast.h"
 #include "ir.h"
@@ -95,12 +96,13 @@ public:
     char* gerarNomeSimbolo(const char* textoOriginal);
     bool elementoEhFlutuante(TipoVariavel tipoPonteiro);
     ArgumentoIR constanteDoTipo(long valor, TipoVariavel tipo);
+    ArgumentoIR argumentoSlot(int slot, TipoVariavel tipo);
+    ArgumentoIR argumentoSlotLargura(int slot, int largura, bool flutuante = false);
 
     // === gerador_funcoes.h ===
     ProgramaIR gerar(const Programa& programa);
     void registrarFuncoes(const Programa& programa, const std::string& origem = "programa principal");
     void gerarFuncaoAlcancavel(const char* nome, ProgramaIR& ir, VetorStr& jaGeradas);
-    void coletarChamadasUsuario(const Vetor<ComandoIR>& bloco, VetorStr& saida);
     FuncaoIR gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<DadoEstaticoIR>& dados);
     bool comandoCrahamadaTerminaProcesso(const ComandoIR& comandoIR);
     ComandoIR gerarSairImplicito();
@@ -131,16 +133,12 @@ public:
     // === gerador_expressoes.h ===
     ArgumentoIR resolverExpressao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverBytes(const Expressao& expressao, TabelaVariaveisLocais& variaveisLocais);
-    ArgumentoIR resolverIndexacao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverConversao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverChamadaSistemaComoValor(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    ArgumentoIR resolverChamadaFuncaoComoValor(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    ArgumentoIR resolverEndereco(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR converterParaTipo(ArgumentoIR valor, bool destinoFlutuante, int larguraDestino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void promoverFlutuantes(ArgumentoIR& esq, ArgumentoIR& dir, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverOperadorEspaco(OperadorAritmetico op, ArgumentoIR esquerda, ArgumentoIR direita, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverTernaria(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    ArgumentoIR resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverAtribuicao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR congelarValor(ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR gravarEmVariavel(const char* nome, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
@@ -148,9 +146,7 @@ public:
     ArgumentoIR gravarEmCampo(const char* nome, const char* campo, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR lerCampoDeBase(const ArgumentoIR& base, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR gravarEmCampoBase(const ArgumentoIR& base, const char* campo, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    ArgumentoIR resolverPonteiroDaExpressao(const Expressao& e, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     int idEspacoDoCampo(int idEspaco, const char* campo);
-    std::string ocultarReceptor(const char* nome, const Expressao& receptor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
 
     // === gerador_condicoes.h ===
     void atribuirMarcacao(int slot, long valor, Vetor<ComandoIR>& saida);
@@ -167,15 +163,23 @@ public:
     void gerarComandoEnquanto(const ComandoEnquanto& comandoEnquanto, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void gerarComandoPor(const ComandoPor& comandoPor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void gerarBlocoComandos(const Vetor<Comando>& corpo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    void gerarChamadaFuncao(const ChamadaFuncao& chamada, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    void resolverArgumentosChamada(const char* nome, const Vetor<Expressao>& argumentos, Vetor<ArgumentoIR>& destino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    bool prepararChamadaIndireta(const char* nome, const Vetor<Expressao>& argumentos, InstrucaoChamadaFuncaoUsuario& chamada, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    bool desdobrarChamadaMetodo(const char* nome, const Vetor<Expressao>& argumentos, std::string& nomeFuncao, Vetor<Expressao>& novos, ContextoFuncao& ctx);
-    void liberarDesdobramento(Vetor<Expressao>& novos, int totalOriginal);
-    void copiarEspaco(const ArgumentoIR& origem, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    ArgumentoIR criarCopiaEspaco(const ArgumentoIR& origem, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void gerarApagar(const ComandoApagar& comando, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     
+    // === gerador_chamadas.h ===
+    void gerarChamadaFuncao(const ChamadaFuncao& chamada, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    std::string ocultarReceptor(const char* nome, const Expressao& receptor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    bool desdobrarChamadaMetodo(const char* nome, const Vetor<Expressao>& argumentos, std::string& nomeFuncao, Vetor<Expressao>& novos, ContextoFuncao& ctx);
+    void liberarDesdobramento(Vetor<Expressao>& novos, int totalOriginal);
+    void resolverArgumentosChamada(const char* nome, const Vetor<Expressao>& argumentos, Vetor<ArgumentoIR>& destino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    bool prepararChamadaIndireta(const char* nome, const Vetor<Expressao>& argumentos, InstrucaoChamadaFuncaoUsuario& chamada, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR resolverChamadaFuncaoComoValor(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+
+    // === gerador_ponteiros.h ===
+    ArgumentoIR resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR resolverPonteiroDaExpressao(const Expressao& e, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR resolverIndexacao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR resolverEndereco(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+
     // === gerador_vida.h ===
     ArgumentoIR argumentoEspaco(int slot, int idEspaco);
     void emitirCriar(const ArgumentoIR& destino, ArgumentoIR valor, int idEspaco, Vetor<ComandoIR>& saida);
@@ -193,6 +197,12 @@ public:
     bool temConstrutor(int idEspaco);
     void emitirAlocar(int slot, int idEspaco, Vetor<ComandoIR>& saida);
     void emitirConstrutor(const DeclaracaoVariavel& decl, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ComandoIR montarChamada(const char* nome, std::initializer_list<ArgumentoIR> args);
+    void emitirChamada(const char* nome, std::initializer_list<ArgumentoIR> args, Vetor<ComandoIR>& saida);
+    ArgumentoIR capturarChamada(ComandoIR& comando, TipoVariavel tipoRetorno, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    void reservarNoFrame(int bytes, int slot, Vetor<ComandoIR>& saida);
+    void copiarEspaco(const ArgumentoIR& origem, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR criarCopiaEspaco(const ArgumentoIR& origem, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     
     // === gerador_globais.h ===
     void registrarGlobaisDeclaradas(const Programa& programa);
@@ -206,6 +216,8 @@ public:
 #include "gerador_expressoes.h"
 #include "gerador_condicoes.h"
 #include "gerador_comandos.h"
+#include "gerador_chamadas.h"
+#include "gerador_ponteiros.h"
 #include "gerador_espacos.h"
 #include "gerador_vida.h"
 #include "gerador_globais.h"

@@ -22,14 +22,14 @@
         se(status[0] == 0) {
             car[512] log;
             GL20.obterShaderInfo(s, 512, 0, log);
-            // escrever(log);
+            escrever(log);
             GL20.apagarShader(s);
             retorne 0;
         }
         retorne s;
     }
 
-    estatico Programa* novo(car* vert, car* frag) {
+    Programa(car* vert, car* frag) {
         int v = Programa.compilar(GL20.SHADER_VERTICES, vert);
         int f = Programa.compilar(GL20.SHADER_FRAGMENTO, frag);
         int prog = GL20.criarPrograma();
@@ -38,10 +38,9 @@
         GL20.ligarPrograma(prog);
         GL20.apagarShader(v);
         GL20.apagarShader(f);
-        Programa* p = malocar(bytes(Programa));
-        p.liberado = falso;
-        p.id = prog;
-        retorne p;
+        
+        liberado = falso;
+        id = prog;
     }
 
     nulo iniciar() {
@@ -56,8 +55,7 @@
         
     }
 
-    @sobrepor
-    nulo liberar() {
+    ~Programa() {
         GL20.apagarPrograma(este.id);
         Liberavel.liberar(este);
     }

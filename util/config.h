@@ -37,7 +37,7 @@ enum class TipoToken {
     ENQUANTO, POR, APAGAR,
     // definição:
     RETORNE, SEM_SINAL, HERDA, ESTATICO, FINAL,
-    MODELO,
+    NOVO,
     // fim:
     FIM_ARQUIVO
 };
@@ -116,6 +116,23 @@ struct VetorStr {
     const char* obter(int i, int* saidaTam) const {
         *saidaTam = tams[i];
         return buf + pos[i];
+    }
+    
+    int buscar(const char* s, int sTam) const {
+        for(int i = 0; i < tam; i++) {
+            if(tams[i] == sTam && memcmp(buf + pos[i], s, sTam) == 0) return i;
+        }
+        return -1;
+    }
+    int buscar(const char* s) const {
+        return buscar(s, (int)strlen(s));
+    }
+    int buscarUltimo(const char* s) const {
+        int sTam = (int)strlen(s);
+        for(int i = tam - 1; i >= 0; i--) {
+            if(tams[i] == sTam && memcmp(buf + pos[i], s, sTam) == 0) return i;
+        }
+        return -1;
     }
 
     void empurrar(const char* s, int sLen) {

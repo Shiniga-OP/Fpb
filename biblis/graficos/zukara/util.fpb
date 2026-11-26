@@ -9,7 +9,7 @@
 #classe Vetor2 {
     flu x, y;
     
-    nulo criar(flu x, flu y) {
+    Vetor2(flu x, flu y) {
         este.x = x;
         este.y = y;
     }
@@ -23,7 +23,7 @@
 #classe Vetor3 {
     flu x, y, z;
     
-    nulo criar(flu x, flu y, flu z) {
+    Vetor3(flu x, flu y, flu z) {
         este.x = x;
         este.y = y;
         este.z = z;

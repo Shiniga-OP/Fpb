@@ -53,6 +53,64 @@ inline bool ehCorpoIdentificador(char c) {
     return isalnum(u) || u == '_' || u >= 128;
 }
 
+// texto -> tipo de token, pras tabelas de diretivas e palavras-chave abaixo. Busca linear: são poucas.
+struct PalavraReservada {
+    const char* texto;
+    TipoToken tipo;
+};
+
+static const PalavraReservada DIRETIVAS[] = {
+    {"#incluir", TipoToken::INCLUIR},
+    {"#macro", TipoToken::MACRO},
+    {"#macrofim", TipoToken::MACROFIM},
+    {"#se", TipoToken::PRE_SE},
+    {"#senaose", TipoToken::PRE_SENAOSE},
+    {"#senao", TipoToken::PRE_SENAO},
+    {"#sefim", TipoToken::PRE_FIM},
+    {"#espaco", TipoToken::ESPACO},
+    {"#classe", TipoToken::CLASSE},
+    {"#chamada_sistema", TipoToken::CHAMADA_SISTEMA},
+    {"#ligar", TipoToken::LIGAR},
+    {"#alvo", TipoToken::ALVO},
+};
+
+// "verdade"/"falso" não estão aqui: viram NUMERO(1/0) direto em lerIdentificadorOuPalavraChave.
+static const PalavraReservada PALAVRAS_CHAVE[] = {
+    {"nulo", TipoToken::NULO},
+    {"int", TipoToken::INT},
+    {"longo", TipoToken::LONGO},
+    {"car", TipoToken::CAR},
+    {"bool", TipoToken::BOOL},
+    {"byte", TipoToken::BYTE},
+    {"curto", TipoToken::CURTO},
+    {"flu", TipoToken::FLUTUANTE},
+    {"dobro", TipoToken::DOBRO},
+    {"se", TipoToken::SE},
+    {"senao", TipoToken::SENAO},
+    {"senão", TipoToken::SENAO},
+    {"enq", TipoToken::ENQUANTO},
+    {"enquanto", TipoToken::ENQUANTO},
+    {"por", TipoToken::POR},
+    {"retorne", TipoToken::RETORNE},
+    {"sem_sinal", TipoToken::SEM_SINAL},
+    {"apagar", TipoToken::APAGAR},
+    {"herda", TipoToken::HERDA},
+    {"novo", TipoToken::NOVO},
+    {"estatico", TipoToken::ESTATICO},
+    {"final", TipoToken::FINAL},
+};
+
+// procura "buf" em "tabela"(de "tam" entradas). Devolve true e preenche *saida se achar.
+inline bool buscarPalavraReservada(const BufAcumulador& buf, const PalavraReservada* tabela, int tam, TipoToken* saida) {
+    for(int i = 0; i < tam; i++) {
+        if(buf.igual(tabela[i].texto)) {
+            *saida = tabela[i].tipo;
+            return true;
+        }
+    }
+    return false;
+}
+
 class Lexer {
 public:
     char* fonte; // não possui: apenas le, quem chamou e dono
@@ -181,68 +239,7 @@ public:
         }
         Token t;
         t.linha = linhaAtual;
-        if(buf.igual("#incluir")) {
-            t.tipo = TipoToken::INCLUIR;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#macro")) {
-            t.tipo = TipoToken::MACRO;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#macrofim")) {
-            t.tipo = TipoToken::MACROFIM;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#se")) {
-            t.tipo = TipoToken::PRE_SE;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#senaose")) {
-            t.tipo = TipoToken::PRE_SENAOSE;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#senao")) {
-            t.tipo = TipoToken::PRE_SENAO;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#sefim")) {
-            t.tipo = TipoToken::PRE_FIM;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#espaco")) {
-            t.tipo = TipoToken::ESPACO;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#classe")) {
-            t.tipo = TipoToken::CLASSE;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#chamada_sistema")) {
-            t.tipo = TipoToken::CHAMADA_SISTEMA;
-            t.valor = buf.paraTokenTexto();
-            buf.liberar();
-            return t;
-        }
-        if(buf.igual("#ligar") || buf.igual("#alvo")) {
-            t.tipo = buf.igual("#ligar") ? TipoToken::LIGAR : TipoToken::ALVO;
+        if(buscarPalavraReservada(buf, DIRETIVAS, (int)(sizeof(DIRETIVAS) / sizeof(DIRETIVAS[0])), &t.tipo)) {
             t.valor = buf.paraTokenTexto();
             buf.liberar();
             return t;
@@ -267,27 +264,7 @@ public:
             buf.liberar();
             return t;
         }
-        if(buf.igual("nulo")) t.tipo = TipoToken::NULO;
-        else if(buf.igual("int")) t.tipo = TipoToken::INT;
-        else if(buf.igual("longo")) t.tipo = TipoToken::LONGO;
-        else if(buf.igual("car")) t.tipo = TipoToken::CAR;
-        else if(buf.igual("bool")) t.tipo = TipoToken::BOOL;
-        else if(buf.igual("byte")) t.tipo = TipoToken::BYTE;
-        else if(buf.igual("curto")) t.tipo = TipoToken::CURTO;
-        else if(buf.igual("flu")) t.tipo = TipoToken::FLUTUANTE;
-        else if(buf.igual("dobro")) t.tipo = TipoToken::DOBRO;
-        else if(buf.igual("se")) t.tipo = TipoToken::SE;
-        else if(buf.igual("senao") || buf.igual("senão")) t.tipo = TipoToken::SENAO;
-        else if(buf.igual("enq") || buf.igual("enquanto")) t.tipo = TipoToken::ENQUANTO;
-        else if(buf.igual("por")) t.tipo = TipoToken::POR;
-        else if(buf.igual("retorne")) t.tipo = TipoToken::RETORNE;
-        else if(buf.igual("sem_sinal")) t.tipo = TipoToken::SEM_SINAL;
-        else if(buf.igual("apagar")) t.tipo = TipoToken::APAGAR;
-        else if(buf.igual("herda")) t.tipo = TipoToken::HERDA;
-        else if(buf.igual("modelo")) t.tipo = TipoToken::MODELO;
-        else if(buf.igual("estatico")) t.tipo = TipoToken::ESTATICO;
-        else if(buf.igual("final")) t.tipo = TipoToken::FINAL;
-        else t.tipo = TipoToken::IDENTIFICADOR;
+        if(!buscarPalavraReservada(buf, PALAVRAS_CHAVE, (int)(sizeof(PALAVRAS_CHAVE) / sizeof(PALAVRAS_CHAVE[0])), &t.tipo)) t.tipo = TipoToken::IDENTIFICADOR;
         t.valor = buf.paraTokenTexto();
         buf.liberar();
         return t;

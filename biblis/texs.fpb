@@ -5,22 +5,26 @@
     car* txt;
     longo tam;
 
-    nulo criar(car* lit) {
+    Texto(car* lit) {
+        este.preencher(lit);
+    }
+
+    nulo copiar(Texto* origem) {
+        este.preencher(origem.txt);
+    }
+
+    ~Texto() {
+        se(este.txt != 0) mliberar(este.txt);
+        este.txt = 0;
+        este.tam = 0;
+    }
+
+    nulo preencher(car* lit) {
         longo n = textam(lit);
         car* buf = malocar(n + 1);
         por(longo i = 0; i <= n; i++) buf[i] = lit[i];
         este.txt = buf;
         este.tam = n;
-    }
-
-    nulo copiar(Texto* origem) {
-        este.criar(origem.txt);
-    }
-
-    nulo liberar() {
-        se(este.txt != 0) mliberar(este.txt);
-        este.txt = 0;
-        este.tam = 0;
     }
 
     Texto* somar(Texto* outro) {

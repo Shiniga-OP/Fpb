@@ -275,34 +275,89 @@ struct ComandoIR {
     }
 };
 
+// libera cada comando de um bloco alocado com new, o próprio bloco, e zera o ponteiro. Aceita nullptr(senão ausente).
+inline void liberarBloco(Vetor<ComandoIR>*& bloco) {
+    if(!bloco) return;
+    for(int i = 0; i < bloco->tam; i++) (*bloco)[i].liberar();
+    bloco->liberar();
+    delete bloco;
+    bloco = nullptr;
+}
+
 inline void InstrucaoSe::liberar() {
-    for(int i = 0; i < entao->tam; i++) (*entao)[i].liberar();
-    entao->liberar();
-    delete entao;
-    entao = nullptr;
-    if(senaoCorpo) {
-        for(int i = 0; i < senaoCorpo->tam; i++) {
-            (*senaoCorpo)[i].liberar();
-        }
-        senaoCorpo->liberar();
-        delete senaoCorpo;
-        senaoCorpo = nullptr;
-    }
+    liberarBloco(entao);
+    liberarBloco(senaoCorpo);
     esquerda.liberar();
     direita.liberar();
 }
 
 inline void InstrucaoEnquanto::liberar() {
-    for(int i = 0; i < comandosCondicao->tam; i++) (*comandosCondicao)[i].liberar();
-    comandosCondicao->liberar();
-    delete comandosCondicao;
-    comandosCondicao = nullptr;
-    for(int i = 0; i < corpo->tam; i++) (*corpo)[i].liberar();
-    corpo->liberar();
-    delete corpo;
-    corpo = nullptr;
+    liberarBloco(comandosCondicao);
+    liberarBloco(corpo);
     esquerda.liberar();
     direita.liberar();
+}
+
+// ===== percorrer a IR =====
+// quem precisa descer em SE/ENQUANTO escreve só o tratamento de UM bloco e passa a si mesmo como "fn":
+// paraCadaFilho chama fn(bloco, ctx) pra cada bloco aninhado do comando, na ordem de emissão
+// (SE: então, senão; ENQUANTO: comandosCondicao, corpo). Comando sem bloco aninhado não chama nada.
+template<typename T>
+inline void paraCadaFilho(const ComandoIR& c, void (*fn)(const Vetor<ComandoIR>&, T&), T& ctx) {
+    if(c.tipo == ComandoIR::Tipo::SE) {
+        fn(*c.instrucaoSe.entao, ctx);
+        if(c.instrucaoSe.temSenao) fn(*c.instrucaoSe.senaoCorpo, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
+        fn(*c.instrucaoEnquanto.comandosCondicao, ctx);
+        fn(*c.instrucaoEnquanto.corpo, ctx);
+    }
+}
+
+// chama fn(arg, ctx) pra cada ArgumentoIR LIDO pelo próprio comando(não desce nos blocos aninhados: ver paraCadaFilho).
+// SE/ENQUANTO: os dois lados da comparação. O slot gravado não entra aqui: ver slotDefinidoPor.
+template<typename T>
+inline void paraCadaOperando(const ComandoIR& c, void (*fn)(const ArgumentoIR&, T&), T& ctx) {
+    if(c.tipo == ComandoIR::Tipo::REATRIBUICAO) {
+        fn(c.instrucaoReatribuicao.valor, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::OPERACAO_ARITMETICA) {
+        fn(c.instrucaoOperacaoAritmetica.esquerda, ctx);
+        fn(c.instrucaoOperacaoAritmetica.direita, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::CHAMADA_SISTEMA_CRUA) {
+        for(int j = 0; j < c.chamadaSistemaCrua.argumentos.tam; j++) fn(c.chamadaSistemaCrua.argumentos[j], ctx);
+    } else if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) {
+        for(int j = 0; j < c.chamadaFuncaoUsuario.argumentos.tam; j++) fn(c.chamadaFuncaoUsuario.argumentos[j], ctx);
+        if(c.chamadaFuncaoUsuario.indireta) fn(c.chamadaFuncaoUsuario.enderecoAlvo, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::RETORNE) {
+        if(c.instrucaoRetorne.temValor) fn(c.instrucaoRetorne.valor, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::LEITURA_INDEXADA) {
+        fn(c.instrucaoLeituraIndexada.ponteiro, ctx);
+        fn(c.instrucaoLeituraIndexada.indice, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::ESCRITA_INDEXADA) {
+        fn(c.instrucaoEscritaIndexada.ponteiro, ctx);
+        fn(c.instrucaoEscritaIndexada.indice, ctx);
+        fn(c.instrucaoEscritaIndexada.valor, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::SE) {
+        fn(c.instrucaoSe.esquerda, ctx);
+        fn(c.instrucaoSe.direita, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
+        fn(c.instrucaoEnquanto.esquerda, ctx);
+        fn(c.instrucaoEnquanto.direita, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::CONVERSAO_NUMERICA) {
+        fn(c.instrucaoConversaoNumerica.origem, ctx);
+    }
+}
+
+// slot que o comando grava, ou -1 se não grava nenhum(ou se só grava quando capturaResultado é false).
+inline int slotDefinidoPor(const ComandoIR& c) {
+    if(c.tipo == ComandoIR::Tipo::REATRIBUICAO) return c.instrucaoReatribuicao.slotDestino;
+    if(c.tipo == ComandoIR::Tipo::OPERACAO_ARITMETICA) return c.instrucaoOperacaoAritmetica.slotDestino;
+    if(c.tipo == ComandoIR::Tipo::CHAMADA_SISTEMA_CRUA) return c.chamadaSistemaCrua.capturaResultado ? c.chamadaSistemaCrua.slotDestino : -1;
+    if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) return c.chamadaFuncaoUsuario.capturaResultado ? c.chamadaFuncaoUsuario.slotDestino : -1;
+    if(c.tipo == ComandoIR::Tipo::LEITURA_INDEXADA) return c.instrucaoLeituraIndexada.slotDestino;
+    if(c.tipo == ComandoIR::Tipo::ENDERECO_FRAME) return c.instrucaoEnderecoFrame.slotDestino;
+    if(c.tipo == ComandoIR::Tipo::ENDERECO_SLOT) return c.instrucaoEnderecoSlot.slotDestino;
+    if(c.tipo == ComandoIR::Tipo::CONVERSAO_NUMERICA) return c.instrucaoConversaoNumerica.slotDestino;
+    return -1;
 }
 
 // número de registradores fisicos disponíveis pro alocador de "liberação por

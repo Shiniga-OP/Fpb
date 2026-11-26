@@ -2,50 +2,43 @@
 #pragma once
 #include "geradorir.h"
 
+// as funções abaixo só consultam TABELA_TIPOS(ast.h), que é o ponto único de verdade sobre tipos: tipo novo = linha nova lá.
+
 // largura em bytes que o proprio VALOR de um tipo ocupa, usada tanto por
-// resolverBytes("bytes(tipo)") quanto pra popular ArgumentoIR.larguraBytes(decide w32/x64 e a instrução de memória usada pela arquitetura). Ponto
-// UNICO de verdade sobre "quantos bytes este tipo ocupa": adicionar um
-// tipo novo no futuro exige mudar só aqui.
+// resolverBytes("bytes(tipo)") quanto pra popular ArgumentoIR.larguraBytes(decide w32/x64 e a instrução de memória usada pela arquitetura).
 // car=1, int=4(32 bits), longo=8(64 bits), qualquer ponteiro=8(endereco).
 inline int GeradorIR::larguraDoTipo(TipoVariavel tipo) {
-    if(tipo == TipoVariavel::CAR || tipo == TipoVariavel::BOOL || tipo == TipoVariavel::BYTE) return 1;
-    if(tipo == TipoVariavel::CURTO) return 2;
-    if(tipo == TipoVariavel::INT || tipo == TipoVariavel::FLUTUANTE) return 4;
-    return 8; // LONGO, CAR_PONTEIRO, LONGO_PONTEIRO, NULO_PONTEIRO
+    return infoTipo(tipo).largura;
 }
 
 // largura em bytes de CADA ELEMENTO apontado por um tipo ponteiro,
-// usada por ArgumentoIR.larguraElemento(indexacao nome[indice]). Ponto
-// UNICO de verdade sobre "o que um ponteiro deste tipo aponta": adicionar
-// um tipo ponteiro novo no futuro exige mudar só aqui, não espalhar
-// "if"/"switch" por resolverIndexacao/gerarAtribuicaoIndexada/arm64.h.
+// usada por ArgumentoIR.larguraElemento(indexacao nome[indice]).
 // Nao confundir com larguraDoTipo() acima: o PONTEIRO em si sempre
 // ocupa 8 bytes(endereco de 64 bits); aqui e' a largura do que ele APONTA.
 inline int GeradorIR::larguraElementoApontado(TipoVariavel tipoPonteiro) {
-    if(tipoPonteiro == TipoVariavel::CAR_PONTEIRO || tipoPonteiro == TipoVariavel::BOOL_PONTEIRO || tipoPonteiro == TipoVariavel::BYTE_PONTEIRO) return 1;
-    if(tipoPonteiro == TipoVariavel::CURTO_PONTEIRO) return 2;
-    if(tipoPonteiro == TipoVariavel::INT_PONTEIRO || tipoPonteiro == TipoVariavel::FLUTUANTE_PONTEIRO) return 4;
-    if(tipoPonteiro == TipoVariavel::LONGO_PONTEIRO || tipoPonteiro == TipoVariavel::DOBRO_PONTEIRO) return 8;
-    return 1; // tipo não-ponteiro(ou NULO_PONTEIRO, generico) nunca deveria ser indexado sem conversão antes; 1 e o valor historico/seguro
+    if(!temElementoTipado(tipoPonteiro)) return 1; // tipo não-ponteiro(ou nulo*/Nome*) nunca deveria ser indexado sem conversão antes; 1 e o valor historico/seguro
+    return infoTipo(infoTipo(tipoPonteiro).elemento).largura;
 }
 
 // sinal do VALOR de um tipo: car e bool são sem sinal(zero-estendem), todos os outros com sinal. So importa pra largura 1 e 2.
 inline bool GeradorIR::tipoEhSinalizado(TipoVariavel tipo) {
-    return !(tipo == TipoVariavel::CAR || tipo == TipoVariavel::BOOL);
+    return infoTipo(tipo).sinalizado;
 }
 
 // true pra flu(32 bits) e dobro(64 bits): o valor mora nos slots como o padrao de bits do float/double.
 inline bool GeradorIR::tipoEhFlutuante(TipoVariavel tipo) {
-    return tipo == TipoVariavel::FLUTUANTE || tipo == TipoVariavel::DOBRO;
+    return infoTipo(tipo).flutuante;
 }
 
-// sinal de CADA ELEMENTO apontado por um tipo ponteiro: car*, bool* e nulo* são sem sinal, os demais com sinal.
+// sinal de CADA ELEMENTO apontado por um tipo ponteiro: byte*, curto*, int* e longo* com sinal; car*, bool*, flu*, dobro*, nulo* e Nome* sem.
 inline bool GeradorIR::elementoEhSinalizado(TipoVariavel tipoPonteiro) {
-    return tipoPonteiro == TipoVariavel::BYTE_PONTEIRO || tipoPonteiro == TipoVariavel::CURTO_PONTEIRO || tipoPonteiro == TipoVariavel::INT_PONTEIRO || tipoPonteiro == TipoVariavel::LONGO_PONTEIRO;
+    if(!temElementoTipado(tipoPonteiro)) return false;
+    const InfoTipo& elemento = infoTipo(infoTipo(tipoPonteiro).elemento);
+    return elemento.sinalizado && !elemento.flutuante;
 }
 
 inline bool GeradorIR::elementoEhFlutuante(TipoVariavel tipoPonteiro) {
-    return tipoPonteiro == TipoVariavel::FLUTUANTE_PONTEIRO || tipoPonteiro == TipoVariavel::DOBRO_PONTEIRO;
+    return temElementoTipado(tipoPonteiro) && infoTipo(infoTipo(tipoPonteiro).elemento).flutuante;
 }
 
 // traduz o operador aritmético da AST(OperadorAritmetico) pro equivalente
@@ -169,5 +162,32 @@ inline ArgumentoIR GeradorIR::constanteDoTipo(long valor, TipoVariavel tipo) {
     arg.ehPonteiro = tipoEhPonteiro(tipo);
     arg.ehFlutuante = tipoEhFlutuante(tipo);
     arg.elementoFlutuante = elementoEhFlutuante(tipo);
+    return arg;
+}
+
+// REGISTRADOR de um slot com todos os atributos derivados do tipo declarado.
+inline ArgumentoIR GeradorIR::argumentoSlot(int slot, TipoVariavel tipo) {
+    ArgumentoIR arg;
+    arg.tipo = ArgumentoIR::Tipo::REGISTRADOR;
+    arg.simbolo = nullptr;
+    arg.registrador = slot;
+    arg.larguraBytes = larguraDoTipo(tipo);
+    arg.sinalizado = tipoEhSinalizado(tipo);
+    arg.elementoSinalizado = elementoEhSinalizado(tipo);
+    arg.larguraElemento = larguraElementoApontado(tipo);
+    arg.ehPonteiro = tipoEhPonteiro(tipo);
+    arg.ehFlutuante = tipoEhFlutuante(tipo);
+    arg.elementoFlutuante = elementoEhFlutuante(tipo);
+    return arg;
+}
+
+// REGISTRADOR de um slot temporário que só tem largura(e talvez flutuante).
+inline ArgumentoIR GeradorIR::argumentoSlotLargura(int slot, int largura, bool flutuante) {
+    ArgumentoIR arg;
+    arg.tipo = ArgumentoIR::Tipo::REGISTRADOR;
+    arg.simbolo = nullptr;
+    arg.registrador = slot;
+    arg.larguraBytes = largura;
+    arg.ehFlutuante = flutuante;
     return arg;
 }

@@ -153,12 +153,7 @@ inline ArgumentoIR GeradorIR::enderecoDeGlobal(const std::string& simbolo, const
     comandoIR.instrucaoReatribuicao.larguraDestino = 8;
     saida.empurrar(comandoIR);
 
-    ArgumentoIR endereco;
-    endereco.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    endereco.simbolo = nullptr;
-    endereco.imediato = 0;
-    endereco.registrador = slot;
-    endereco.larguraBytes = 8;
+    ArgumentoIR endereco = argumentoSlotLargura(slot, 8);
     endereco.ehPonteiro = true;
     endereco.larguraElemento = largura;
     return endereco;
@@ -176,17 +171,7 @@ inline ArgumentoIR GeradorIR::resolverAcessoEstatico(const std::string& simbolo,
     comandoIR.instrucaoLeituraIndexada.indice = imediatoInt(0);
     saida.empurrar(comandoIR);
 
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = larguraDoTipo(estatico.tipo);
-    referenciaSlot.sinalizado = tipoEhSinalizado(estatico.tipo);
-    referenciaSlot.elementoSinalizado = elementoEhSinalizado(estatico.tipo);
-    referenciaSlot.larguraElemento = larguraElementoApontado(estatico.tipo);
-    referenciaSlot.ehPonteiro = tipoEhPonteiro(estatico.tipo);
-    return referenciaSlot;
+    return argumentoSlot(slot, estatico.tipo);
 }
 
 // confere a herança depois que todos os espaços(do programa e das bibliotecas) foram registrados: base existe, sem ciclo, sem campo repetido
@@ -246,7 +231,7 @@ inline void GeradorIR::validarHeranca() {
                 }
                 ancestral = baseDoEspaco(ancestral);
             }
-            bool ehConstrutor = strcmp(metodo.nome, "criar") == 0;
+            bool ehConstrutor = metodo.nome[0] == '.'; // construtor e destrutor não precisam de @sobrepor
             if(achou && !metodo.ehSobrepor && !ehConstrutor) {
                 throw std::runtime_error("O método '" + nomeStr + "." + metodoStr + "' já existe em '" + donoStr + "': marque com @sobrepor");
             }
@@ -324,19 +309,9 @@ inline ArgumentoIR GeradorIR::lerCampoDeBase(const ArgumentoIR& base, const char
     comandoIR.instrucaoLeituraIndexada.indice = imediatoInt(posCampo / largura);
     saida.empurrar(comandoIR);
 
-    ArgumentoIR referenciaSlot;
-    referenciaSlot.tipo = ArgumentoIR::Tipo::REGISTRADOR;
-    referenciaSlot.simbolo = nullptr;
-    referenciaSlot.imediato = 0;
-    referenciaSlot.registrador = slot;
-    referenciaSlot.larguraBytes = largura;
-    referenciaSlot.ehFlutuante = tipoEhFlutuante(tipoCampo);
-    referenciaSlot.sinalizado = tipoEhSinalizado(tipoCampo);
-    referenciaSlot.elementoSinalizado = elementoEhSinalizado(tipoCampo);
-    referenciaSlot.larguraElemento = larguraElementoApontado(tipoCampo);
+    ArgumentoIR referenciaSlot = argumentoSlot(slot, tipoCampo);
     if(tipoCampo == TipoVariavel::ESPACO_PONTEIRO) {
         referenciaSlot.idEspaco = idEspacoDoCampo(base.idEspaco, campo);
-        referenciaSlot.ehPonteiro = true;
     }
     return referenciaSlot;
 }
@@ -354,7 +329,14 @@ inline ArgumentoIR GeradorIR::resolverAcessoCampo(const Expressao& expressao, Ve
         return resolverAcessoEstatico(simbolo, *estatico, saida, ctx);
     }
     ArgumentoIR base;
-    if(!ctx.variaveisLocais.buscar(expressao.esquerda->valor, &base)) {
+    ArgumentoIR esteBase;
+    bool achouBase = ctx.variaveisLocais.buscar(expressao.esquerda->valor, &base);
+    if(!achouBase && ctx.variaveisLocais.buscar("este", &esteBase) && esteBase.idEspaco >= 0 && existeCampo(esteBase.idEspaco, expressao.esquerda->valor)) {
+        // "p.campo" com "p" campo de "este": vira "este.p.campo"
+        base = lerCampoDeBase(esteBase, expressao.esquerda->valor, saida, ctx);
+        achouBase = true;
+    }
+    if(!achouBase) {
         std::string nomeStr = expressao.esquerda->valor;
         if(espacos.buscar(expressao.esquerda->valor) >= 0) {
             throw std::runtime_error("Classe '" + nomeStr + "' não tem o campo estatico '" + expressao.valor + "'");
@@ -399,7 +381,14 @@ inline ArgumentoIR GeradorIR::gravarEmCampo(const char* nome, const char* campo,
         return valor;
     }
     ArgumentoIR base;
-    if(!ctx.variaveisLocais.buscar(nome, &base)) {
+    ArgumentoIR esteBase;
+    bool achouBase = ctx.variaveisLocais.buscar(nome, &base);
+    if(!achouBase && ctx.variaveisLocais.buscar("este", &esteBase) && esteBase.idEspaco >= 0 && existeCampo(esteBase.idEspaco, nome)) {
+        // "p.campo = e" com "p" campo de "este": vira "este.p.campo = e"
+        base = lerCampoDeBase(esteBase, nome, saida, ctx);
+        achouBase = true;
+    }
+    if(!achouBase) {
         std::string nomeStr = nome;
         if(espacos.buscar(nome) >= 0) {
             std::string campoStr = campo;

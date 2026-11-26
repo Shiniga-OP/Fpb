@@ -13,74 +13,38 @@
 // coube continua acessando a pilha(ldr/str), igual ao comportamento
 // anterior a esta mudança.
 
+// primeira e última posição em que cada slot aparece(vetores paralelos indexados por slot, -1 = nunca)
+// e o contador "pos" da instrução atual, compartilhado por toda a varredura da função.
+struct UsosSlots {
+    Vetor<int> primeiraPos;
+    Vetor<int> ultimaPos;
+    int pos;
+};
+
 // varre um bloco de comandos IR em ordem de emissao, numerando cada
 // instrução(posicao sequencial) e, para cada ArgumentoIR::Tipo::REGISTRADOR
 // encontrado(seja como destino ou como operando), atualiza
-// "primeiraPos"(so a primeira vez) e "ultimaPos"(sempre, guarda o maior)
-// nos vetores paralelos indexados por slot. "pos" e passado por
-// referencia e incrementado a cada instrução, inclusive dentro de
+// "primeiraPos"(so a primeira vez) e "ultimaPos"(sempre, guarda o maior).
+// "usos.pos" e incrementado a cada instrução, inclusive dentro de
 // blocos aninhados de "se", pra manter uma numeracao unica e continua
 // por toda a função(assim um "ultimo uso" dentro de um "se" e comparado
 // corretamente com usos antes/depois do bloco).
-inline void registrarUsoArgumento(const ArgumentoIR& arg, Vetor<int>& primeiraPos, Vetor<int>& ultimaPos, int pos) {
+inline void registrarUsoArgumento(const ArgumentoIR& arg, UsosSlots& usos) {
     if(arg.tipo != ArgumentoIR::Tipo::REGISTRADOR) return;
     int slot = arg.registrador;
-    if(primeiraPos[slot] == -1) primeiraPos[slot] = pos;
-    ultimaPos[slot] = pos; // sempre atualiza: queremos o MAIOR(ultimo uso)
+    if(usos.primeiraPos[slot] == -1) usos.primeiraPos[slot] = usos.pos;
+    usos.ultimaPos[slot] = usos.pos; // sempre atualiza: queremos o MAIOR(ultimo uso)
 }
 
-inline void registrarDefinicaoSlot(int slot, Vetor<int>& primeiraPos, Vetor<int>& ultimaPos, int pos) {
-    if(primeiraPos[slot] == -1) primeiraPos[slot] = pos;
-    if(ultimaPos[slot] < pos) ultimaPos[slot] = pos;
+inline void registrarDefinicaoSlot(int slot, UsosSlots& usos) {
+    if(usos.primeiraPos[slot] == -1) usos.primeiraPos[slot] = usos.pos;
+    if(usos.ultimaPos[slot] < usos.pos) usos.ultimaPos[slot] = usos.pos;
 }
 
-inline void varrerBlocoParaUsos(const Vetor<ComandoIR>& bloco, Vetor<int>& primeiraPos, Vetor<int>& ultimaPos, int& pos) {
+inline void varrerBlocoParaUsos(const Vetor<ComandoIR>& bloco, UsosSlots& usos) {
     for(int i = 0; i < bloco.tam; i++) {
         const ComandoIR& c = bloco[i];
-        if(c.tipo == ComandoIR::Tipo::REATRIBUICAO) {
-            registrarUsoArgumento(c.instrucaoReatribuicao.valor, primeiraPos, ultimaPos, pos);
-            registrarDefinicaoSlot(c.instrucaoReatribuicao.slotDestino, primeiraPos, ultimaPos, pos);
-        } else if(c.tipo == ComandoIR::Tipo::OPERACAO_ARITMETICA) {
-            registrarUsoArgumento(c.instrucaoOperacaoAritmetica.esquerda, primeiraPos, ultimaPos, pos);
-            registrarUsoArgumento(c.instrucaoOperacaoAritmetica.direita, primeiraPos, ultimaPos, pos);
-            registrarDefinicaoSlot(c.instrucaoOperacaoAritmetica.slotDestino, primeiraPos, ultimaPos, pos);
-        } else if(c.tipo == ComandoIR::Tipo::CHAMADA_SISTEMA_CRUA) {
-            for(int j = 0; j < c.chamadaSistemaCrua.argumentos.tam; j++) {
-                registrarUsoArgumento(c.chamadaSistemaCrua.argumentos[j], primeiraPos, ultimaPos, pos);
-            }
-            if(c.chamadaSistemaCrua.capturaResultado) {
-                registrarDefinicaoSlot(c.chamadaSistemaCrua.slotDestino, primeiraPos, ultimaPos, pos);
-            }
-        } else if(c.tipo == ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO) {
-            for(int j = 0; j < c.chamadaFuncaoUsuario.argumentos.tam; j++) {
-                registrarUsoArgumento(c.chamadaFuncaoUsuario.argumentos[j], primeiraPos, ultimaPos, pos);
-            }
-            if(c.chamadaFuncaoUsuario.indireta) {
-                registrarUsoArgumento(c.chamadaFuncaoUsuario.enderecoAlvo, primeiraPos, ultimaPos, pos);
-            }
-            if(c.chamadaFuncaoUsuario.capturaResultado) {
-                registrarDefinicaoSlot(c.chamadaFuncaoUsuario.slotDestino, primeiraPos, ultimaPos, pos);
-            }
-        } else if(c.tipo == ComandoIR::Tipo::RETORNE) {
-            if(c.instrucaoRetorne.temValor) {
-                registrarUsoArgumento(c.instrucaoRetorne.valor, primeiraPos, ultimaPos, pos);
-            }
-        } else if(c.tipo == ComandoIR::Tipo::LEITURA_INDEXADA) {
-            registrarUsoArgumento(c.instrucaoLeituraIndexada.ponteiro, primeiraPos, ultimaPos, pos);
-            registrarUsoArgumento(c.instrucaoLeituraIndexada.indice, primeiraPos, ultimaPos, pos);
-            registrarDefinicaoSlot(c.instrucaoLeituraIndexada.slotDestino, primeiraPos, ultimaPos, pos);
-        } else if(c.tipo == ComandoIR::Tipo::ESCRITA_INDEXADA) {
-            registrarUsoArgumento(c.instrucaoEscritaIndexada.ponteiro, primeiraPos, ultimaPos, pos);
-            registrarUsoArgumento(c.instrucaoEscritaIndexada.indice, primeiraPos, ultimaPos, pos);
-            registrarUsoArgumento(c.instrucaoEscritaIndexada.valor, primeiraPos, ultimaPos, pos);
-        } else if(c.tipo == ComandoIR::Tipo::SE) {
-            registrarUsoArgumento(c.instrucaoSe.esquerda, primeiraPos, ultimaPos, pos);
-            registrarUsoArgumento(c.instrucaoSe.direita, primeiraPos, ultimaPos, pos);
-            varrerBlocoParaUsos(*c.instrucaoSe.entao, primeiraPos, ultimaPos, pos);
-            if(c.instrucaoSe.temSenao) {
-                varrerBlocoParaUsos(*c.instrucaoSe.senaoCorpo, primeiraPos, ultimaPos, pos);
-            }
-        } else if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
+        if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
             // marca todo slot ja definido antes do laço como "em uso" a
             // partir daqui: comandosCondicao E corpo podem reexecutar do
             // zero a cada iteração, então um slot lido/escrito em
@@ -88,30 +52,27 @@ inline void varrerBlocoParaUsos(const Vetor<ComandoIR>& bloco, Vetor<int>& prime
             // nao so ate seu ultimo uso textual(senao o registrador
             // podia ser reciclado no meio de uma iteração seguinte e
             // corromper o valor).
-            int posAntesDoLaco = pos;
-            varrerBlocoParaUsos(*c.instrucaoEnquanto.comandosCondicao, primeiraPos, ultimaPos, pos);
-            registrarUsoArgumento(c.instrucaoEnquanto.esquerda, primeiraPos, ultimaPos, pos);
-            registrarUsoArgumento(c.instrucaoEnquanto.direita, primeiraPos, ultimaPos, pos);
-            varrerBlocoParaUsos(*c.instrucaoEnquanto.corpo, primeiraPos, ultimaPos, pos);
+            int posAntesDoLaco = usos.pos;
+            varrerBlocoParaUsos(*c.instrucaoEnquanto.comandosCondicao, usos);
+            paraCadaOperando(c, registrarUsoArgumento, usos);
+            varrerBlocoParaUsos(*c.instrucaoEnquanto.corpo, usos);
             // apos varrer condicao+corpo, "pos" esta na posicao final do
             // laço: qualquer slot com uso registrado dentro do intervalo
             // [posAntesDoLaco, pos] tem sua ultimaPos estendida ate "pos",
             // garantindo que o registrador so seja liberado depois que o
             // laço inteiro(todas as iteracoes) ja tiver terminado.
-            for(int s = 0; s < ultimaPos.tam; s++) {
-                if(ultimaPos[s] >= posAntesDoLaco && ultimaPos[s] <= pos) {
-                    ultimaPos[s] = pos;
+            for(int s = 0; s < usos.ultimaPos.tam; s++) {
+                if(usos.ultimaPos[s] >= posAntesDoLaco && usos.ultimaPos[s] <= usos.pos) {
+                    usos.ultimaPos[s] = usos.pos;
                 }
             }
-        } else if(c.tipo == ComandoIR::Tipo::ENDERECO_FRAME) {
-            registrarDefinicaoSlot(c.instrucaoEnderecoFrame.slotDestino, primeiraPos, ultimaPos, pos);
-        } else if(c.tipo == ComandoIR::Tipo::ENDERECO_SLOT) {
-            registrarDefinicaoSlot(c.instrucaoEnderecoSlot.slotDestino, primeiraPos, ultimaPos, pos);
-        } else if(c.tipo == ComandoIR::Tipo::CONVERSAO_NUMERICA) {
-            registrarUsoArgumento(c.instrucaoConversaoNumerica.origem, primeiraPos, ultimaPos, pos);
-            registrarDefinicaoSlot(c.instrucaoConversaoNumerica.slotDestino, primeiraPos, ultimaPos, pos);
+        } else {
+            paraCadaOperando(c, registrarUsoArgumento, usos);
+            int slot = slotDefinidoPor(c);
+            if(slot >= 0) registrarDefinicaoSlot(slot, usos);
+            paraCadaFilho(c, varrerBlocoParaUsos, usos);
         }
-        pos++; // cada ComandoIR do bloco ocupa uma posição própria na numeração
+        usos.pos++; // cada ComandoIR do bloco ocupa uma posição própria na numeração
     }
 }
 
@@ -120,15 +81,8 @@ inline void varrerBlocoParaUsos(const Vetor<ComandoIR>& bloco, Vetor<int>& prime
 inline void marcarSlotsComEndereco(const Vetor<ComandoIR>& bloco, Vetor<bool>& forcaPilha) {
     for(int i = 0; i < bloco.tam; i++) {
         const ComandoIR& c = bloco[i];
-        if(c.tipo == ComandoIR::Tipo::ENDERECO_SLOT) {
-            forcaPilha[c.instrucaoEnderecoSlot.slotOrigem] = true;
-        } else if(c.tipo == ComandoIR::Tipo::SE) {
-            marcarSlotsComEndereco(*c.instrucaoSe.entao, forcaPilha);
-            if(c.instrucaoSe.temSenao) marcarSlotsComEndereco(*c.instrucaoSe.senaoCorpo, forcaPilha);
-        } else if(c.tipo == ComandoIR::Tipo::ENQUANTO) {
-            marcarSlotsComEndereco(*c.instrucaoEnquanto.comandosCondicao, forcaPilha);
-            marcarSlotsComEndereco(*c.instrucaoEnquanto.corpo, forcaPilha);
-        }
+        if(c.tipo == ComandoIR::Tipo::ENDERECO_SLOT) forcaPilha[c.instrucaoEnderecoSlot.slotOrigem] = true;
+        paraCadaFilho(c, marcarSlotsComEndereco, forcaPilha);
     }
 }
 
@@ -150,13 +104,15 @@ inline void alocarRegistradores(FuncaoIR& funcaoIR) {
     for(int i = 0; i < totalSlots; i++) funcaoIR.registradorDoSlot.empurrar(DONO_SLOT_NENHUM);
     if(totalSlots == 0 || funcaoIR.ehInicio) return;
 
-    Vetor<int> primeiraPos, ultimaPos;
-    primeiraPos.iniciar();
-    ultimaPos.iniciar();
+    UsosSlots usos;
+    usos.primeiraPos.iniciar();
+    usos.ultimaPos.iniciar();
     for(int i = 0; i < totalSlots; i++) {
-        primeiraPos.empurrar(-1);
-        ultimaPos.empurrar(-1);
+        usos.primeiraPos.empurrar(-1);
+        usos.ultimaPos.empurrar(-1);
     }
+    Vetor<int>& primeiraPos = usos.primeiraPos;
+    Vetor<int>& ultimaPos = usos.ultimaPos;
     // parâmetros(slots 0..totalParametros-1) ja nascem "definidos" na
     // posição 0(prologo da funcao), mesmo que nunca apareçam como
     // operando explícito depois.
@@ -164,8 +120,8 @@ inline void alocarRegistradores(FuncaoIR& funcaoIR) {
         primeiraPos[i] = 0;
         if(ultimaPos[i] < 0) ultimaPos[i] = 0;
     }
-    int pos = 1; // posição 0 reservada pro prólogo/parâmetros acima
-    varrerBlocoParaUsos(funcaoIR.instrucoes, primeiraPos, ultimaPos, pos);
+    usos.pos = 1; // posição 0 reservada pro prólogo/parâmetros acima
+    varrerBlocoParaUsos(funcaoIR.instrucoes, usos);
 
     // reuso de registradores fisicos livres(indices 0..TOTAL_REGISTRADORES_FISICOS-1,
     // correspondendo a x19..x27 na arquitetura, todos salvos). "ocupadoPor[r]" guarda

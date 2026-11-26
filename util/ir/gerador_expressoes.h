@@ -85,14 +85,16 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
     if(expressao.tipo == Expressao::Tipo::INDEXACAO) {
         return resolverIndexacao(expressao, saida, ctx);
     }
-    // só sobra BINARIA daqui pra baixo.
+    if(expressao.tipo == Expressao::Tipo::ATRIBUICAO) {
+        return resolverAtribuicao(expressao, saida, ctx);
+    }
+    // so sobra BINARIA daqui pra baixo.
     ArgumentoIR esquerda = resolverExpressao(*expressao.esquerda, saida, ctx);
     ArgumentoIR direita = resolverExpressao(*expressao.direita, saida, ctx);
     if(esquerda.tipo == ArgumentoIR::Tipo::REGISTRADOR && esquerda.idEspaco >= 0) {
         // operando esquerdo é um espaço(ou ponteiro pra um): "a + b" vira "Nome_somar(a, b)", e assim por diante.
         return resolverOperadorEspaco(expressao.operadorAritmetico, esquerda, direita, saida, ctx);
     }
-
     promoverFlutuantes(esquerda, direita, saida, ctx);
     bool ehFlutuante = esquerda.ehFlutuante;
     if(ehFlutuante) {
@@ -722,4 +724,47 @@ inline ArgumentoIR GeradorIR::resolverEndereco(const Expressao& expressao, Vetor
     referenciaSlot.elementoSinalizado = variavel.sinalizado;
     referenciaSlot.elementoFlutuante = variavel.ehFlutuante;
     return referenciaSlot;
+}
+
+// copia um valor que mora em slot de variável pra um slot novo, senão "(a = b) + (b = 5)" leria o b já alterado.
+// Temporário já é slot exclusivo, não precisa copiar.
+inline ArgumentoIR GeradorIR::congelarValor(ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(valor.tipo != ArgumentoIR::Tipo::REGISTRADOR || valor.ehTemporario) return valor;
+    int slot = ctx.variaveisLocais.proximoSlot++;
+    ComandoIR copia;
+    copia.tipo = ComandoIR::Tipo::REATRIBUICAO;
+    copia.instrucaoReatribuicao.slotDestino = slot;
+    copia.instrucaoReatribuicao.valor = valor;
+    copia.instrucaoReatribuicao.larguraDestino = valor.larguraBytes;
+    saida.empurrar(copia);
+    valor.registrador = slot;
+    return valor;
+}
+
+// resolve "destino = expr" usada como valor: avalia expr UMA vez, grava no destino e devolve o valor gravado.
+inline ArgumentoIR GeradorIR::resolverAtribuicao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    const Expressao& destino = *expressao.esquerda;
+    if(destino.tipo == Expressao::Tipo::INDEXACAO) {
+        // mesma ordem do comando: ponteiro, índice, valor
+        ArgumentoIR ponteiro;
+        if(destino.esquerda->tipo == Expressao::Tipo::ACESSO_CAMPO) {
+            ponteiro = resolverPonteiroIndexado(destino.esquerda->esquerda->valor, destino.esquerda->valor, saida, ctx);
+        } else {
+            ponteiro = resolverPonteiroIndexado(destino.esquerda->valor, nullptr, saida, ctx);
+        }
+        ArgumentoIR indice = resolverExpressao(*destino.direita, saida, ctx);
+        ArgumentoIR valor = congelarValor(resolverExpressao(*expressao.direita, saida, ctx), saida, ctx);
+        return gravarEmIndexacao(ponteiro, indice, valor, saida, ctx);
+    }
+    if(destino.tipo == Expressao::Tipo::IDENTIFICADOR) {
+        ArgumentoIR existente;
+        if(ctx.variaveisLocais.buscar(destino.valor, &existente) && existente.espacoPorValor) {
+            throw std::runtime_error("Atribuição de espaço por valor só vale como comando(não como valor de expressão)");
+        }
+        ArgumentoIR valor = congelarValor(resolverExpressao(*expressao.direita, saida, ctx), saida, ctx);
+        return gravarEmVariavel(destino.valor, valor, saida, ctx);
+    }
+    // ACESSO_CAMPO("nome.campo" ou "Classe.estatico")
+    ArgumentoIR valor = congelarValor(resolverExpressao(*expressao.direita, saida, ctx), saida, ctx);
+    return gravarEmCampo(destino.esquerda->valor, destino.valor, valor, saida, ctx);
 }

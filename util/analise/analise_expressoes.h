@@ -59,6 +59,77 @@ inline Expressao Analisador::analisarBinaria(int nivel) {
     return esquerda;
 }
 
+// destino valido de atribuição: variavel, "nome.campo" ou "nome[indice]" / "nome.campo[indice]".
+inline bool ehDestinoAtribuicao(const Expressao& e) {
+    return e.tipo == Expressao::Tipo::IDENTIFICADOR || e.tipo == Expressao::Tipo::ACESSO_CAMPO || e.tipo == Expressao::Tipo::INDEXACAO;
+}
+
+// true se avaliar "e" duas vezes dá o mesmo resultado (sem chamada de função, atribuição ou chamada de sistema).
+inline bool ehExpressaoPura(const Expressao& e) {
+    Expressao::Tipo t = e.tipo;
+    if(t == Expressao::Tipo::NUMERO_LITERAL || t == Expressao::Tipo::DECIMAL_LITERAL || t == Expressao::Tipo::TEXTO_LITERAL || t == Expressao::Tipo::IDENTIFICADOR || t == Expressao::Tipo::BYTES) return true;
+    if(t == Expressao::Tipo::ACESSO_CAMPO || t == Expressao::Tipo::CONVERSAO) return ehExpressaoPura(*e.esquerda);
+    if(t == Expressao::Tipo::BINARIA || t == Expressao::Tipo::INDEXACAO) return ehExpressaoPura(*e.esquerda) && ehExpressaoPura(*e.direita);
+    return false;
+}
+
+// cópia profunda de uma expressão pura (só chamar depois de ehExpressaoPura).
+inline Expressao clonarExpressaoPura(const Expressao& e) {
+    Expressao c = e;
+    Expressao::Tipo t = e.tipo;
+    if(t == Expressao::Tipo::BYTES) {
+        if(e.bytesNomeVariavel) c.bytesNomeVariavel = strdup(e.bytesNomeVariavel);
+    } else if(t == Expressao::Tipo::NUMERO_LITERAL || t == Expressao::Tipo::DECIMAL_LITERAL || t == Expressao::Tipo::TEXTO_LITERAL || t == Expressao::Tipo::IDENTIFICADOR || t == Expressao::Tipo::ACESSO_CAMPO) {
+        c.valor = strdup(e.valor);
+    }
+    if(t == Expressao::Tipo::ACESSO_CAMPO || t == Expressao::Tipo::CONVERSAO || t == Expressao::Tipo::BINARIA || t == Expressao::Tipo::INDEXACAO) {
+        c.esquerda = new Expressao(clonarExpressaoPura(*e.esquerda));
+    }
+    if(t == Expressao::Tipo::BINARIA || t == Expressao::Tipo::INDEXACAO) {
+        c.direita = new Expressao(clonarExpressaoPura(*e.direita));
+    }
+    return c;
+}
+
+// monta "destino = destino OP 1" (nó ATRIBUICAO, que devolve o valor NOVO).
+inline Expressao Analisador::montarIncremento(const Expressao& destino, OperadorAritmetico op) {
+    if(!ehExpressaoPura(destino)) erro("'++'/'--' não aceita destino com efeito colateral (ex: a[f()]++ ou a[i++]++): use uma variável auxiliar");
+    Expressao nova;
+    nova.tipo = Expressao::Tipo::BINARIA;
+    nova.valor = nullptr;
+    nova.operadorAritmetico = op;
+    nova.esquerda = new Expressao(clonarExpressaoPura(destino));
+    nova.direita = new Expressao(montarNumeroLiteral("1"));
+    Expressao atrib;
+    atrib.tipo = Expressao::Tipo::ATRIBUICAO;
+    atrib.valor = nullptr;
+    atrib.esquerda = new Expressao(destino);
+    atrib.direita = new Expressao(nova);
+    return atrib;
+}
+
+// "x++" / "x--" pós-fixo: devolve o valor ANTIGO, ou seja, "(x = x + 1) - 1".
+inline Expressao Analisador::analisarPosfixo(Expressao base) {
+    if((verificar(TipoToken::MAIS_MAIS) || verificar(TipoToken::MENOS_MENOS)) && ehDestinoAtribuicao(base)) {
+        bool soma = verificar(TipoToken::MAIS_MAIS);
+        pos++;
+        Expressao atrib = montarIncremento(base, soma ? OperadorAritmetico::SOMA : OperadorAritmetico::SUBTRACAO);
+        Expressao antigo;
+        antigo.tipo = Expressao::Tipo::BINARIA;
+        antigo.valor = nullptr;
+        antigo.operadorAritmetico = soma ? OperadorAritmetico::SUBTRACAO : OperadorAritmetico::SOMA;
+        antigo.esquerda = new Expressao(atrib);
+        antigo.direita = new Expressao(montarNumeroLiteral("1"));
+        return antigo;
+    }
+    return base;
+}
+
+// ponto de entrada das expressões primárias: primária + "++"/"--" pós-fixo opcional.
+inline Expressao Analisador::analisarExpressaoPrimaria() {
+    return analisarPosfixo(analisarPrimariaSemPosfixo());
+}
+
 // ponto de entrada de qualquer expressao: operadores aritmeticos e de bit, e "cond ? a : b" no nivel mais fraco(associativo a direita).
 // le primeiro como expressao comum; se logo depois vem comparacao, "&&", "||" ou "?", era a condicao de um ternario: volta ao inicio e le como condicao.
 // se a leitura comum falhar(ex: "(a == 1 || b == 2) ? x : y", onde o parentese tem uma condicao), tambem tenta como condicao.
@@ -70,6 +141,16 @@ inline Expressao Analisador::analisarExpressaoAditiva() {
         base = analisarBinaria(0);
     } catch(const std::runtime_error&) {
         leu = false;
+    }
+    if(leu && verificar(TipoToken::IGUAL) && ehDestinoAtribuicao(base)) {
+        // "destino = expr": associativo a direita. "a = b = c = 0" vira a = (b = (c = 0)).
+        pos++;
+        Expressao e;
+        e.tipo = Expressao::Tipo::ATRIBUICAO;
+        e.valor = nullptr;
+        e.esquerda = new Expressao(base);
+        e.direita = new Expressao(analisarExpressaoAditiva());
+        return e;
     }
     if(leu && !ehTokenComparacao(atual().tipo) && !verificar(TipoToken::OU_OU) && !verificar(TipoToken::TAMBEM_TAMBEM) && !verificar(TipoToken::INTERROGACAO)) {
         return base;
@@ -162,7 +243,7 @@ inline Expressao Analisador::analisarBytes() {
     return e;
 }
 
-inline Expressao Analisador::analisarExpressaoPrimaria() {
+inline Expressao Analisador::analisarPrimariaSemPosfixo() {
     if(verificar(TipoToken::CHAMADA_SISTEMA)) {
         Expressao e;
         e.tipo = Expressao::Tipo::CHAMADA_SISTEMA;
@@ -195,6 +276,14 @@ inline Expressao Analisador::analisarExpressaoPrimaria() {
             }
         }
         return e;
+    }
+    if(verificar(TipoToken::MAIS_MAIS) || verificar(TipoToken::MENOS_MENOS)) {
+        // "++x" / "--x" pré-fixo: devolve o valor NOVO, ou seja, "x = x + 1".
+        bool soma = verificar(TipoToken::MAIS_MAIS);
+        pos++;
+        Expressao alvo = analisarPrimariaSemPosfixo();
+        if(!ehDestinoAtribuicao(alvo)) erro("'++'/'--' só vale em variável, campo ou posição de array");
+        return montarIncremento(alvo, soma ? OperadorAritmetico::SOMA : OperadorAritmetico::SUBTRACAO);
     }
     if(verificar(TipoToken::TIL)) {
         // "~x" vira "x ^ -1" (-1 tem todos os bits em 1): sem nó novo na AST nem instrução nova no IR.

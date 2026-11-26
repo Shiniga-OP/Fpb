@@ -9,6 +9,9 @@
 #include <cstring>
 #include <cctype>
 #include <elf.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include "util/diagnostico.h"
 #include "util/lexer.h"
 #include "util/analisador.h"
 #include "util/preprocessador.h"
@@ -49,6 +52,11 @@ static std::unique_ptr<Arquitetura> obterArquitetura(const std::string& nomeArqu
 }
 
 static std::string lerArquivo(const std::string& caminho) {
+    if(caminho == "-") {
+        std::stringstream conteudo;
+        conteudo << std::cin.rdbuf();
+        return conteudo.str();
+    }
     std::ifstream arquivo(caminho);
     if(!arquivo) {
         throw std::runtime_error("Não foi possível abrir o arquivo: " + caminho);
@@ -154,19 +162,24 @@ int main(int argc, char** argv) {
             pastasExtras += "-L" + pasta + " -rpath " + pasta + " ";
         }
     }
+    bool lerEntrada = caminhoFonte == "-";
+    bool executarDepois = lerEntrada && caminhoSaida.empty();
     std::filesystem::path caminhoBase(caminhoFonte);
     std::string nomeBase = caminhoBase.stem().string();
+    if(lerEntrada) nomeBase = (std::filesystem::temp_directory_path() / ("fpbc_" + std::to_string(getpid()))).string();
+    
     std::string caminhoAsm = nomeBase + ".asm";
     std::string caminhoObjeto = nomeBase + ".o";
     if(caminhoSaida.empty()) caminhoSaida = nomeBase;
-
+    
     try {
         std::string codigoFonte = lerArquivo(caminhoFonte);
 
         std::string diretorioBase = std::filesystem::path(caminhoFonte).parent_path().string();
         if(diretorioBase.empty()) diretorioBase = ".";
 
-        Lexer lexer(codigoFonte.c_str());
+        int idPrincipal = RegistroFontes::instancia().registrar(lerEntrada ? "<stdin>" : caminhoFonte, codigoFonte, false);
+        Lexer lexer(codigoFonte.c_str(), idPrincipal);
         auto tokens = lexer.tokenizar();
 
         // "#alvo" do fonte vale mais que o "--alvo": precisa ser lido antes do pré-processador, que define as macros do alvo
@@ -188,9 +201,13 @@ int main(int argc, char** argv) {
         
         tokens = preprocessador.processar(tokens, diretorioBase);
 
+        // o GeradorIR(e o CarregadorBiblis dentro dele) nasce antes do Analisador:
+        // as bibliotecas são lidas e os modelos "Nome<...>" expandidos antes do parse do principal.
+        GeradorIR geradorIR(diretorioBase, &preprocessador);
+        geradorIR.carregador.prepararPrincipal(tokens, diretorioBase);
+
         Analisador analisador(tokens);
         auto programa = analisador.analisar();
-        GeradorIR geradorIR(diretorioBase, &preprocessador);
         auto programaIR = geradorIR.gerar(programa);
 
         // libera memoria manual da AST/tokens(sem RAII, entao liberamos explicitamente)
@@ -265,9 +282,17 @@ int main(int argc, char** argv) {
         if(!manterAsm) std::filesystem::remove(caminhoAsm);
         std::filesystem::remove(caminhoObjeto);
 
+        if(executarDepois) {
+            int status = executar(caminhoSaida);
+            std::filesystem::remove(caminhoSaida);
+            return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+        }
         return 0;
+    } catch(const ErroCompilacao& e) {
+        imprimirErro(e);
+        return 1;
     } catch(const std::exception& e) {
-        std::cerr << "Erro de compilacao: " << e.what() << "\n";
+        imprimirErroSimples(e.what());
         return 1;
     }
 }

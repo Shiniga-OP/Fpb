@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "config.h"
+#include "diagnostico.h"
 #include "ast.h"
 
 class Analisador {
@@ -80,6 +81,9 @@ public:
     Expressao analisarChamadaFuncaoComoExpressao();
     Expressao analisarChamadaMetodoComoExpressao();
     Expressao analisarExpressaoSemTernario();
+    Expressao analisarPosfixo(Expressao base);
+    Expressao montarIncremento(const Expressao& destino, OperadorAritmetico op);
+    Expressao analisarPrimariaSemPosfixo();
 };
 
 // definições dos métodos (cada arquivo inclui este de volta; #pragma once evita ciclo)

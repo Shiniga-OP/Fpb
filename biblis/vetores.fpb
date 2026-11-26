@@ -1,0 +1,28 @@
+// ~vetores.fpb
+#incluir "mem.fpb"
+
+#classe Vetor<T> {
+    T* dados;
+    int tam;
+    int cap;
+    
+    nulo iniciar() {
+        este.dados = (T*)0;
+        este.tam = este.cap = 0;
+    }
+    nulo liberar() {
+        mliberar(este.dados);
+        este.iniciar();
+    }
+    nulo limpar() {
+        este.tam = 0;
+    }
+
+    nulo empurrar(T v) {
+        se(este.tam == este.cap) {
+            este.cap = este.cap ? este.cap * 2 : 8;
+            este.dados = mrealocar(este.dados, este.cap * bytes(T));
+        }
+        este.dados[este.tam++] = v;
+    }
+}

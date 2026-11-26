@@ -9,6 +9,7 @@
 #include <string.h>
 #include "config.h"
 #include "lexer.h"
+#include "diagnostico.h"
 
 // raiz das bibliotecas: variável de ambiente FPB_RAIZ, ou "." se não existir.
 inline std::string raizBiblisPadrao() {
@@ -70,6 +71,7 @@ public:
             bool paiAtivo;
             bool tomou;
             bool temSenao;
+            Token origem;
         };
         Vetor<BlocoCond> conds;
         conds.iniciar();
@@ -79,20 +81,22 @@ public:
             Token t = entrada[pos];
             
             if(t.tipo == TipoToken::PRE_SE) {
-                int linha = t.linha;
+                Token origem = t;
+                origem.valor = nullptr;
                 t.liberar();
                 pos++;
-                bool cond = lerCondicao(entrada, pos, linha);
-                conds.empurrar({ativo, ativo && cond, false});
+                bool cond = lerCondicao(entrada, pos, origem);
+                conds.empurrar({ativo, ativo && cond, false, origem});
                 ativo = ativo && cond;
                 continue;
             }
             if(t.tipo == TipoToken::PRE_SENAOSE) {
-                if(conds.tam == 0 || conds[conds.tam - 1].temSenao) throw std::runtime_error("'#senaose' inesperado na linha " + std::to_string(t.linha));
-                int linha = t.linha;
+                if(conds.tam == 0 || conds[conds.tam - 1].temSenao) throw erroNoToken(ERRO_PRE, "'#senaose' inesperado", t);
+                Token origem = t;
+                origem.valor = nullptr;
                 t.liberar();
                 pos++;
-                bool cond = lerCondicao(entrada, pos, linha);
+                bool cond = lerCondicao(entrada, pos, origem);
                 BlocoCond& topo = conds[conds.tam - 1];
                 bool toma = topo.paiAtivo && !topo.tomou && cond;
                 topo.tomou = topo.tomou || toma;
@@ -100,7 +104,7 @@ public:
                 continue;
             }
             if(t.tipo == TipoToken::PRE_SENAO) {
-                if(conds.tam == 0 || conds[conds.tam - 1].temSenao) throw std::runtime_error("'#senao' inesperado na linha " + std::to_string(t.linha));
+                if(conds.tam == 0 || conds[conds.tam - 1].temSenao) throw erroNoToken(ERRO_PRE, "'#senao' inesperado", t);
                 BlocoCond& topo = conds[conds.tam - 1];
                 topo.temSenao = true;
                 ativo = topo.paiAtivo && !topo.tomou;
@@ -109,7 +113,7 @@ public:
                 continue;
             }
             if(t.tipo == TipoToken::PRE_FIM) {
-                if(conds.tam == 0) throw std::runtime_error("'#sefim' sem '#se' na linha " + std::to_string(t.linha));
+                if(conds.tam == 0) throw erroNoToken(ERRO_PRE, "'#sefim' sem '#se'", t);
                 ativo = conds[conds.tam - 1].paiAtivo;
                 conds.tam--;
                 t.liberar();
@@ -126,7 +130,7 @@ public:
                 continue;
             }
             if(t.tipo == TipoToken::MACROFIM) {
-                throw std::runtime_error("'#macrofim' sem '#macro' na linha " + std::to_string(t.linha));
+                throw erroNoToken(ERRO_PRE, "'#macrofim' sem '#macro'", t);
             }
             if(t.tipo == TipoToken::INCLUIR && pos + 1 < entrada.tam && entrada[pos + 1].tipo == TipoToken::TEXTO) {
                 varrerInclusao(entrada[pos + 1].valor, diretorio);
@@ -139,7 +143,7 @@ public:
                 int indice = buscar(t.valor);
                 if(indice >= 0) {
                     pilha.empurrar(t.valor);
-                    expandir(corpos[indice], t.linha, saida);
+                    expandir(corpos[indice], t, saida);
                     pilha.tam--;
                     t.liberar();
                     pos++;
@@ -149,7 +153,7 @@ public:
             saida.empurrar(t);
             pos++;
         }
-        if(conds.tam > 0) throw std::runtime_error("'#se' sem '#sefim'");
+        if(conds.tam > 0) throw erroNoToken(ERRO_PRE, "'#se' sem '#sefim'", conds[conds.tam - 1].origem);
         conds.liberar();
         entrada.liberar(); // só o array: cada token já foi movido pra saida ou liberado
         return juntarTextos(saida);
@@ -175,37 +179,44 @@ public:
         t.valor = strdup(std::to_string(valor).c_str());
         t.linha = 0;
         corpo.empurrar(t);
-        def(nome, corpo, 0);
+        Token origem;
+        origem.tipo = TipoToken::MACRO;
+        origem.valor = nullptr;
+        origem.linha = 0;
+        def(nome, corpo, origem);
     }
 private:
     // "(NOME)" ou "(!NOME)" a partir de "pos", logo depois da diretiva. Libera os tokens e deixa "pos" depois do ')'.
-    bool lerCondicao(Vetor<Token>& e, int& pos, int linha) {
-        std::string erroFormato = "Esperado '(NOME)' ou '(!NOME)' após a diretiva na linha " + std::to_string(linha);
+    [[noreturn]] static void falharCondicao(const Vetor<Token>& e, int i, const Token& diretiva, const std::string& mensagem) {
+        if(i < e.tam) throw erroNoToken(ERRO_PRE, mensagem, e[i], notaEncontrado(e[i]));
+        throw erroNoToken(ERRO_PRE, mensagem, diretiva);
+    }
+
+    bool lerCondicao(Vetor<Token>& e, int& pos, const Token& diretiva) {
+        std::string formato = "esperado '(NOME)' ou '(!NOME)' após a diretiva";
         int i = pos;
-        
-        if(i >= e.tam || e[i].tipo != TipoToken::ABRE_PARENTESE) throw std::runtime_error(erroFormato);
+        if(i >= e.tam || e[i].tipo != TipoToken::ABRE_PARENTESE) falharCondicao(e, i, diretiva, formato);
         i++;
-        
         bool nega = i < e.tam && e[i].tipo == TipoToken::EXCLAMACAO;
         if(nega) i++;
-        if(i >= e.tam || e[i].tipo != TipoToken::IDENTIFICADOR) throw std::runtime_error(erroFormato);
-        
+        if(i >= e.tam || e[i].tipo != TipoToken::IDENTIFICADOR) falharCondicao(e, i, diretiva, formato);
         bool definido = buscar(e[i].valor) >= 0;
         i++;
-        
-        if(i >= e.tam || e[i].tipo != TipoToken::FECHA_PARENTESE) throw std::runtime_error(erroFormato);
+        if(i >= e.tam || e[i].tipo != TipoToken::FECHA_PARENTESE) falharCondicao(e, i, diretiva, formato);
         i++;
-        
         for(int k = pos; k < i; k++) e[k].liberar();
         pos = i;
         return definido != nega;
     }
     
-    static Token copiarToken(const Token& t, int linha) {
+    static Token copiarToken(const Token& t, const Token& uso) {
         Token c;
         c.tipo = t.tipo;
         c.valor = strdup(t.valor);
-        c.linha = linha;
+        c.linha = uso.linha;
+        c.coluna = uso.coluna;
+        c.tam = uso.tam;
+        c.arquivo = uso.arquivo;
         return c;
     }
 
@@ -229,11 +240,12 @@ private:
 
     // lê "#macro NOME corpo #macrofim" a partir de "pos"(no #macro), registra e devolve a posição depois do #macrofim.
     int lerMacro(Vetor<Token>& entrada, int pos) {
-        int linha = entrada[pos].linha;
+        Token origem = entrada[pos];
+        origem.valor = nullptr;
         entrada[pos].liberar();
         pos++;
         if(pos >= entrada.tam || entrada[pos].tipo != TipoToken::IDENTIFICADOR) {
-            throw std::runtime_error("Esperado nome da macro após '#macro' na linha " + std::to_string(linha));
+            throw erroNoToken(ERRO_PRE, "esperado nome da macro após '#macro'", pos < entrada.tam ? entrada[pos] : origem);
         }
         std::string nome = entrada[pos].valor;
         entrada[pos].liberar();
@@ -245,13 +257,13 @@ private:
             if(pos >= entrada.tam || entrada[pos].tipo == TipoToken::FIM_ARQUIVO) {
                 for(int i = 0; i < corpo.tam; i++) corpo[i].liberar();
                 corpo.liberar();
-                throw std::runtime_error("Macro '" + nome + "' aberta na linha " + std::to_string(linha) + " não foi fechada");
+                throw erroNoToken(ERRO_PRE, "macro '" + nome + "' não foi fechada: falta '#macrofim'", origem);
             }
             if(entrada[pos].tipo == TipoToken::MACRO) {
-                int linhaInterna = entrada[pos].linha;
+                Token interno = entrada[pos];
                 for(int i = 0; i < corpo.tam; i++) corpo[i].liberar();
                 corpo.liberar();
-                throw std::runtime_error("'#macro' dentro da macro '" + nome + "' na linha " + std::to_string(linhaInterna));
+                throw erroNoToken(ERRO_PRE, "'#macro' dentro da macro '" + nome + "'", interno);
             }
             if(entrada[pos].tipo == TipoToken::MACROFIM) break;
             corpo.empurrar(entrada[pos]);
@@ -259,19 +271,19 @@ private:
         }
         entrada[pos].liberar();
         pos++;
-        def(nome, corpo, linha);
+        def(nome, corpo, origem);
         return pos;
     }
 
     // registra a macro. Repetir a mesma definição(biblioteca lida duas vezes) é aceito; corpo diferente é erro.
-    void def(const std::string& nome, Vetor<Token>& corpo, int linha) {
+    void def(const std::string& nome, Vetor<Token>& corpo, const Token& origem) {
         int indice = buscar(nome.c_str());
         if(indice >= 0) {
             bool igual = mesmoCorpo(corpos[indice], corpo);
             for(int i = 0; i < corpo.tam; i++) corpo[i].liberar();
             corpo.liberar();
             if(!igual) {
-                throw std::runtime_error("Macro '" + nome + "' redefinida com corpo diferente na linha " + std::to_string(linha));
+                throw erroNoToken(ERRO_PRE, "macro '" + nome + "' redefinida com corpo diferente", origem);
             }
             return;
         }
@@ -280,22 +292,22 @@ private:
     }
 
     // copia o corpo pra "saida", expandindo macros dentro dele. Os tokens ganham a linha do ponto de uso, pra mensagens de erro apontarem pro lugar certo.
-    void expandir(const Vetor<Token>& corpo, int linhaUso, Vetor<Token>& saida) {
+    void expandir(const Vetor<Token>& corpo, const Token& uso, Vetor<Token>& saida) {
         for(int i = 0; i < corpo.tam; i++) {
             const Token& t = corpo[i];
             if(t.tipo == TipoToken::IDENTIFICADOR) {
                 int indice = buscar(t.valor);
                 if(indice >= 0) {
                     if(pilhaTem(t.valor)) {
-                        throw std::runtime_error(std::string("Macro '") + t.valor + "' se referencia a si mesma (linha " + std::to_string(linhaUso) + ")");
+                        throw erroNoToken(ERRO_PRE, std::string("macro '") + t.valor + "' se referencia a si mesma", uso);
                     }
                     pilha.empurrar(t.valor);
-                    expandir(corpos[indice], linhaUso, saida);
+                    expandir(corpos[indice], uso, saida);
                     pilha.tam--;
                     continue;
                 }
             }
-            saida.empurrar(copiarToken(t, linhaUso));
+            saida.empurrar(copiarToken(t, uso));
         }
     }
 
@@ -340,7 +352,8 @@ private:
         conteudoStream << arquivo.rdbuf();
         std::string conteudo = conteudoStream.str();
 
-        Lexer lexer(conteudo.c_str());
+        int idArquivo = RegistroFontes::instancia().registrar(absolutoStr, conteudo, true);
+        Lexer lexer(conteudo.c_str(), idArquivo);
         Vetor<Token> tokens = lexer.tokenizar();
         Vetor<Token> resultado = processar(tokens, caminhoAbsoluto.parent_path().string());
         for(int i = 0; i < resultado.tam; i++) resultado[i].liberar();

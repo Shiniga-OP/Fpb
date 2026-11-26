@@ -208,59 +208,57 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
     saida.empurrar(comandoIR);
 }
 
-// "nome = expr;": busca o slot já alocado na declaracao e empurra em
-// "saida" as instruções que sobrescrevem o valor nesse mesmo slot.
-inline void GeradorIR::gerarReatribuicao(const Reatribuicao& reat, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+// grava "valor"(já resolvido) na variável local "nome". Miolo de "nome = expr;" e de "nome = expr" usado como valor.
+inline ArgumentoIR GeradorIR::gravarEmVariavel(const char* nome, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     ArgumentoIR existente;
     int slot;
-    if(!ctx.variaveisLocais.buscar(reat.nome, &existente, &slot)) {
-        std::string nomeStr = reat.nome;
+    if(!ctx.variaveisLocais.buscar(nome, &existente, &slot)) {
+        std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
     }
     if(existente.tipo == ArgumentoIR::Tipo::IMEDIATO) {
-        std::string nomeStr = reat.nome;
+        std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' é final e não pode ser alterada");
     }
     if(existente.espacoPorValor) {
-        std::string nomeStr = reat.nome;
+        std::string nomeStr = nome;
         int id = existente.idEspaco;
-        ArgumentoIR origem = resolverExpressao(reat.valor, saida, ctx);
-        if(origem.tipo == ArgumentoIR::Tipo::REGISTRADOR && origem.idEspaco >= 0 && origem.idEspaco != id) {
+        if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.idEspaco >= 0 && valor.idEspaco != id) {
             throw std::runtime_error("Variável '" + nomeStr + "' só pode receber um espaço do mesmo tipo");
         }
-        if(origem.tipo == ArgumentoIR::Tipo::REGISTRADOR && origem.idEspaco == id) {
-            if(origem.registrador == slot) return; // x = x
+        if(valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.idEspaco == id) {
+            if(valor.registrador == slot) return valor; // x = x
             emitirLiberar(existente, id, saida);
-            if(origem.ehTemporario) moverEspaco(origem, existente, id, saida, ctx);
-            else copiarObjeto(origem, existente, id, saida, ctx);
-            return;
+            if(valor.ehTemporario) moverEspaco(valor, existente, id, saida, ctx);
+            else copiarObjeto(valor, existente, id, saida, ctx);
+            return valor;
         }
         emitirLiberar(existente, id, saida); // texto = "literal"
-        emitirCriar(existente, origem, id, saida);
-        return;
+        emitirCriar(existente, valor, id, saida);
+        return valor;
     }
-    ArgumentoIR novoValor = resolverExpressao(reat.valor, saida, ctx);
-    novoValor = converterParaTipo(novoValor, existente.ehFlutuante, existente.larguraBytes, saida, ctx);
-    if(novoValor.tipo == ArgumentoIR::Tipo::IMEDIATO) novoValor.larguraBytes = existente.larguraBytes; // a gravação segue o tipo do slot já declarado, não o da expressão do lado direito(ver gerarDeclaracaoVariavel)
+    valor = converterParaTipo(valor, existente.ehFlutuante, existente.larguraBytes, saida, ctx);
+    if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = existente.larguraBytes; // a gravação segue o tipo do slot já declarado
 
     ComandoIR comandoIR;
     comandoIR.tipo = ComandoIR::Tipo::REATRIBUICAO;
     comandoIR.instrucaoReatribuicao.slotDestino = slot;
-    comandoIR.instrucaoReatribuicao.valor = novoValor;
+    comandoIR.instrucaoReatribuicao.valor = valor;
     comandoIR.instrucaoReatribuicao.larguraDestino = existente.larguraBytes;
     saida.empurrar(comandoIR);
+    return valor;
 }
 
-// "nome[indice] = expr;": grava "larguraElemento" bytes(1, 8, ou qualquer
-// largura futura) no endereço nome+(indice*larguraElemento), decidido pelo
-// tipo declarado do ponteiro(ver larguraElementoApontado()). "nome"
-// precisa ser uma variável ja declarada(o ponteiro sendo indexado).
-inline void GeradorIR::gerarAtribuicaoIndexada(const AtribuicaoIndexada& atr, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    ArgumentoIR ponteiro = resolverPonteiroIndexado(atr.nome, atr.campo, saida, ctx);
-    ArgumentoIR indice = resolverExpressao(atr.indice, saida, ctx);
-    ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
+// "nome = expr;": resolve o lado direito e grava.
+inline void GeradorIR::gerarReatribuicao(const Reatribuicao& reat, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    ArgumentoIR valor = resolverExpressao(reat.valor, saida, ctx);
+    gravarEmVariavel(reat.nome, valor, saida, ctx);
+}
+
+// grava "valor"(já resolvido) em ponteiro[indice]: converte pro tipo do elemento e emite a escrita.
+inline ArgumentoIR GeradorIR::gravarEmIndexacao(const ArgumentoIR& ponteiro, const ArgumentoIR& indice, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     valor = converterParaTipo(valor, ponteiro.elementoFlutuante, ponteiro.larguraElemento, saida, ctx);
-    if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = ponteiro.larguraElemento; // registrador mantém a largura de origem: a arquitetura estende e grava só a largura do elemento
+    if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = ponteiro.larguraElemento;
 
     ComandoIR comandoIR;
     comandoIR.tipo = ComandoIR::Tipo::ESCRITA_INDEXADA;
@@ -268,6 +266,15 @@ inline void GeradorIR::gerarAtribuicaoIndexada(const AtribuicaoIndexada& atr, Ve
     comandoIR.instrucaoEscritaIndexada.indice = indice;
     comandoIR.instrucaoEscritaIndexada.valor = valor;
     saida.empurrar(comandoIR);
+    return valor;
+}
+
+// "nome[indice] = expr;"
+inline void GeradorIR::gerarAtribuicaoIndexada(const AtribuicaoIndexada& atr, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    ArgumentoIR ponteiro = resolverPonteiroIndexado(atr.nome, atr.campo, saida, ctx);
+    ArgumentoIR indice = resolverExpressao(atr.indice, saida, ctx);
+    ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
+    gravarEmIndexacao(ponteiro, indice, valor, saida, ctx);
 }
 
 // gera IR pra "#chamada_sistema id, arg1, arg2, ...;" ou, com destino,

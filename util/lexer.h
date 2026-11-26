@@ -150,6 +150,7 @@ public:
                 while(!fimDoArquivo() && atual() != '\n') avancar();
             } else if(c == '/' && pos + 1 < tamFonte && fonte[pos + 1] == '*') {
                 int linhaAbertura = linha;
+                int colunaAbertura = colunaAtual();
                 avancar(); // '/'
                 avancar(); // '*'
                 bool fechou = false;
@@ -163,7 +164,7 @@ public:
                     avancar(); // usa avancar() pra manter "linha" correta mesmo atravessando '\n' dentro do comentario
                 }
                 if(!fechou) {
-                    throw std::runtime_error("Comentário de bloco não fechado (aberto na linha " + std::to_string(linhaAbertura) + ")");
+                    erro("comentário de bloco não fechado", linhaAbertura, colunaAbertura, 2);
                 }
             } else {
                 break;
@@ -246,7 +247,6 @@ public:
             buf.liberar();
             return t;
         }
-        std::string msg = "Diretiva desconhecida '";
         std::string nome = buf.dados ? buf.dados : "";
         buf.liberar();
         erro("diretiva desconhecida '" + nome + "'", linhaAtual, colunaToken, (int)nome.size());
@@ -284,6 +284,7 @@ public:
         else if(buf.igual("sem_sinal")) t.tipo = TipoToken::SEM_SINAL;
         else if(buf.igual("apagar")) t.tipo = TipoToken::APAGAR;
         else if(buf.igual("herda")) t.tipo = TipoToken::HERDA;
+        else if(buf.igual("modelo")) t.tipo = TipoToken::MODELO;
         else if(buf.igual("estatico")) t.tipo = TipoToken::ESTATICO;
         else if(buf.igual("final")) t.tipo = TipoToken::FINAL;
         else t.tipo = TipoToken::IDENTIFICADOR;
@@ -303,7 +304,8 @@ public:
                 digitos.empurrar(avancar());
             }
             if(digitos.tam == 0) {
-                throw std::runtime_error("Número hexadecimal sem dígitos na linha " + std::to_string(linhaAtual));
+                digitos.liberar();
+                erro("número hexadecimal sem dígitos", linhaAtual, colunaToken, 2);
             }
             char bufNumero[32];
             snprintf(bufNumero, sizeof(bufNumero), "%ld", (long)strtoull(digitos.dados, nullptr, 16));
@@ -357,9 +359,8 @@ public:
             }
         }
         if(fimDoArquivo()) {
-            std::string msg = "Texto não fechado na linha " + std::to_string(linhaAtual);
             buf.liberar();
-            throw std::runtime_error(msg);
+            erro("texto não fechado: faltou '\"' para fechar", linhaAtual, colunaToken, 1);
         }
         avancar(); // fecha aspas
         Token t;
@@ -378,7 +379,7 @@ public:
     Token lerCaractere(int linhaAtual) {
         avancar(); // abre aspas simples
         if(fimDoArquivo()) {
-            throw std::runtime_error("Literal de caractere não fechado na linha " + std::to_string(linhaAtual));
+            erro("literal de caractere não fechado", linhaAtual, colunaToken, 1);
         }
         unsigned char valor;
         char c = avancar();
@@ -397,7 +398,7 @@ public:
             valor = (unsigned char)c;
         }
         if(fimDoArquivo() || atual() != '\'') {
-            throw std::runtime_error("Literal de caractere não fechado na linha " + std::to_string(linhaAtual) + " (esperado apenas um caractere entre aspas simples)");
+            erro("esperado apenas um caractere entre aspas simples", linhaAtual, colunaToken, 1);
         }
         avancar(); // fecha aspas simples
 
@@ -643,7 +644,7 @@ public:
                 t.valor = strdup(":");
                 return t;
             default:
-                throw std::runtime_error(std::string("Caractere inesperado '") + c + "' na linha " + std::to_string(linhaAtual));
+                erro(std::string("caractere inesperado '") + c + "'", linhaAtual, colunaToken, 1);
         }
     }
 };

@@ -13,6 +13,7 @@
 inline constexpr const char* ERRO_LEXICO = "erro léxico";
 inline constexpr const char* ERRO_SINTAXE = "erro de sintaxe";
 inline constexpr const char* ERRO_PRE = "erro de pré-processamento";
+inline constexpr const char* ERRO_INCLUSAO = "erro de inclusão";
 
 inline constexpr const char* COR_RESET = "\033[0m";
 inline constexpr const char* COR_NEGRITO = "\033[1m";

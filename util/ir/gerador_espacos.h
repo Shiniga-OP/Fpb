@@ -354,38 +354,46 @@ inline void GeradorIR::emitirEscritaCampo(const ArgumentoIR& base, int posCampo,
     saida.empurrar(comandoIR);
 }
 
-// "nome.campo = expr;"
-inline void GeradorIR::gerarAtribuicaoCampo(const AtribuicaoCampo& atr, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+// grava "valor"(já resolvido) em "nome.campo": campo estático(global) ou de instância(base + posição).
+inline ArgumentoIR GeradorIR::gravarEmCampo(const char* nome, const char* campo, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     std::string simbolo;
     const CampoEstatico* estatico = nullptr;
-    if(localizarEstatico(atr.nome, atr.campo, ctx, simbolo, &estatico)) {
+    if(localizarEstatico(nome, campo, ctx, simbolo, &estatico)) {
         if(estatico->ehFinal) {
-            std::string nomeStr = atr.nome;
-            std::string campoStr = atr.campo;
+            std::string nomeStr = nome;
+            std::string campoStr = campo;
             throw std::runtime_error("'" + nomeStr + "." + campoStr + "' é final e não pode ser alterado");
         }
         ArgumentoIR endereco = enderecoDeGlobal(simbolo, *estatico, saida, ctx);
-        ArgumentoIR valorEstatico = resolverExpressao(atr.valor, saida, ctx);
-        valorEstatico = converterParaTipo(valorEstatico, false, larguraDoTipo(estatico->tipo), saida, ctx);
-        emitirEscritaCampo(endereco, 0, estatico->tipo, valorEstatico, saida);
-        return;
+        valor = converterParaTipo(valor, tipoEhFlutuante(estatico->tipo), larguraDoTipo(estatico->tipo), saida, ctx);
+        if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = larguraDoTipo(estatico->tipo);
+        emitirEscritaCampo(endereco, 0, estatico->tipo, valor, saida);
+        return valor;
     }
     ArgumentoIR base;
-    if(!ctx.variaveisLocais.buscar(atr.nome, &base)) {
-        std::string nomeStr = atr.nome;
-        if(espacos.buscar(atr.nome) >= 0) {
-            throw std::runtime_error("Classe '" + nomeStr + "' não tem o campo estatico '" + atr.campo + "'");
+    if(!ctx.variaveisLocais.buscar(nome, &base)) {
+        std::string nomeStr = nome;
+        if(espacos.buscar(nome) >= 0) {
+            std::string campoStr = campo;
+            throw std::runtime_error("Classe '" + nomeStr + "' não tem o campo estatico '" + campoStr + "'");
         }
         throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
     }
     if(base.idEspaco < 0) {
-        std::string nomeStr = atr.nome;
+        std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não é um espaço, não tem campos");
     }
     int posCampo;
     TipoVariavel tipoCampo;
-    posicaoDoCampo(base.idEspaco, atr.campo, &posCampo, &tipoCampo);
-    ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
+    posicaoDoCampo(base.idEspaco, campo, &posCampo, &tipoCampo);
     valor = converterParaTipo(valor, tipoEhFlutuante(tipoCampo), larguraDoTipo(tipoCampo), saida, ctx);
+    if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = larguraDoTipo(tipoCampo);
     emitirEscritaCampo(base, posCampo, tipoCampo, valor, saida);
+    return valor;
+}
+
+// "nome.campo = expr;"
+inline void GeradorIR::gerarAtribuicaoCampo(const AtribuicaoCampo& atr, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
+    gravarEmCampo(atr.nome, atr.campo, valor, saida, ctx);
 }

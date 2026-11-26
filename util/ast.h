@@ -55,7 +55,7 @@ struct Expressao {
         CHAMADA_FUNCAO, BYTES,
         INDEXACAO, CHAMADA_SISTEMA,
         ACESSO_CAMPO, ENDERECO,
-        TERNARIA
+        TERNARIA, ATRIBUICAO
     } tipo;
     char* valor; // dono: quem criou a expressao(strdup). usado quando tipo != BINARIA e tipo != CONVERSAO e tipo != CHAMADA_FUNCAO e tipo != BYTES e tipo != INDEXACAO e tipo != CHAMADA_SISTEMA
     OperadorAritmetico operadorAritmetico; // usado quando tipo == BINARIA
@@ -556,6 +556,10 @@ struct DeclaracaoEspaco {
 
 struct Inclusao {
     char* caminho; // dono: quem criou a inclusao(strdup)
+    int linha = 0; // posição do texto do caminho no #incluir, pra apontar erros de abertura
+    int coluna = 0;
+    int tam = 0;
+    int arquivo = -1;
 
     void liberar() {
         free(caminho);

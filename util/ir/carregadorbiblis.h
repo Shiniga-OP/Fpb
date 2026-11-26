@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
@@ -13,6 +14,13 @@
 #include "../lexer.h"
 #include "../analisador.h"
 #include "../preprocessador.h"
+#include "../analise/modelos.h"
+
+// tokens de uma biblioteca já lida, esperando a expansão dos modelos e o parse
+struct Pendente {
+    Vetor<Token> tokens;
+    std::string caminhoRelativo;
+};
 
 // Localiza, le e faz o parsing dos arquivos .fpb incluidos via "#incluir".
 // Não sabe nada sobre IR nem sobre tabelas de funções: só devolve as ASTs
@@ -29,6 +37,7 @@ public:
     VetorStr origens; // caminho relativo, como escrito no #incluir, de cada item de "programas"(usado só em mensagens de erro)
     Preprocessador* preprocessador = nullptr;
     std::string raizBiblis = raizBiblisPadrao(); // raiz das bibliotecas, usada nos "~caminho"
+    std::vector<Pendente> pendentes; // bibliotecas tokenizadas e ainda não parseadas(só durante prepararPrincipal)
 
     CarregadorBiblis() {
         caminhosJaIncluidos.iniciar();
@@ -57,6 +66,85 @@ public:
         return std::string(texto, tam);
     }
 
+    // erro de abertura: aponta pro caminho no #incluir quando a posição é conhecida.
+    [[noreturn]] void falharAbrir(const std::string& mensagem, const Inclusao* inclusao) {
+        if(inclusao) throw ErroCompilacao(ERRO_INCLUSAO, mensagem, inclusao->arquivo, inclusao->linha, inclusao->coluna, inclusao->tam);
+        throw std::runtime_error(mensagem);
+    }
+
+    // resolve o caminho e lê o arquivo; false se o arquivo já foi incluído
+    bool lerNovaBiblioteca(const char* caminhoRelativo, const std::string& diretorioAtual, const Inclusao* inclusao, std::filesystem::path& absoluto, std::string& conteudo) {
+        std::filesystem::path caminho = resolverCaminhoInclusao(caminhoRelativo, diretorioAtual, raizBiblis);
+        std::error_code erroCaminho;
+        absoluto = std::filesystem::canonical(caminho, erroCaminho);
+        if(erroCaminho) {
+            falharAbrir("não foi possível achar a biblioteca '" + caminho.string() + "'", inclusao);
+        }
+        std::string absolutoStr = absoluto.string();
+        for(int i = 0; i < caminhosJaIncluidos.tam; i++) {
+            int tamCandidato;
+            const char* candidato = caminhosJaIncluidos.obter(i, &tamCandidato);
+            if(tamCandidato == (int)absolutoStr.size() && memcmp(candidato, absolutoStr.c_str(), tamCandidato) == 0) return false;
+        }
+        caminhosJaIncluidos.empurrar(absolutoStr.c_str());
+        std::ifstream arquivo(absoluto);
+        if(!arquivo) {
+            falharAbrir("não foi possível abrir a biblioteca '" + absolutoStr + "'", inclusao);
+        }
+        std::stringstream conteudoStream;
+        conteudoStream << arquivo.rdbuf();
+        conteudo = conteudoStream.str();
+        return true;
+    }
+
+    // fase 1: lê e tokeniza, sem parsear. Mantém a pré-ordem: o índice é reservado antes de descer nas inclusões
+    void coletar(const char* caminhoRelativo, const std::string& diretorioAtual, const Inclusao* inclusao) {
+        std::filesystem::path absoluto;
+        std::string conteudo;
+        if(!lerNovaBiblioteca(caminhoRelativo, diretorioAtual, inclusao, absoluto, conteudo)) return;
+        Lexer lexer(conteudo.c_str(), RegistroFontes::instancia().registrar(absoluto.string(), conteudo, true));
+        Vetor<Token> tokens = lexer.tokenizar();
+        if(preprocessador) tokens = preprocessador->processar(tokens, absoluto.parent_path().string());
+        Pendente p;
+        p.tokens = tokens;
+        p.caminhoRelativo = caminhoRelativo;
+        pendentes.push_back(p);
+        coletarInclusoes(tokens, absoluto.parent_path().string());
+    }
+
+    void coletarInclusoes(Vetor<Token>& tokens, const std::string& diretorioAtual) {
+        for(int i = 0; i + 1 < tokens.tam; i++) {
+            if(tokens[i].tipo != TipoToken::INCLUIR || tokens[i + 1].tipo != TipoToken::TEXTO) continue;
+            const Token& t = tokens[i + 1];
+            Inclusao inclusao;
+            inclusao.caminho = t.valor;
+            inclusao.linha = t.linha;
+            inclusao.coluna = t.coluna;
+            inclusao.tam = t.tam;
+            inclusao.arquivo = t.arquivo;
+            coletar(t.valor, diretorioAtual, &inclusao);
+        }
+    }
+
+    // fase 2: chamar com os tokens do principal(já passados pelo preprocessador) ANTES de analisá-lo
+    void prepararPrincipal(Vetor<Token>& tokensPrincipal, const std::string& diretorioPrincipal) {
+        coletarInclusoes(tokensPrincipal, diretorioPrincipal);
+        std::vector<Vetor<Token>*> arquivos;
+        for(size_t i = 0; i < pendentes.size(); i++) arquivos.push_back(&pendentes[i].tokens);
+        arquivos.push_back(&tokensPrincipal);
+        expandirModelosTodos(arquivos);
+        for(size_t i = 0; i < pendentes.size(); i++) {
+            Analisador analisador(pendentes[i].tokens);
+            Programa* programa = new Programa();
+            *programa = analisador.analisar();
+            programas.empurrar(programa);
+            origens.empurrar(pendentes[i].caminhoRelativo.c_str());
+            for(int k = 0; k < pendentes[i].tokens.tam; k++) pendentes[i].tokens[k].liberar();
+            pendentes[i].tokens.liberar();
+        }
+        pendentes.clear();
+    }
+
     // carrega uma biblioteca(#incluir "caminho.fpb"): "diretorioAtual" e o
     // diretório a partir do qual "caminhoRelativo" deve ser resolvido(o
     // diretório do arquivo que contem o #incluir, não sempre o diretório
@@ -67,33 +155,12 @@ public:
     // escrito), já que não ha cenario util pra incluir o mesmo arquivo duas
     // vezes. Inclusões feitas pela própria biblioteca são carregadas em
     // seguida, recursivamente.
-    void carregar(const char* caminhoRelativo, const std::string& diretorioAtual) {
-        std::filesystem::path caminho = resolverCaminhoInclusao(caminhoRelativo, diretorioAtual, raizBiblis);
-        std::error_code erroCaminho;
-        std::filesystem::path caminhoAbsoluto = std::filesystem::canonical(caminho, erroCaminho);
-        if(erroCaminho) {
-            throw std::runtime_error("Não foi possível abrir biblioteca incluída: " + caminho.string());
-        }
-        std::string caminhoAbsolutoStr = caminhoAbsoluto.string();
+    void carregar(const char* caminhoRelativo, const std::string& diretorioAtual, const Inclusao* inclusao = nullptr) {
+        std::filesystem::path caminhoAbsoluto;
+        std::string conteudo;
+        if(!lerNovaBiblioteca(caminhoRelativo, diretorioAtual, inclusao, caminhoAbsoluto, conteudo)) return;
 
-        for(int i = 0; i < caminhosJaIncluidos.tam; i++) {
-            int tamCandidato;
-            const char* candidato = caminhosJaIncluidos.obter(i, &tamCandidato);
-            if(tamCandidato == (int)caminhoAbsolutoStr.size() && memcmp(candidato, caminhoAbsolutoStr.c_str(), tamCandidato) == 0) {
-                return; // já incluída antes, mesmo arquivo: ignora silenciosamente
-            }
-        }
-        caminhosJaIncluidos.empurrar(caminhoAbsolutoStr.c_str());
-
-        std::ifstream arquivo(caminhoAbsoluto);
-        if(!arquivo) {
-            throw std::runtime_error("Não foi possível abrir biblioteca incluída: " + caminhoAbsolutoStr);
-        }
-        std::stringstream conteudoStream;
-        conteudoStream << arquivo.rdbuf();
-        std::string conteudo = conteudoStream.str();
-
-        Lexer lexer(conteudo.c_str());
+        Lexer lexer(conteudo.c_str(), RegistroFontes::instancia().registrar(caminhoAbsoluto.string(), conteudo, true));
         Vetor<Token> tokens = lexer.tokenizar();
         if(preprocessador) tokens = preprocessador->processar(tokens, caminhoAbsoluto.parent_path().string());
         Analisador analisador(tokens);
@@ -113,7 +180,7 @@ public:
         // não ao diretório do arquivo raiz.
         std::string diretorioDestaBiblioteca = caminhoAbsoluto.parent_path().string();
         for(int i = 0; i < bibliotecaPrograma->inclusoes.tam; i++) {
-            carregar(bibliotecaPrograma->inclusoes[i].caminho, diretorioDestaBiblioteca);
+            carregar(bibliotecaPrograma->inclusoes[i].caminho, diretorioDestaBiblioteca, &bibliotecaPrograma->inclusoes[i]);
         }
         // libera só os tokens(a AST da biblioteca continua viva em "programas").
         for(int i = 0; i < tokens.tam; i++) tokens[i].liberar();

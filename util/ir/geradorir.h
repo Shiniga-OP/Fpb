@@ -141,7 +141,12 @@ public:
     ArgumentoIR resolverOperadorEspaco(OperadorAritmetico op, ArgumentoIR esquerda, ArgumentoIR direita, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverTernaria(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-    
+    ArgumentoIR resolverAtribuicao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR congelarValor(ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR gravarEmVariavel(const char* nome, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR gravarEmIndexacao(const ArgumentoIR& ponteiro, const ArgumentoIR& indice, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR gravarEmCampo(const char* nome, const char* campo, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+
     // === gerador_condicoes.h ===
     void atribuirMarcacao(int slot, long valor, Vetor<ComandoIR>& saida);
     void marcarSeVerdadeira(const Condicao& cond, int slot, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
@@ -165,6 +170,7 @@ public:
     void copiarEspaco(const ArgumentoIR& origem, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR criarCopiaEspaco(const ArgumentoIR& origem, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void gerarApagar(const ComandoApagar& comando, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    
     // === gerador_vida.h ===
     ArgumentoIR argumentoEspaco(int slot, int idEspaco);
     void emitirCriar(const ArgumentoIR& destino, ArgumentoIR valor, int idEspaco, Vetor<ComandoIR>& saida);

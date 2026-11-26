@@ -2,6 +2,10 @@
 #pragma once
 #include "../analisador.h"
 
+inline bool ehExpressaoPura(const Expressao& e);
+inline Expressao clonarExpressaoPura(const Expressao& e);
+inline Expressao montarNumeroLiteral(const char* valor);
+
 // true se "tipo" e um operador composto de bit: &=, |=, ^=, <<=, >>=.
 inline bool ehAtribuicaoComposta(TipoToken tipo) {
     return tipo == TipoToken::TAMBEM_IGUAL || tipo == TipoToken::OU_IGUAL || tipo == TipoToken::CIRCUNFLEXO_IGUAL || tipo == TipoToken::MENOR_MENOR_IGUAL || tipo == TipoToken::MAIOR_MAIOR_IGUAL || tipo == TipoToken::VEZES_IGUAL || tipo == TipoToken::DIVIDIR_IGUAL || tipo == TipoToken::PORCENTAGEM_IGUAL;
@@ -111,8 +115,40 @@ inline AtribuicaoIndexada Analisador::analisarAtribuicaoIndexada() {
     consumir(TipoToken::ABRE_COLCHETE, "esperado '[' após nome do ponteiro");
     atr.indice = analisarExpressaoAditiva();
     consumir(TipoToken::FECHA_COLCHETE, "esperado ']' após índice");
-    consumir(TipoToken::IGUAL, "esperado '=' na atribuicao indexada");
-    atr.valor = analisarExpressaoAditiva();
+    
+    TipoToken op = atual().tipo;
+    if(op == TipoToken::IGUAL) {
+        pos++;
+        atr.valor = analisarExpressaoAditiva();
+    } else if(ehTokenReatribuicao(op)) {
+        // "a[i] += e" / "a[i]++" viram "a[i] = a[i] op e"
+        if(!ehExpressaoPura(atr.indice)) erro("operador composto em posição de array exige índice sem efeito colateral");
+        pos++;
+        Expressao operando;
+        if(op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS) operando = montarNumeroLiteral("1");
+        else operando = analisarExpressaoAditiva();
+        Expressao ponteiro;
+        if(atr.campo) {
+            ponteiro = montarAcessoCampo(atr.nome, atr.campo);
+        } else {
+            ponteiro.tipo = Expressao::Tipo::IDENTIFICADOR;
+            ponteiro.valor = strdup(atr.nome);
+        }
+        Expressao lido;
+        lido.tipo = Expressao::Tipo::INDEXACAO;
+        lido.valor = nullptr;
+        lido.esquerda = new Expressao(ponteiro);
+        lido.direita = new Expressao(clonarExpressaoPura(atr.indice));
+        Expressao binaria;
+        binaria.tipo = Expressao::Tipo::BINARIA;
+        binaria.valor = nullptr;
+        binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
+        binaria.esquerda = new Expressao(lido);
+        binaria.direita = new Expressao(operando);
+        atr.valor = binaria;
+    } else {
+        erro("esperado '=' ou operador composto na atribuição indexada");
+    }
     if(verificar(TipoToken::PONTO_VIRGULA)) {
         consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após atribuição indexada");
     }

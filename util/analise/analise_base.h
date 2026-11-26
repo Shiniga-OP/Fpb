@@ -47,8 +47,7 @@ inline const Token& Analisador::consumir(TipoToken tipo, const char* mensagemErr
 }
 
 inline void Analisador::erro(const char* mensagem) {
-    std::string msg = "Erro de sintaxe na linha " + std::to_string(atual().linha) + ": " + mensagem + " (encontrado '" + atual().valor + "')";
-    throw std::runtime_error(msg);
+    throw erroNoToken(ERRO_SINTAXE, mensagem, atual(), notaEncontrado(atual()));
 }
 
 inline Inclusao Analisador::analisarInclusao(TipoToken diretiva) {
@@ -57,6 +56,10 @@ inline Inclusao Analisador::analisarInclusao(TipoToken diretiva) {
     if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
     Inclusao inc;
     inc.caminho = strdup(caminho.valor);
+    inc.linha = caminho.linha;
+    inc.coluna = caminho.coluna;
+    inc.tam = caminho.tam;
+    inc.arquivo = caminho.arquivo;
     return inc;
 }
 

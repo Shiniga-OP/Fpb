@@ -15,7 +15,7 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     // 2. o carregador resolve cada "#incluir"(dedupe por caminho absoluto) e
     //    devolve a AST de cada biblioteca; aqui registramos assinatura + corpo de cada função delas.
     for(int i = 0; i < programa.inclusoes.tam; i++) {
-        carregador.carregar(programa.inclusoes[i].caminho, diretorioBase);
+        carregador.carregar(programa.inclusoes[i].caminho, diretorioBase, &programa.inclusoes[i]);
     }
     for(int i = 0; i < carregador.programas.tam; i++) {
         registrarFuncoes(*carregador.programas[i], carregador.origem(i));

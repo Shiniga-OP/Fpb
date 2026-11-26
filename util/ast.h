@@ -31,6 +31,7 @@ inline bool tipoEhPonteiro(TipoVariavel tipo) {
 struct TipoRetorno {
     bool ehNulo;
     TipoVariavel tipo; // valido so se ehNulo == false
+    char* nomeEspaco;
 };
 
 // propagação: Expressao e ela mesma(recursiva) numa BINARIA ou CONVERSAO.
@@ -378,7 +379,8 @@ struct Comando {
         DECLARACAO_VARIAVEL, REATRIBUICAO,
         CHAMADA_FUNCAO, CHAMADA_SISTEMA_CRUA,
         SE, ENQUANTO, POR, APAGAR,
-        RETORNE, ATRIBUICAO_INDEXADA, ATRIBUICAO_CAMPO
+        RETORNE, ATRIBUICAO_INDEXADA, ATRIBUICAO_CAMPO,
+        EXPRESSAO
     } tipo;
     DeclaracaoVariavel declaracaoVariavel;
     Reatribuicao reatribuicao;
@@ -391,6 +393,7 @@ struct Comando {
     ComandoApagar comandoApagar;
     AtribuicaoIndexada atribuicaoIndexada;
     AtribuicaoCampo atribuicaoCampo;
+    Expressao expressao;
 
     void liberar() {
         if(tipo == Tipo::DECLARACAO_VARIAVEL) declaracaoVariavel.liberar();
@@ -404,6 +407,7 @@ struct Comando {
         else if(tipo == Tipo::ATRIBUICAO_INDEXADA) atribuicaoIndexada.liberar();
         else if(tipo == Tipo::ATRIBUICAO_CAMPO) atribuicaoCampo.liberar();
         else if(tipo == Tipo::APAGAR) comandoApagar.liberar();
+        else if(tipo == Tipo::EXPRESSAO) expressao.liberar();
     }
 };
 
@@ -493,6 +497,7 @@ struct DeclaracaoFuncao {
 struct CampoEspaco {
     TipoVariavel tipo;
     char* nome; // dono: quem criou o campo(strdup)
+    char* nomeEspaco;
 
     void liberar() {
         free(nome);

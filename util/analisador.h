@@ -84,6 +84,8 @@ public:
     Expressao analisarPosfixo(Expressao base);
     Expressao montarIncremento(const Expressao& destino, OperadorAritmetico op);
     Expressao analisarPrimariaSemPosfixo();
+    Expressao continuarCadeia(Expressao base);
+    Comando analisarComandoCadeia();
 };
 
 // definições dos métodos (cada arquivo inclui este de volta; #pragma once evita ciclo)

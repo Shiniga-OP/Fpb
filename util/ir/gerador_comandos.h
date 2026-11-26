@@ -386,6 +386,8 @@ inline void GeradorIR::gerarBlocoComandos(const Vetor<Comando>& corpo, Vetor<Com
             gerarAtribuicaoCampo(comando.atribuicaoCampo, saida, ctx);
         } else if(comando.tipo == Comando::Tipo::APAGAR) {
             gerarApagar(comando.comandoApagar, saida, ctx);
+        } else if(comando.tipo == Comando::Tipo::EXPRESSAO) {
+            resolverExpressao(comando.expressao, saida, ctx);
         } else {
             gerarChamadaFuncao(comando.chamadaFuncao, saida, ctx);
         }
@@ -393,11 +395,34 @@ inline void GeradorIR::gerarBlocoComandos(const Vetor<Comando>& corpo, Vetor<Com
     }
 }
 
+// "X.metodo(args)" com X qualquer expressão (o parser manda ".metodo" e X em argumentos[0]): resolve X uma vez, guarda numa
+// variável oculta e devolve "oculta.metodo", que segue o caminho normal de desdobrarChamadaMetodo.
+inline std::string GeradorIR::ocultarReceptor(const char* nome, const Expressao& receptor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    ArgumentoIR valor = resolverExpressao(receptor, saida, ctx);
+    if(valor.tipo != ArgumentoIR::Tipo::REGISTRADOR || valor.idEspaco < 0) {
+        throw std::runtime_error(std::string("O valor à esquerda de '") + nome + "' não é um espaço, não tem métodos");
+    }
+    std::string oculto = "$r" + std::to_string(valor.registrador);
+    ctx.variaveisLocais.definirComSlot(oculto.c_str(), valor, valor.registrador);
+    return oculto + nome;
+}
+
 // gera IR pra uma chamada de função de usuário usada como COMANDO de
 // topo(valor de retorno, se houver, e descartado): "bl nome". "saida"
 // recebe os comandos auxiliares de cada argumento(ex: chamada de funcao
 // aninhada) antes do comando final.
 inline void GeradorIR::gerarChamadaFuncao(const ChamadaFuncao& chamada, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(chamada.nome[0] == '.') {
+        ChamadaFuncao oculta;
+        oculta.iniciar();
+        std::string nomeOculto = ocultarReceptor(chamada.nome, chamada.argumentos[0], saida, ctx);
+        oculta.nome = strdup(nomeOculto.c_str());
+        for(int i = 1; i < chamada.argumentos.tam; i++) oculta.argumentos.empurrar(chamada.argumentos[i]);
+        gerarChamadaFuncao(oculta, saida, ctx);
+        free(oculta.nome);
+        oculta.argumentos.liberar();
+        return;
+    }
     std::string nomeMetodo;
     ChamadaFuncao reescrita;
     reescrita.iniciar();

@@ -5,6 +5,7 @@
 inline bool ehExpressaoPura(const Expressao& e);
 inline Expressao clonarExpressaoPura(const Expressao& e);
 inline Expressao montarNumeroLiteral(const char* valor);
+inline bool ehDestinoAtribuicao(const Expressao& e);
 
 // true se "tipo" e um operador composto de bit: &=, |=, ^=, <<=, >>=.
 inline bool ehAtribuicaoComposta(TipoToken tipo) {
@@ -76,6 +77,9 @@ inline Comando Analisador::analisarComando() {
         comando.reatribuicao = analisarReatribuicao();
         return comando;
     }
+    if(pos + 3 < (size_t)tokens.tam && verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::PONTO && tokens[pos + 2].tipo == TipoToken::IDENTIFICADOR && tokens[pos + 3].tipo == TipoToken::PONTO) {
+        return analisarComandoCadeia();
+    }
     if(ehChamadaMetodo()) {
         comando.tipo = Comando::Tipo::CHAMADA_FUNCAO;
         comando.chamadaFuncao = analisarChamadaMetodo();
@@ -98,6 +102,56 @@ inline Comando Analisador::analisarComando() {
     }
     comando.tipo = Comando::Tipo::CHAMADA_FUNCAO;
     comando.chamadaFuncao = analisarChamadaFuncao();
+    return comando;
+}
+
+// analisa um comando com cadeia de '.' (a.b.c = e; a.b.c += e; a.b.c++; a.b.metodo(...);)
+inline Comando Analisador::analisarComandoCadeia() {
+    Comando comando;
+    Expressao alvo = analisarPrimariaSemPosfixo();
+    TipoToken op = atual().tipo;
+    if(alvo.tipo == Expressao::Tipo::CHAMADA_FUNCAO) {
+        ChamadaFuncao chamada;
+        chamada.iniciar();
+        chamada.nome = alvo.nomeFuncao;
+        for(int i = 0; i < alvo.argumentosFuncao->tam; i++) chamada.argumentos.empurrar((*alvo.argumentosFuncao)[i]);
+        alvo.argumentosFuncao->liberar();
+        delete alvo.argumentosFuncao;
+        comando.tipo = Comando::Tipo::CHAMADA_FUNCAO;
+        comando.chamadaFuncao = chamada;
+        if(verificar(TipoToken::PONTO_VIRGULA)) consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após chamada de método");
+        return comando;
+    }
+    if(!ehTokenReatribuicao(op) || !ehDestinoAtribuicao(alvo)) erro("esperado '=', operador composto, '++', '--' ou chamada de método");
+    comando.tipo = Comando::Tipo::EXPRESSAO;
+    if(op == TipoToken::IGUAL) {
+        pos++;
+        Expressao e;
+        e.tipo = Expressao::Tipo::ATRIBUICAO;
+        e.valor = nullptr;
+        e.esquerda = new Expressao(alvo);
+        e.direita = new Expressao(analisarExpressaoAditiva());
+        comando.expressao = e;
+    } else if(op == TipoToken::MAIS_MAIS || op == TipoToken::MENOS_MENOS) {
+        pos++;
+        comando.expressao = montarIncremento(alvo, op == TipoToken::MAIS_MAIS ? OperadorAritmetico::SOMA : OperadorAritmetico::SUBTRACAO);
+    } else {
+        if(!ehExpressaoPura(alvo)) erro("operador composto exige destino sem efeito colateral");
+        pos++;
+        Expressao binaria;
+        binaria.tipo = Expressao::Tipo::BINARIA;
+        binaria.valor = nullptr;
+        binaria.operadorAritmetico = operadorDaAtribuicaoComposta(op);
+        binaria.esquerda = new Expressao(clonarExpressaoPura(alvo));
+        binaria.direita = new Expressao(analisarExpressaoAditiva());
+        Expressao e;
+        e.tipo = Expressao::Tipo::ATRIBUICAO;
+        e.valor = nullptr;
+        e.esquerda = new Expressao(alvo);
+        e.direita = new Expressao(binaria);
+        comando.expressao = e;
+    }
+    if(verificar(TipoToken::PONTO_VIRGULA)) consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após o comando");
     return comando;
 }
 

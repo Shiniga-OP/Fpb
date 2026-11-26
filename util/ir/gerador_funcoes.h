@@ -253,6 +253,8 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
             gerarAtribuicaoIndexada(comando.atribuicaoIndexada, funcaoIR.instrucoes, ctx);
         } else if(comando.tipo == Comando::Tipo::ATRIBUICAO_CAMPO) {
             gerarAtribuicaoCampo(comando.atribuicaoCampo, funcaoIR.instrucoes, ctx);
+        } else if(comando.tipo == Comando::Tipo::EXPRESSAO) {
+            resolverExpressao(comando.expressao, funcaoIR.instrucoes, ctx);
         } else {
             gerarChamadaFuncao(comando.chamadaFuncao, funcaoIR.instrucoes, ctx);
         }

@@ -146,6 +146,11 @@ public:
     ArgumentoIR gravarEmVariavel(const char* nome, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR gravarEmIndexacao(const ArgumentoIR& ponteiro, const ArgumentoIR& indice, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR gravarEmCampo(const char* nome, const char* campo, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR lerCampoDeBase(const ArgumentoIR& base, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR gravarEmCampoBase(const ArgumentoIR& base, const char* campo, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR resolverPonteiroDaExpressao(const Expressao& e, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    int idEspacoDoCampo(int idEspaco, const char* campo);
+    std::string ocultarReceptor(const char* nome, const Expressao& receptor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
 
     // === gerador_condicoes.h ===
     void atribuirMarcacao(int slot, long valor, Vetor<ComandoIR>& saida);

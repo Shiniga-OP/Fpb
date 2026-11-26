@@ -336,6 +336,27 @@ inline ArgumentoIR GeradorIR::resolverPonteiroIndexado(const char* nome, const c
     return ponteiro;
 }
 
+// ponteiro sendo indexado em "alvo[i]": variável, "nome.campo" ou "qualquer.coisa.campo".
+inline ArgumentoIR GeradorIR::resolverPonteiroDaExpressao(const Expressao& e, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(e.tipo == Expressao::Tipo::IDENTIFICADOR) return resolverPonteiroIndexado(e.valor, nullptr, saida, ctx);
+    if(e.tipo != Expressao::Tipo::ACESSO_CAMPO) return resolverExpressao(e, saida, ctx);
+    if(e.esquerda->tipo == Expressao::Tipo::IDENTIFICADOR) return resolverPonteiroIndexado(e.esquerda->valor, e.valor, saida, ctx);
+    ArgumentoIR base = resolverExpressao(*e.esquerda, saida, ctx);
+    ArgumentoIR ponteiro = lerCampoDeBase(base, e.valor, saida, ctx);
+    int posCampo;
+    TipoVariavel tipoCampo;
+    posicaoDoCampo(base.idEspaco, e.valor, &posCampo, &tipoCampo);
+    if(!tipoEhPonteiro(tipoCampo)) {
+        std::string campoStr = e.valor;
+        throw std::runtime_error("O campo '" + campoStr + "' não é um ponteiro, não pode ser indexado");
+    }
+    ponteiro.ehPonteiro = true;
+    ponteiro.larguraElemento = larguraElementoApontado(tipoCampo);
+    ponteiro.elementoSinalizado = elementoEhSinalizado(tipoCampo);
+    ponteiro.elementoFlutuante = elementoEhFlutuante(tipoCampo);
+    return ponteiro;
+}
+
 // resolve "ponteiro[indice]" como valor de leitura: le "larguraElemento"
 // bytes(1, 8, ou qualquer largura futura), decidido pelo tipo declarado
 // do ponteiro(ver larguraElementoApontado()). Emite InstrucaoLeituraIndexada
@@ -344,12 +365,7 @@ inline ArgumentoIR GeradorIR::resolverPonteiroIndexado(const char* nome, const c
 // slot(mesmo padrao de resolverExpressao pra BINARIA/chamada de funcao).
 // "ponteiro" precisa ser uma variavel já declarada(parâmetro ou local); indice pode ser qualquer expressão.
 inline ArgumentoIR GeradorIR::resolverIndexacao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    ArgumentoIR ponteiro;
-    if(expressao.esquerda->tipo == Expressao::Tipo::ACESSO_CAMPO) {
-        ponteiro = resolverPonteiroIndexado(expressao.esquerda->esquerda->valor, expressao.esquerda->valor, saida, ctx);
-    } else {
-        ponteiro = resolverPonteiroIndexado(expressao.esquerda->valor, nullptr, saida, ctx);
-    }
+    ArgumentoIR ponteiro = resolverPonteiroDaExpressao(*expressao.esquerda, saida, ctx);
     ArgumentoIR indice = resolverExpressao(*expressao.direita, saida, ctx);
 
     int slot = ctx.variaveisLocais.proximoSlot++;
@@ -483,6 +499,21 @@ inline ArgumentoIR GeradorIR::resolverChamadaSistemaComoValor(const Expressao& e
 // topo, valor descartado). Exige função de usuário não-"nulo". Emite "bl nome" com capturaResultado=true num slot novo
 // e devolve uma referência REGISTRADOR pra esse slot.
 inline ArgumentoIR GeradorIR::resolverChamadaFuncaoComoValor(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(expressao.nomeFuncao[0] == '.') {
+        Vetor<Expressao> restantes;
+        restantes.iniciar();
+        std::string nomeOculto = ocultarReceptor(expressao.nomeFuncao, (*expressao.argumentosFuncao)[0], saida, ctx);
+        for(int i = 1; i < expressao.argumentosFuncao->tam; i++) restantes.empurrar((*expressao.argumentosFuncao)[i]);
+        Expressao reescritaOculta;
+        reescritaOculta.tipo = Expressao::Tipo::CHAMADA_FUNCAO;
+        reescritaOculta.valor = nullptr;
+        reescritaOculta.nomeFuncao = strdup(nomeOculto.c_str());
+        reescritaOculta.argumentosFuncao = &restantes;
+        ArgumentoIR resultadoOculto = resolverChamadaFuncaoComoValor(reescritaOculta, saida, ctx);
+        free(reescritaOculta.nomeFuncao);
+        restantes.liberar();
+        return resultadoOculto;
+    }
     std::string nomeMetodo;
     Vetor<Expressao> novos;
     novos.iniciar();
@@ -746,12 +777,7 @@ inline ArgumentoIR GeradorIR::resolverAtribuicao(const Expressao& expressao, Vet
     const Expressao& destino = *expressao.esquerda;
     if(destino.tipo == Expressao::Tipo::INDEXACAO) {
         // mesma ordem do comando: ponteiro, índice, valor
-        ArgumentoIR ponteiro;
-        if(destino.esquerda->tipo == Expressao::Tipo::ACESSO_CAMPO) {
-            ponteiro = resolverPonteiroIndexado(destino.esquerda->esquerda->valor, destino.esquerda->valor, saida, ctx);
-        } else {
-            ponteiro = resolverPonteiroIndexado(destino.esquerda->valor, nullptr, saida, ctx);
-        }
+        ArgumentoIR ponteiro = resolverPonteiroDaExpressao(*destino.esquerda, saida, ctx);
         ArgumentoIR indice = resolverExpressao(*destino.direita, saida, ctx);
         ArgumentoIR valor = congelarValor(resolverExpressao(*expressao.direita, saida, ctx), saida, ctx);
         return gravarEmIndexacao(ponteiro, indice, valor, saida, ctx);
@@ -763,6 +789,11 @@ inline ArgumentoIR GeradorIR::resolverAtribuicao(const Expressao& expressao, Vet
         }
         ArgumentoIR valor = congelarValor(resolverExpressao(*expressao.direita, saida, ctx), saida, ctx);
         return gravarEmVariavel(destino.valor, valor, saida, ctx);
+    }
+    if(destino.esquerda->tipo != Expressao::Tipo::IDENTIFICADOR) {
+        ArgumentoIR baseComposta = resolverExpressao(*destino.esquerda, saida, ctx);
+        ArgumentoIR valorComposto = congelarValor(resolverExpressao(*expressao.direita, saida, ctx), saida, ctx);
+        return gravarEmCampoBase(baseComposta, destino.valor, valorComposto, saida, ctx);
     }
     // ACESSO_CAMPO("nome.campo" ou "Classe.estatico")
     ArgumentoIR valor = congelarValor(resolverExpressao(*expressao.direita, saida, ctx), saida, ctx);

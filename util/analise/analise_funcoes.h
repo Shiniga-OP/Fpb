@@ -58,7 +58,8 @@ inline TipoRetorno Analisador::analisarTipoRetorno() {
         return tr;
     }
     if(verificar(TipoToken::IDENTIFICADOR)) {
-        // "Nome*": ponteiro pra espaco(struct). O id do espaco do retorno nao e guardado: quem recebe o valor declara "Nome* var".
+        // "Nome*": ponteiro pra espaco(struct). O nome do espaço fica em nomeEspaco, pra cadeia a.b.c saber o tipo do retorno.
+        tr.nomeEspaco = strdup(atual().valor);
         pos++;
         consumir(TipoToken::VEZES, "espaço só pode ser retornado por ponteiro: use 'Nome*'");
         tr.ehNulo = false;

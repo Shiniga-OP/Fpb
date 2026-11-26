@@ -28,6 +28,7 @@ inline DeclaracaoEspaco Analisador::analisarEspaco() {
             consumir(TipoToken::VEZES, "esperado '*' apos 'nulo' no campo(nulo sozinho nao e' um tipo de valor valido)");
             campo.tipo = TipoVariavel::NULO_PONTEIRO;
         } else if(verificar(TipoToken::IDENTIFICADOR)) {
+            campo.nomeEspaco = strdup(atual().valor);
             pos++;
             consumir(TipoToken::VEZES, "espaço dentro de espaço só por ponteiro: use 'Nome* campo'");
             campo.tipo = TipoVariavel::ESPACO_PONTEIRO;
@@ -43,6 +44,7 @@ inline DeclaracaoEspaco Analisador::analisarEspaco() {
             const Token& outroNome = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo após ','");
             CampoEspaco outro;
             outro.tipo = campo.tipo;
+            outro.nomeEspaco = campo.nomeEspaco ? strdup(campo.nomeEspaco) : nullptr;
             outro.nome = strdup(outroNome.valor);
             espaco.campos.empurrar(outro);
         }
@@ -157,6 +159,7 @@ inline void Analisador::analisarClasse(Programa& programa) {
             if(ehFinal) erro("'final' em campo de instância não é suportado: use 'estatico final'");
             CampoEspaco campo;
             campo.tipo = tipo.tipo;
+            campo.nomeEspaco = tipo.nomeEspaco;
             campo.nome = strdup(nomeMembro.valor);
             espaco.campos.empurrar(campo);
 
@@ -165,6 +168,7 @@ inline void Analisador::analisarClasse(Programa& programa) {
                 const Token& outroNome = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo após ','");
                 CampoEspaco outro;
                 outro.tipo = tipo.tipo;
+                outro.nomeEspaco = tipo.nomeEspaco ? strdup(tipo.nomeEspaco) : nullptr;
                 outro.nome = strdup(outroNome.valor);
                 espaco.campos.empurrar(outro);
             }

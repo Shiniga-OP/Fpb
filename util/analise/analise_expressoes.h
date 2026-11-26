@@ -243,6 +243,48 @@ inline Expressao Analisador::analisarBytes() {
     return e;
 }
 
+// "base.campo", "base.campo[i]" e "base.metodo(args)" encadeados sobre qualquer expressão (a.b.c, a.b.dados[i], a.b.metodo()).
+// Método sobre expressão vira CHAMADA_FUNCAO de nome ".metodo" com o receptor em argumentosFuncao[0].
+inline Expressao Analisador::continuarCadeia(Expressao base) {
+    while(verificar(TipoToken::PONTO) && tokens[pos + 1].tipo == TipoToken::IDENTIFICADOR) {
+        pos++;
+        const Token& membro = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo ou método após '.'");
+        Expressao e;
+        e.valor = nullptr;
+        if(verificar(TipoToken::ABRE_PARENTESE)) {
+            e.tipo = Expressao::Tipo::CHAMADA_FUNCAO;
+            std::string nome = std::string(".") + membro.valor;
+            e.nomeFuncao = strdup(nome.c_str());
+            e.argumentosFuncao = new Vetor<Expressao>();
+            e.argumentosFuncao->iniciar();
+            e.argumentosFuncao->empurrar(base);
+            pos++;
+            while(!verificar(TipoToken::FECHA_PARENTESE)) {
+                e.argumentosFuncao->empurrar(analisarExpressaoAditiva());
+                if(verificar(TipoToken::VIRGULA)) pos++;
+            }
+            consumir(TipoToken::FECHA_PARENTESE, "esperado ')' após argumentos");
+        } else {
+            e.tipo = Expressao::Tipo::ACESSO_CAMPO;
+            e.valor = strdup(membro.valor);
+            e.esquerda = new Expressao(base);
+            e.direita = nullptr;
+        }
+        base = e;
+        if(!verificar(TipoToken::ABRE_COLCHETE)) continue;
+        pos++;
+        Expressao indice = analisarExpressaoAditiva();
+        consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
+        Expressao indexacao;
+        indexacao.tipo = Expressao::Tipo::INDEXACAO;
+        indexacao.valor = nullptr;
+        indexacao.esquerda = new Expressao(base);
+        indexacao.direita = new Expressao(indice);
+        base = indexacao;
+    }
+    return base;
+}
+
 inline Expressao Analisador::analisarPrimariaSemPosfixo() {
     if(verificar(TipoToken::CHAMADA_SISTEMA)) {
         Expressao e;
@@ -373,24 +415,25 @@ inline Expressao Analisador::analisarPrimariaSemPosfixo() {
         return e;
     }
     if(ehChamadaMetodo()) {
-        return analisarChamadaMetodoComoExpressao();
+        return continuarCadeia(analisarChamadaMetodoComoExpressao());
     }
     if(verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::PONTO) {
         const Token& nome = tokens[pos++];
         pos++; // consome '.'
         const Token& campo = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo após '.'");
-        Expressao acesso = montarAcessoCampo(nome.valor, campo.valor);
-        if(!verificar(TipoToken::ABRE_COLCHETE)) return acesso;
-        // "nome.campo[indice]": indexa o ponteiro guardado no campo
-        pos++;
-        Expressao indice = analisarExpressaoAditiva();
-        consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
-        Expressao e;
-        e.tipo = Expressao::Tipo::INDEXACAO;
-        e.valor = nullptr;
-        e.esquerda = new Expressao(acesso);
-        e.direita = new Expressao(indice);
-        return e;
+        Expressao resultado = montarAcessoCampo(nome.valor, campo.valor);
+        if(verificar(TipoToken::ABRE_COLCHETE)) {
+            pos++;
+            Expressao indice = analisarExpressaoAditiva();
+            consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
+            Expressao e;
+            e.tipo = Expressao::Tipo::INDEXACAO;
+            e.valor = nullptr;
+            e.esquerda = new Expressao(resultado);
+            e.direita = new Expressao(indice);
+            resultado = e;
+        }
+        return continuarCadeia(resultado);
     }
     if(verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::ABRE_PARENTESE) {
         return analisarChamadaFuncaoComoExpressao();

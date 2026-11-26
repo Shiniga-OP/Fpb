@@ -292,30 +292,27 @@ inline int GeradorIR::tamanhoDoEspaco(int idEspaco) {
     return ((pos + maiorLargura - 1) / maiorLargura) * maiorLargura;
 }
 
-// resolve "nome.campo" como valor de leitura: emite LEITURA_INDEXADA(base + pos do campo) num slot temporário novo e devolve
-// REGISTRADOR com a largura e o sinal do campo. "nome" pode ser um espaço por valor ou um parâmetro/variável "Nome*": nos dois o
-// slot guarda o endereço base, então o acesso é o mesmo.
-inline ArgumentoIR GeradorIR::resolverAcessoCampo(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    std::string simbolo;
-    const CampoEstatico* estatico = nullptr;
-    if(localizarEstatico(expressao.esquerda->valor, expressao.valor, ctx, simbolo, &estatico)) {
-        return resolverAcessoEstatico(simbolo, *estatico, saida, ctx);
+// id do espaço apontado pelo campo "Nome* campo" (ou -1 se o campo não aponta pra espaço).
+inline int GeradorIR::idEspacoDoCampo(int idEspaco, const char* campo) {
+    int total = totalCampos(idEspaco);
+    for(int i = 0; i < total; i++) {
+        const CampoEspaco& atual = campoDoIndice(idEspaco, i);
+        if(strcmp(atual.nome, campo) != 0) continue;
+        if(!atual.nomeEspaco) return -1;
+        return obterIdEspaco(atual.nomeEspaco);
     }
-    ArgumentoIR base;
-    if(!ctx.variaveisLocais.buscar(expressao.esquerda->valor, &base)) {
-        std::string nomeStr = expressao.esquerda->valor;
-        if(espacos.buscar(expressao.esquerda->valor) >= 0) {
-            throw std::runtime_error("Classe '" + nomeStr + "' não tem o campo estatico '" + expressao.valor + "'");
-        }
-        throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
-    }
+    return -1;
+}
+
+// lê o campo "campo" do espaço cujo endereço base está em "base": emite LEITURA_INDEXADA(base + pos do campo) num slot novo e devolve
+// REGISTRADOR com a largura e o sinal do campo. Campo "Nome*" devolve o idEspaco, pra permitir a.b.c.
+inline ArgumentoIR GeradorIR::lerCampoDeBase(const ArgumentoIR& base, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     if(base.idEspaco < 0) {
-        std::string nomeStr = expressao.esquerda->valor;
-        throw std::runtime_error("Variável '" + nomeStr + "' não é um espaço, não tem campos");
+        throw std::runtime_error(std::string("O valor à esquerda de '.") + campo + "' não é um espaço, não tem campos");
     }
     int posCampo;
     TipoVariavel tipoCampo;
-    posicaoDoCampo(base.idEspaco, expressao.valor, &posCampo, &tipoCampo);
+    posicaoDoCampo(base.idEspaco, campo, &posCampo, &tipoCampo);
     int largura = larguraDoTipo(tipoCampo);
 
     int slot = ctx.variaveisLocais.proximoSlot++;
@@ -337,7 +334,38 @@ inline ArgumentoIR GeradorIR::resolverAcessoCampo(const Expressao& expressao, Ve
     referenciaSlot.sinalizado = tipoEhSinalizado(tipoCampo);
     referenciaSlot.elementoSinalizado = elementoEhSinalizado(tipoCampo);
     referenciaSlot.larguraElemento = larguraElementoApontado(tipoCampo);
+    if(tipoCampo == TipoVariavel::ESPACO_PONTEIRO) {
+        referenciaSlot.idEspaco = idEspacoDoCampo(base.idEspaco, campo);
+        referenciaSlot.ehPonteiro = true;
+    }
     return referenciaSlot;
+}
+
+// resolve "nome.campo" (ou "qualquer.coisa.campo") como valor de leitura. "nome" pode ser um espaço por valor ou um parâmetro/variável "Nome*": nos dois o
+// slot guarda o endereço base, então o acesso é o mesmo.
+inline ArgumentoIR GeradorIR::resolverAcessoCampo(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(expressao.esquerda->tipo != Expressao::Tipo::IDENTIFICADOR) {
+        ArgumentoIR baseComposta = resolverExpressao(*expressao.esquerda, saida, ctx);
+        return lerCampoDeBase(baseComposta, expressao.valor, saida, ctx);
+    }
+    std::string simbolo;
+    const CampoEstatico* estatico = nullptr;
+    if(localizarEstatico(expressao.esquerda->valor, expressao.valor, ctx, simbolo, &estatico)) {
+        return resolverAcessoEstatico(simbolo, *estatico, saida, ctx);
+    }
+    ArgumentoIR base;
+    if(!ctx.variaveisLocais.buscar(expressao.esquerda->valor, &base)) {
+        std::string nomeStr = expressao.esquerda->valor;
+        if(espacos.buscar(expressao.esquerda->valor) >= 0) {
+            throw std::runtime_error("Classe '" + nomeStr + "' não tem o campo estatico '" + expressao.valor + "'");
+        }
+        throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
+    }
+    if(base.idEspaco < 0) {
+        std::string nomeStr = expressao.esquerda->valor;
+        throw std::runtime_error("Variável '" + nomeStr + "' não é um espaço, não tem campos");
+    }
+    return lerCampoDeBase(base, expressao.valor, saida, ctx);
 }
 
 // emite ESCRITA_INDEXADA de "valor" no campo(posCampo, tipoCampo) do espaço cujo endereço base está em "base". Usada pela lista de
@@ -382,6 +410,14 @@ inline ArgumentoIR GeradorIR::gravarEmCampo(const char* nome, const char* campo,
     if(base.idEspaco < 0) {
         std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não é um espaço, não tem campos");
+    }
+    return gravarEmCampoBase(base, campo, valor, saida, ctx);
+}
+
+// grava "valor"(já resolvido) no campo "campo" do espaço cujo endereço base está em "base".
+inline ArgumentoIR GeradorIR::gravarEmCampoBase(const ArgumentoIR& base, const char* campo, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(base.idEspaco < 0) {
+        throw std::runtime_error(std::string("O valor à esquerda de '.") + campo + "' não é um espaço, não tem campos");
     }
     int posCampo;
     TipoVariavel tipoCampo;

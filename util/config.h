@@ -45,6 +45,9 @@ struct Token {
     TipoToken tipo;
     char* valor; // dono: quem criou o token(strdup). liberar() quando descartar.
     int linha;
+    int coluna = 0;
+    int tam = 0;
+    int arquivo = -1;
 
     void liberar() {
         free(valor);

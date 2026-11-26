@@ -295,6 +295,45 @@ inline ArgumentoIR GeradorIR::resolverBytes(const Expressao& expressao, TabelaVa
     return arg;
 }
 
+// devolve o ponteiro sendo indexado: a variável "nome" ou, se "campo" não é nullptr, o valor do campo ponteiro "nome.campo".
+// Pro campo, a largura do elemento vem do tipo declarado do campo.
+inline ArgumentoIR GeradorIR::resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    ArgumentoIR base;
+    if(!ctx.variaveisLocais.buscar(nome, &base)) {
+        std::string nomeStr = nome;
+        throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
+    }
+    if(!campo) return base;
+    if(base.idEspaco < 0) {
+        std::string nomeStr = nome;
+        throw std::runtime_error("Variável '" + nomeStr + "' não é um espaço, não tem campos");
+    }
+    int posCampo;
+    TipoVariavel tipoCampo;
+    posicaoDoCampo(base.idEspaco, campo, &posCampo, &tipoCampo);
+    if(!tipoEhPonteiro(tipoCampo)) {
+        std::string campoStr = campo;
+        throw std::runtime_error("O campo '" + campoStr + "' não é um ponteiro, não pode ser indexado");
+    }
+    // expressões temporárias na pilha: os char* são emprestados, então não chama liberar()
+    Expressao identificador;
+    identificador.tipo = Expressao::Tipo::IDENTIFICADOR;
+    identificador.valor = (char*)nome;
+    identificador.esquerda = nullptr;
+    identificador.direita = nullptr;
+    Expressao acesso;
+    acesso.tipo = Expressao::Tipo::ACESSO_CAMPO;
+    acesso.valor = (char*)campo;
+    acesso.esquerda = &identificador;
+    acesso.direita = nullptr;
+    ArgumentoIR ponteiro = resolverExpressao(acesso, saida, ctx);
+    ponteiro.ehPonteiro = true;
+    ponteiro.larguraElemento = larguraElementoApontado(tipoCampo);
+    ponteiro.elementoSinalizado = elementoEhSinalizado(tipoCampo);
+    ponteiro.elementoFlutuante = elementoEhFlutuante(tipoCampo);
+    return ponteiro;
+}
+
 // resolve "ponteiro[indice]" como valor de leitura: le "larguraElemento"
 // bytes(1, 8, ou qualquer largura futura), decidido pelo tipo declarado
 // do ponteiro(ver larguraElementoApontado()). Emite InstrucaoLeituraIndexada
@@ -304,9 +343,10 @@ inline ArgumentoIR GeradorIR::resolverBytes(const Expressao& expressao, TabelaVa
 // "ponteiro" precisa ser uma variavel já declarada(parâmetro ou local); indice pode ser qualquer expressão.
 inline ArgumentoIR GeradorIR::resolverIndexacao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     ArgumentoIR ponteiro;
-    if(!ctx.variaveisLocais.buscar(expressao.esquerda->valor, &ponteiro)) {
-        std::string nomeStr = expressao.esquerda->valor;
-        throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
+    if(expressao.esquerda->tipo == Expressao::Tipo::ACESSO_CAMPO) {
+        ponteiro = resolverPonteiroIndexado(expressao.esquerda->esquerda->valor, expressao.esquerda->valor, saida, ctx);
+    } else {
+        ponteiro = resolverPonteiroIndexado(expressao.esquerda->valor, nullptr, saida, ctx);
     }
     ArgumentoIR indice = resolverExpressao(*expressao.direita, saida, ctx);
 

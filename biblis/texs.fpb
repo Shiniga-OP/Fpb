@@ -25,7 +25,7 @@
 
     Texto* somar(Texto* outro) {
         longo total = este.tam + outro.tam;
-        Texto* r = mlocar(bytes(Texto));
+        Texto* r = malocar(bytes(Texto));
         car* buf = malocar(total + 1);
         car* a = este.txt;
         car* b = outro.txt;

@@ -258,15 +258,19 @@ struct Reatribuicao {
 // ex: txt[i] = 65; grava 1 byte(car) no endereco nome+indice.
 struct AtribuicaoIndexada {
     char* nome; // dono: quem criou a atribuicao(strdup). nome do ponteiro(car*) sendo indexado
+    char* campo; // dono: idem. nullptr em "nome[i] = v"; nome do campo ponteiro em "nome.campo[i] = v"
     Expressao indice;
     Expressao valor;
 
     void iniciar() {
         nome = nullptr;
+        campo = nullptr;
     }
     void liberar() {
         free(nome);
         nome = nullptr;
+        free(campo);
+        campo = nullptr;
         indice.liberar();
         valor.liberar();
     }
@@ -564,6 +568,7 @@ struct Programa {
     Vetor<DeclaracaoEspaco> espacos;
     Vetor<DeclaracaoFuncao> funcoes;
     Vetor<Inclusao> ligacoes;
+    Vetor<DeclaracaoVariavel> variaveisGlobais;
     char* alvo;
 
     void iniciar() {
@@ -571,6 +576,7 @@ struct Programa {
         espacos.iniciar();
         funcoes.iniciar();
         ligacoes.iniciar();
+        variaveisGlobais.iniciar();
         alvo = nullptr;
     }
     void liberar() {
@@ -582,6 +588,8 @@ struct Programa {
         funcoes.liberar();
         for(int i = 0; i < ligacoes.tam; i++) ligacoes[i].liberar();
         ligacoes.liberar();
+        for(int i = 0; i < variaveisGlobais.tam; i++) variaveisGlobais[i].liberar();
+        variaveisGlobais.liberar();
         free(alvo);
     }
 };

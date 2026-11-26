@@ -2,6 +2,7 @@
 #incluir "~graficos/opengl/egl.fpb"
 #incluir "~mem.fpb"
 #incluir "~threads.fpb"
+#incluir "~impressao.fpb"
 
 #classe Janela {
     nulo* tela;
@@ -76,7 +77,7 @@
 
 #se(__ANDROID__)
 
-// roda na thread de renderização, criada por thcriar (clone cru, sem libc)
+// roda na thread de renderização, criada por thcriar
 nulo* corpoThread(Janela* j) {
     j.iniciarEGL((nulo*)0, j.nativa);
     principal(j);
@@ -88,6 +89,7 @@ nulo aoCriarJanela(nulo* atividade, nulo* janela) {
     j.nativa = janela;
     Thread* th = thcriar(@corpoThread, (longo)j);
     se(th == (Thread*)0) {
+        escrever("[ERRO]: não foi possível criar a thread de renderização\n");
         sair(1);
     }
 }
@@ -104,6 +106,7 @@ nulo ANativeActivity_onCreate(nulo* atividade, nulo* estado, longo tam) {
 nulo inicio() {
     nulo* tela = X11.abrirTela((nulo*)0);
     se(tela == (nulo*)0) {
+        escrever("[ERRO]: não foi possível abrir a tela\n");
         sair(1);
     }
     longo raiz = X11.janelaRaizPadrao(tela);

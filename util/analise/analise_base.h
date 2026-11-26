@@ -23,6 +23,9 @@ inline Programa Analisador::analisar() {
             DeclaracaoFuncao funcao = analisarFuncao();
             funcao.ehExportada = true;
             programa.funcoes.empurrar(funcao);
+        } else if(verificar(TipoToken::ESTATICO)) {
+            pos++;
+            programa.variaveisGlobais.empurrar(analisarDeclaracaoVariavel());
         } else {
             erro("Esperado '#incluir' ou declaração de função");
         }

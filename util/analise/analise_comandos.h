@@ -77,6 +77,11 @@ inline Comando Analisador::analisarComando() {
         comando.chamadaFuncao = analisarChamadaMetodo();
         return comando;
     }
+    if(pos + 3 < (size_t)tokens.tam && verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::PONTO && tokens[pos + 2].tipo == TipoToken::IDENTIFICADOR && tokens[pos + 3].tipo == TipoToken::ABRE_COLCHETE) {
+        comando.tipo = Comando::Tipo::ATRIBUICAO_INDEXADA;
+        comando.atribuicaoIndexada = analisarAtribuicaoIndexada();
+        return comando;
+    }
     if(verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::PONTO) {
         comando.tipo = Comando::Tipo::ATRIBUICAO_CAMPO;
         comando.atribuicaoCampo = analisarAtribuicaoCampo();
@@ -98,6 +103,11 @@ inline AtribuicaoIndexada Analisador::analisarAtribuicaoIndexada() {
     atr.iniciar();
     const Token& nome = consumir(TipoToken::IDENTIFICADOR, "esperado nome do ponteiro");
     atr.nome = strdup(nome.valor);
+    if(verificar(TipoToken::PONTO)) {
+        pos++;
+        const Token& campo = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo após '.'");
+        atr.campo = strdup(campo.valor);
+    }
     consumir(TipoToken::ABRE_COLCHETE, "esperado '[' após nome do ponteiro");
     atr.indice = analisarExpressaoAditiva();
     consumir(TipoToken::FECHA_COLCHETE, "esperado ']' após índice");
@@ -305,11 +315,23 @@ inline DeclaracaoVariavel Analisador::analisarDeclaracaoVariavel() {
 
     if(ehArray) {
         decl.tamArray = tamArray;
-        if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
         TipoVariavel tipoArray = ponteiroDoTipo(decl.tipo);
-        if(tipoArray == decl.tipo) erro("array só aceita int, longo, car, bool, byte ou curto");
+        if(tipoArray == decl.tipo) erro("array só aceita int, longo, car, bool, byte, curto, flu ou dobro");
         decl.tipo = tipoArray;
         decl.ehArray = true;
+        if(verificar(TipoToken::IGUAL)) {
+            // "flu[2] x = { 1f, 1f };": cada valor vira uma escrita no elemento; os que faltam ficam zerados
+            pos++;
+            consumir(TipoToken::ABRE_CHAVE, "array só pode ser inicializado com uma lista: { valor1, valor2, ... }");
+            while(!verificar(TipoToken::FECHA_CHAVE)) {
+                decl.listaInicial.empurrar(analisarExpressaoAditiva());
+                if(verificar(TipoToken::VIRGULA)) pos++;
+            }
+            consumir(TipoToken::FECHA_CHAVE, "esperado '}' para fechar a lista de inicialização");
+            decl.temLista = true;
+            if(decl.listaInicial.tam > tamArray) erro("a lista de inicialização tem mais valores que o tamanho do array");
+        }
+        if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
         return decl;
     }
     if(decl.tipo == TipoVariavel::ESPACO) {

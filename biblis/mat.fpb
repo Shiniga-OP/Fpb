@@ -8,6 +8,26 @@
         semente = Mat.proximo(semente);
         retorne semente;
     }
+    
+    estatico flu aleatorioFlu() {
+        longo r = 0;
+        #chamada_sistema ALEATORIO, @r, 8, 0;
+        r = Mat.proximo(r);
+        // máscara para 53 bits e normalização
+        retorne (flu)(r & 0x1FFFFFFFFFFFFF) / (flu)0x20000000000000;
+    }
+
+    // Aleatório em [a, b)
+    estatico flu aleatorioEntre(flu a, flu b) {
+        retorne a + Mat.aleatorioFlu() * (b - a);
+    }
+
+    // produto escalar(para camadas maiores)
+    estatico flu ponto(flu* a, flu* b, int n) {
+        flu s = 0;
+        por(int i = 0; i < n; i++) s += a[i] * b[i];
+        retorne s;
+    }
 
     estatico int piso(flu x) {
         int xi = (int)x;
@@ -23,5 +43,64 @@
         x ^= x >> 7;
         x ^= x << 17;
         retorne x;
+    }
+    
+    estatico flu exp(flu x) {
+        // 1) reduzir: x = k*ln2 + r
+        flu ln2 = 0.6931471805599453;
+        int k = Mat.piso(x / ln2 + 0.5); // arredonda
+        flu r = x - (flu)k * ln2; // r em [-ln2/2, ln2/2]
+        
+        // 2) e^r por Taylor(r pequeno -> 10 termos bastam)
+        flu soma  = 1.0;
+        flu termo = 1.0;
+        por(int n = 1; n < 12; n++) {
+            termo = termo * r / (flu)n;
+            soma += termo;
+        }
+        // 3) multiplicar por 2^k
+        retorne soma * Mat.pot2(k);
+    }
+    
+    // 2^k para k inteiro(positivo ou negativo)
+    estatico flu pot2(int k) {
+        flu base = (k >= 0) ? 2.0 : 0.5;
+        int n = (k >= 0) ? k : -k;
+        flu r = 1.0;
+        
+        enquanto(n > 0) {
+            se (n & 1) r *= base;
+            base *= base;
+            n >>= 1;
+        }
+        retorne r;
+    }
+    
+    estatico flu raiz(flu x) {
+        se(x <= 0.0) retorne 0.0;
+        flu r = x;
+        por(int i = 0; i < 20; i++) {
+            r = 0.5 * (r + x / r);
+        }
+        retorne r;
+    }
+    
+    // ativações:
+    estatico flu sigmoide(flu x) {
+        se(x >= 0.0) {
+            flu e = Mat.exp(-x);
+            retorne 1.0 / (1.0 + e);
+        } senao {
+            flu e = Mat.exp(x);
+            retorne e / (1.0 + e);
+        }
+    }
+    
+    estatico flu reLU(flu x) {
+        retorne x > 0 ? x : 0;
+    }
+    
+    estatico flu tanh(flu x) {
+        retorne 2.0 * Mat.sigmoide(2.0 * x) - 1.0;
     }
 }

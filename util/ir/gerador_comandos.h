@@ -63,6 +63,22 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
         comandoArray.instrucaoEnderecoFrame.slotDestino = slot;
         comandoArray.instrucaoEnderecoFrame.posArray = posArray;
         saida.empurrar(comandoArray);
+        if(decl.temLista) {
+            // "tipo[N] nome = { v0, v1, ... };": um ESCRITA_INDEXADA por elemento; os que a lista não cobre são zerados
+            for(int i = 0; i < decl.tamArray; i++) {
+                ArgumentoIR valor;
+                if(i < decl.listaInicial.tam) valor = resolverExpressao(decl.listaInicial[i], saida, ctx);
+                else valor = imediatoInt(0);
+                valor = converterParaTipo(valor, referenciaSlot.elementoFlutuante, referenciaSlot.larguraElemento, saida, ctx);
+                if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = referenciaSlot.larguraElemento;
+                ComandoIR comandoEscrita;
+                comandoEscrita.tipo = ComandoIR::Tipo::ESCRITA_INDEXADA;
+                comandoEscrita.instrucaoEscritaIndexada.ponteiro = copiarArgumento(referenciaSlot);
+                comandoEscrita.instrucaoEscritaIndexada.indice = imediatoInt(i);
+                comandoEscrita.instrucaoEscritaIndexada.valor = valor;
+                saida.empurrar(comandoEscrita);
+            }
+        }
         return;
     }
     if(decl.tipo == TipoVariavel::ESPACO) {
@@ -240,11 +256,7 @@ inline void GeradorIR::gerarReatribuicao(const Reatribuicao& reat, Vetor<Comando
 // tipo declarado do ponteiro(ver larguraElementoApontado()). "nome"
 // precisa ser uma variável ja declarada(o ponteiro sendo indexado).
 inline void GeradorIR::gerarAtribuicaoIndexada(const AtribuicaoIndexada& atr, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
-    ArgumentoIR ponteiro;
-    if(!ctx.variaveisLocais.buscar(atr.nome, &ponteiro)) {
-        std::string nomeStr = atr.nome;
-        throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
-    }
+    ArgumentoIR ponteiro = resolverPonteiroIndexado(atr.nome, atr.campo, saida, ctx);
     ArgumentoIR indice = resolverExpressao(atr.indice, saida, ctx);
     ArgumentoIR valor = resolverExpressao(atr.valor, saida, ctx);
     valor = converterParaTipo(valor, ponteiro.elementoFlutuante, ponteiro.larguraElemento, saida, ctx);

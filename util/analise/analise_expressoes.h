@@ -36,7 +36,18 @@ inline Expressao Analisador::analisarBinaria(int nivel) {
     while(operadorDoNivel(nivel, op)) {
         pos++;
         Expressao direita = analisarBinaria(nivel + 1);
-
+        
+        if(op == OperadorAritmetico::SOMA && esquerda.tipo == Expressao::Tipo::TEXTO_LITERAL && direita.tipo == Expressao::Tipo::TEXTO_LITERAL) {
+            size_t a = strlen(esquerda.valor);
+            size_t b = strlen(direita.valor);
+            char* junto = (char*)malloc(a + b + 1);
+            memcpy(junto, esquerda.valor, a);
+            memcpy(junto + a, direita.valor, b + 1);
+            free(esquerda.valor);
+            free(direita.valor);
+            esquerda.valor = junto;
+            continue;
+        }
         Expressao binaria;
         binaria.tipo = Expressao::Tipo::BINARIA;
         binaria.valor = nullptr;
@@ -279,7 +290,18 @@ inline Expressao Analisador::analisarExpressaoPrimaria() {
         const Token& nome = tokens[pos++];
         pos++; // consome '.'
         const Token& campo = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo após '.'");
-        return montarAcessoCampo(nome.valor, campo.valor);
+        Expressao acesso = montarAcessoCampo(nome.valor, campo.valor);
+        if(!verificar(TipoToken::ABRE_COLCHETE)) return acesso;
+        // "nome.campo[indice]": indexa o ponteiro guardado no campo
+        pos++;
+        Expressao indice = analisarExpressaoAditiva();
+        consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
+        Expressao e;
+        e.tipo = Expressao::Tipo::INDEXACAO;
+        e.valor = nullptr;
+        e.esquerda = new Expressao(acesso);
+        e.direita = new Expressao(indice);
+        return e;
     }
     if(verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::ABRE_PARENTESE) {
         return analisarChamadaFuncaoComoExpressao();

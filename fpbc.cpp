@@ -131,7 +131,9 @@ int main(int argc, char** argv) {
     for(int i = 1; i < argc; i++) {
         std::string argumento = argv[i];
         if(argumento == "-v") {
-            std::cout << "Versão: v" << versaoAtual << '\n' <<
+            std::cout <<
+            "FPBC — Fácil Programação Baixo nível Compilador" << '\n' <<
+            "Versão: v" << versaoAtual << '\n' <<
             "Arquitetura: " << alvoPadrao << '\n' <<
             "Sistema: " << sistemaAtual << '\n' <<
             "Implementação: Foca-do Estúdios\n";

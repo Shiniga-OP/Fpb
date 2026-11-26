@@ -45,6 +45,7 @@ inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
             const VariavelGlobalIR& global = programa.globais[i];
             const char* diretiva = global.largura == 1 ? ".byte" : global.largura == 2 ? ".hword" : global.largura == 4 ? ".word" : ".quad";
             saida << ".weak " << global.simbolo << "\n";
+            saida << ".hidden " << global.simbolo << "\n";
             saida << ".balign " << global.largura << "\n";
             saida << global.simbolo << ": " << diretiva << " " << global.valorInicial << "\n";
         }

@@ -11,6 +11,7 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     registrarFuncoes(programa);
     registrarEspacos(programa);
     registrarLigacoes(programa);
+    registrarGlobaisDeclaradas(programa);
     // 2. o carregador resolve cada "#incluir"(dedupe por caminho absoluto) e
     //    devolve a AST de cada biblioteca; aqui registramos assinatura + corpo de cada função delas.
     for(int i = 0; i < programa.inclusoes.tam; i++) {
@@ -20,6 +21,7 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
         registrarFuncoes(*carregador.programas[i], carregador.origem(i));
         registrarEspacos(*carregador.programas[i], carregador.origem(i));
         registrarLigacoes(*carregador.programas[i]);
+        registrarGlobaisDeclaradas(*carregador.programas[i]);
     }
     validarHeranca();
     // 3. gera FuncaoIR só pras funções alcançáveis a partir das raízes
@@ -28,6 +30,9 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
     ir.iniciar();
     VetorStr jaGeradas;
     jaGeradas.iniciar();
+    if(globaisDeclarados.tam > 0) {
+        jaGeradas.empurrar("_iniciar_globais");
+    }
     for(int i = 0; i < programa.funcoes.tam; i++) {
         const DeclaracaoFuncao& f = programa.funcoes[i];
         if(f.ehExportada || strcmp(f.nome, "inicio") == 0) gerarFuncaoAlcancavel(f.nome, ir, jaGeradas);
@@ -37,6 +42,21 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
             const DeclaracaoFuncao& f = carregador.programas[i]->funcoes[j];
             if(f.ehExportada || strcmp(f.nome, "inicio") == 0) gerarFuncaoAlcancavel(f.nome, ir, jaGeradas);
         }
+    }
+    if(globaisDeclarados.tam > 0) {
+        FuncaoIR ini = gerarIniciarGlobais(ir.dados);
+        VetorStr chamadasIni;
+        chamadasIni.iniciar();
+        coletarChamadasUsuario(ini.instrucoes, chamadasIni);
+        ir.funcoes.empurrar(ini);
+        
+        for(int i = 0; i < chamadasIni.tam; i++) {
+            int tamChamada;
+            const char* nomeChamada = chamadasIni.obter(i, &tamChamada);
+            std::string nomeChamadaStr(nomeChamada, tamChamada);
+            gerarFuncaoAlcancavel(nomeChamadaStr.c_str(), ir, jaGeradas);
+        }
+        chamadasIni.liberar();
     }
     // 4. valida as funções do arquivo principal que não foram alcançadas: gera e descarta,
     //    só pra acusar erro (tipo não declarado, função inexistente...). Roda depois da
@@ -190,6 +210,14 @@ inline FuncaoIR GeradorIR::gerarFuncao(const DeclaracaoFuncao& funcao, Vetor<Dad
         funcaoIR.parametrosLargura.empurrar(arg.larguraBytes);
         funcaoIR.parametrosFlutuante.empurrar(arg.ehFlutuante);
     }
+    if(funcaoIR.ehInicio && globaisDeclarados.tam > 0) {
+        ComandoIR chamadaIni;
+        chamadaIni.tipo = ComandoIR::Tipo::CHAMADA_FUNCAO_USUARIO;
+        chamadaIni.chamadaFuncaoUsuario.iniciar();
+        chamadaIni.chamadaFuncaoUsuario.nome = strdup("_iniciar_globais");
+        funcaoIR.instrucoes.empurrar(chamadaIni);
+    }
+    vincularGlobais(ctx, funcaoIR.instrucoes);
     emitirConstrutorBase(funcao, funcaoIR.instrucoes);
     funcaoIR.retornoFlutuante = !funcao.tipoRetorno.ehNulo && tipoEhFlutuante(funcao.tipoRetorno.tipo);
     funcaoIR.retornoLargura = funcao.tipoRetorno.ehNulo ? 8 : larguraDoTipo(funcao.tipoRetorno.tipo);

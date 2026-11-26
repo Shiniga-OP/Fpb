@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "config.h"
+#include "diagnostico.h"
 
 // buffer de acumulação de texto cru(usado so durante "lexear" de um token).
 // não tem dono compartilhado: cada chamada de lerXxx cria o seu, acumula,
@@ -58,40 +59,68 @@ public:
     size_t tamFonte;
     size_t pos = 0;
     int linha = 1;
+    size_t inicioLinha = 0;
+    int colunaToken = 1;
+    int arquivo;
 
-    explicit Lexer(const char* fonte) {
+    explicit Lexer(const char* fonte, int arquivo = -1) {
         this->fonte = (char*)fonte;
         this->tamFonte = strlen(fonte);
+        this->arquivo = arquivo;
+    }
+
+    int colunaAtual() {
+        return (int)(pos - inicioLinha) + 1;
+    }
+
+    [[noreturn]] void erro(const std::string& mensagem, int linhaErro, int colunaErro, int tamTrecho) {
+        throw ErroCompilacao(ERRO_LEXICO, mensagem, arquivo, linhaErro, colunaErro, tamTrecho);
     }
 
     Vetor<Token> tokenizar() {
         Vetor<Token> tokens;
         tokens.iniciar();
+        
         while(!fimDoArquivo()) {
             pularEspacosEComentarios();
             if(fimDoArquivo()) break;
 
             char c = atual();
             int linhaAtual = linha;
-
+            colunaToken = colunaAtual();
+            size_t posInicio = pos;
+            Token t;
             if(c == '#') {
-                tokens.empurrar(lerDiretiva(linhaAtual));
+                t = lerDiretiva(linhaAtual);
             } else if(ehInicioIdentificador(c)) {
-                tokens.empurrar(lerIdentificadorOuPalavraChave(linhaAtual));
+                t = lerIdentificadorOuPalavraChave(linhaAtual);
             } else if(isdigit((unsigned char)c)) {
-                tokens.empurrar(lerNumero(linhaAtual));
+                t = lerNumero(linhaAtual);
             } else if(c == '"') {
-                tokens.empurrar(lerTexto(linhaAtual));
+                t = lerTexto(linhaAtual);
             } else if(c == '\'') {
-                tokens.empurrar(lerCaractere(linhaAtual));
+                t = lerCaractere(linhaAtual);
             } else {
-                tokens.empurrar(lerSimbolo(linhaAtual));
+                t = lerSimbolo(linhaAtual);
             }
+            t.coluna = colunaToken;
+            t.tam = (int)(pos - posInicio);
+            t.arquivo = arquivo;
+            tokens.empurrar(t);
         }
         Token fim;
         fim.tipo = TipoToken::FIM_ARQUIVO;
         fim.valor = strdup("");
-        fim.linha = linha;
+        fim.arquivo = arquivo;
+        fim.tam = 1;
+        if(tokens.tam > 0) {
+            // aponta pro fim do último token real, onde o que faltava deveria estar
+            fim.linha = tokens[tokens.tam - 1].linha;
+            fim.coluna = tokens[tokens.tam - 1].coluna + tokens[tokens.tam - 1].tam;
+        } else {
+            fim.linha = linha;
+            fim.coluna = 1;
+        }
         tokens.empurrar(fim);
         return tokens;
     }
@@ -99,11 +128,16 @@ public:
     bool fimDoArquivo() {
         return pos >= tamFonte;
     }
-    char atual() { return fonte[pos]; }
+    char atual() {
+        return fonte[pos];
+    }
 
     char avancar() {
         char c = fonte[pos++];
-        if(c == '\n') linha++;
+        if(c == '\n') {
+            linha++;
+            inicioLinha = pos;
+        }
         return c;
     }
 
@@ -213,10 +247,9 @@ public:
             return t;
         }
         std::string msg = "Diretiva desconhecida '";
-        msg += buf.dados ? buf.dados : "";
-        msg += "' na linha " + std::to_string(linhaAtual);
+        std::string nome = buf.dados ? buf.dados : "";
         buf.liberar();
-        throw std::runtime_error(msg);
+        erro("diretiva desconhecida '" + nome + "'", linhaAtual, colunaToken, (int)nome.size());
     }
 
     Token lerIdentificadorOuPalavraChave(int linhaAtual) {

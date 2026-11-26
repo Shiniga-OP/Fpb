@@ -57,6 +57,7 @@ public:
     int bytesArraysAtual = 0;
     VetorStr ligacoes;
     Vetor<VariavelGlobalIR> globais; // campos estaticos usados pelas funções geradas(sem repetir); passam pro ProgramaIR no fim de gerar()
+    Vetor<const DeclaracaoVariavel*> globaisDeclarados;
 
     // diretorioBase: diretório a partir do qual os "#incluir" são resolvidos.
     explicit GeradorIR(const std::string& diretorioBase, Preprocessador* pre = nullptr) : diretorioBase(diretorioBase) {
@@ -66,6 +67,7 @@ public:
         espacos.iniciar();
         ligacoes.iniciar();
         globais.iniciar();
+        globaisDeclarados.iniciar();
     }
 
     ~GeradorIR() {
@@ -74,6 +76,7 @@ public:
         espacos.liberar();
         ligacoes.liberar();
         globais.liberar();
+        globaisDeclarados.liberar();
     }
 
     // ===== declarações: cada método é definido(inline) no leitor indicado =====
@@ -137,7 +140,8 @@ public:
     void promoverFlutuantes(ArgumentoIR& esq, ArgumentoIR& dir, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverOperadorEspaco(OperadorAritmetico op, ArgumentoIR esquerda, ArgumentoIR direita, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverTernaria(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
-
+    ArgumentoIR resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    
     // === gerador_condicoes.h ===
     void atribuirMarcacao(int slot, long valor, Vetor<ComandoIR>& saida);
     void marcarSeVerdadeira(const Condicao& cond, int slot, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
@@ -178,6 +182,11 @@ public:
     bool temConstrutor(int idEspaco);
     void emitirAlocar(int slot, int idEspaco, Vetor<ComandoIR>& saida);
     void emitirConstrutor(const DeclaracaoVariavel& decl, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    
+    // === gerador_globais.h ===
+    void registrarGlobaisDeclaradas(const Programa& programa);
+    void vincularGlobais(ContextoFuncao& ctx, Vetor<ComandoIR>& saida);
+    FuncaoIR gerarIniciarGlobais(Vetor<DadoEstaticoIR>& dados);
 };
 
 // definições dos métodos(cada arquivo inclui este de volta; #pragma once evita ciclo)
@@ -188,3 +197,4 @@ public:
 #include "gerador_comandos.h"
 #include "gerador_espacos.h"
 #include "gerador_vida.h"
+#include "gerador_globais.h"

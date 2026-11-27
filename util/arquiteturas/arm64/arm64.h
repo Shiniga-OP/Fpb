@@ -71,6 +71,7 @@ public:
     // === arm64_chamadas.h ===
     void emitirChamadaSistemaCrua(std::ostringstream& saida, const InstrucaoChamadaSistemaCrua& instrucao);
     void emitirChamadaFuncaoUsuario(std::ostringstream& saida, const InstrucaoChamadaFuncaoUsuario& instrucao);
+    void emitirRegistradorSistema(std::ostringstream& saida, const InstrucaoRegistradorSistema& instrucao);
 };
 
 // definições dos métodos(cada arquivo inclui este de volta; #pragma once evita ciclo)

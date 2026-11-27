@@ -10,14 +10,19 @@ nulo* malocar(longo bytes) {
     car* baseCar = (car*)bruto;
     car* usuario = baseCar + 16;
     
+    // escreverf("bytes alocados: %i\n", tam);
+    
     retorne (nulo*)usuario;
 }
 
 bool mliberar(nulo* ptr) {
     car* usuario = (car*)ptr;
     car* baseCar = usuario + (-16);
+    
     longo* bruto = (longo*)baseCar;
     longo tam = bruto[0] + 16;
+    
+    // escreverf("bytes alocados: %i\n", tam);
     
     retorne #chamada_sistema LIBERAR, bruto, tam;
 }

@@ -184,6 +184,8 @@ inline void ARM64::emitirBlocoComandos(std::ostringstream& saida, const Vetor<Co
             emitirEnderecoSlot(saida, comando.instrucaoEnderecoSlot);
         } else if(comando.tipo == ComandoIR::Tipo::CONVERSAO_NUMERICA) {
             emitirConversaoNumerica(saida, comando.instrucaoConversaoNumerica);
+        } else if(comando.tipo == ComandoIR::Tipo::REGISTRADOR_SISTEMA) {
+            emitirRegistradorSistema(saida, comando.instrucaoRegistradorSistema);
         } else {
             emitirRetorne(saida, comando.instrucaoRetorne);
         }

@@ -71,3 +71,14 @@ inline void ARM64::emitirChamadaFuncaoUsuario(std::ostringstream& saida, const I
     }
     saida << "\n";
 }
+// emite "#ler_reg<TLS>"(mrs) ou "#escrever_reg<TLS, valor>"(msr). TLS = tpidr_el0. x9 e o rascunho.
+inline void ARM64::emitirRegistradorSistema(std::ostringstream& saida, const InstrucaoRegistradorSistema& instrucao) {
+    if(instrucao.escrever) {
+        emitirCarregarValorEmComLargura(saida, "x9", instrucao.valor, 8);
+        saida << "msr tpidr_el0, x9\n\n";
+        return;
+    }
+    saida << "mrs x9, tpidr_el0\n";
+    emitirGravarSlot(saida, "x9", instrucao.slotDestino, 8);
+    saida << "\n";
+}

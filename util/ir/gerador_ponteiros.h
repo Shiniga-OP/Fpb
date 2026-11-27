@@ -2,6 +2,19 @@
 #pragma once
 #include "geradorir.h"
 
+// "xs[i]" com "xs" de uma classe que tem campo "representante": indexa esse campo(vira "xs.dados[i]"). Sem representante devolve o ponteiro intacto.
+inline ArgumentoIR GeradorIR::indexarRepresentante(const ArgumentoIR& ponteiro, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(ponteiro.idEspaco < 0) return ponteiro;
+    const CampoEspaco* representante = campoRepresentante(ponteiro.idEspaco);
+    if(!representante) return ponteiro;
+    ArgumentoIR resultado = lerCampoDeBase(ponteiro, representante->nome, saida, ctx);
+    resultado.ehPonteiro = true;
+    resultado.larguraElemento = larguraElementoApontado(representante->tipo);
+    resultado.elementoSinalizado = elementoEhSinalizado(representante->tipo);
+    resultado.elementoFlutuante = elementoEhFlutuante(representante->tipo);
+    return resultado;
+}
+
 // devolve o ponteiro sendo indexado: a variável "nome" ou, se "campo" não é nullptr, o valor do campo ponteiro "nome.campo".
 // Pro campo, a largura do elemento vem do tipo declarado do campo.
 inline ArgumentoIR GeradorIR::resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
@@ -10,7 +23,7 @@ inline ArgumentoIR GeradorIR::resolverPonteiroIndexado(const char* nome, const c
         std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
     }
-    if(!campo) return base;
+    if(!campo) return indexarRepresentante(base, saida, ctx);
     if(base.idEspaco < 0) {
         std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não é um espaço, não tem campos");
@@ -38,13 +51,15 @@ inline ArgumentoIR GeradorIR::resolverPonteiroIndexado(const char* nome, const c
     ponteiro.larguraElemento = larguraElementoApontado(tipoCampo);
     ponteiro.elementoSinalizado = elementoEhSinalizado(tipoCampo);
     ponteiro.elementoFlutuante = elementoEhFlutuante(tipoCampo);
-    return ponteiro;
+    const CampoEspaco* representante = campoRepresentante(base.idEspaco);
+    if(representante && strcmp(representante->nome, campo) == 0) return ponteiro; // "xs.dados[i]": o próprio representante é o array cru
+    return indexarRepresentante(ponteiro, saida, ctx);
 }
 
 // ponteiro sendo indexado em "alvo[i]": variável, "nome.campo" ou "qualquer.coisa.campo".
 inline ArgumentoIR GeradorIR::resolverPonteiroDaExpressao(const Expressao& e, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     if(e.tipo == Expressao::Tipo::IDENTIFICADOR) return resolverPonteiroIndexado(e.valor, nullptr, saida, ctx);
-    if(e.tipo != Expressao::Tipo::ACESSO_CAMPO) return resolverExpressao(e, saida, ctx);
+    if(e.tipo != Expressao::Tipo::ACESSO_CAMPO) return indexarRepresentante(resolverExpressao(e, saida, ctx), saida, ctx);
     if(e.esquerda->tipo == Expressao::Tipo::IDENTIFICADOR) return resolverPonteiroIndexado(e.esquerda->valor, e.valor, saida, ctx);
     ArgumentoIR base = resolverExpressao(*e.esquerda, saida, ctx);
     ArgumentoIR ponteiro = lerCampoDeBase(base, e.valor, saida, ctx);
@@ -59,7 +74,49 @@ inline ArgumentoIR GeradorIR::resolverPonteiroDaExpressao(const Expressao& e, Ve
     ponteiro.larguraElemento = larguraElementoApontado(tipoCampo);
     ponteiro.elementoSinalizado = elementoEhSinalizado(tipoCampo);
     ponteiro.elementoFlutuante = elementoEhFlutuante(tipoCampo);
-    return ponteiro;
+    const CampoEspaco* representante = campoRepresentante(base.idEspaco);
+    if(representante && strcmp(representante->nome, e.valor) == 0) return ponteiro;
+    return indexarRepresentante(ponteiro, saida, ctx);
+}
+
+// "p[i]" com "p" apontando pra espaço(Nome*): os corpos ficam um depois do outro, então o elemento "i" mora em p + i * tamDoEspaco.
+// Devolve o endereço dele como um Nome*(mesmo idEspaco do ponteiro): serve pra leitura("a.b[i].campo") e pra escrita(cópia do corpo em gravarEmIndexacao).
+inline ArgumentoIR GeradorIR::enderecoDoElementoEspaco(const ArgumentoIR& ponteiro, const ArgumentoIR& indice, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    long tamanho = tamDoEspaco(ponteiro.idEspaco);
+    ArgumentoIR deslocamento;
+    if(indice.tipo == ArgumentoIR::Tipo::IMEDIATO && !indice.ehFlutuante) {
+        deslocamento = imediatoInt(indice.imediato * tamanho);
+    } else {
+        ArgumentoIR passo = imediatoInt(tamanho);
+        passo.larguraBytes = 8; // promove o produto pra 64 bits
+        int slotProduto = ctx.variaveisLocais.proximoSlot++;
+        ComandoIR comandoProduto;
+        comandoProduto.tipo = ComandoIR::Tipo::OPERACAO_ARITMETICA;
+        comandoProduto.instrucaoOperacaoAritmetica.slotDestino = slotProduto;
+        comandoProduto.instrucaoOperacaoAritmetica.esquerda = indice;
+        comandoProduto.instrucaoOperacaoAritmetica.operador = traduzirOperadorAritmetico(OperadorAritmetico::MULTIPLICACAO);
+        comandoProduto.instrucaoOperacaoAritmetica.direita = passo;
+        saida.empurrar(comandoProduto);
+        deslocamento = argumentoSlotLargura(slotProduto, 8);
+    }
+    deslocamento.larguraBytes = 8;
+    ArgumentoIR base = copiarArgumento(ponteiro);
+    base.larguraBytes = 8;
+    base.espacoPorValor = false;
+    base.ehPonteiro = true;
+    int slot = ctx.variaveisLocais.proximoSlot++;
+    ComandoIR comandoSoma;
+    comandoSoma.tipo = ComandoIR::Tipo::OPERACAO_ARITMETICA;
+    comandoSoma.instrucaoOperacaoAritmetica.slotDestino = slot;
+    comandoSoma.instrucaoOperacaoAritmetica.esquerda = base;
+    comandoSoma.instrucaoOperacaoAritmetica.operador = OperadorAritmeticoIR::SOMA;
+    comandoSoma.instrucaoOperacaoAritmetica.direita = deslocamento;
+    saida.empurrar(comandoSoma);
+
+    ArgumentoIR elemento = argumentoSlotLargura(slot, 8);
+    elemento.ehPonteiro = true;
+    elemento.idEspaco = ponteiro.idEspaco;
+    return elemento;
 }
 
 // resolve "ponteiro[indice]" como valor de leitura: le "larguraElemento"
@@ -72,6 +129,7 @@ inline ArgumentoIR GeradorIR::resolverPonteiroDaExpressao(const Expressao& e, Ve
 inline ArgumentoIR GeradorIR::resolverIndexacao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     ArgumentoIR ponteiro = resolverPonteiroDaExpressao(*expressao.esquerda, saida, ctx);
     ArgumentoIR indice = resolverExpressao(*expressao.direita, saida, ctx);
+    if(ponteiro.idEspaco >= 0) return enderecoDoElementoEspaco(ponteiro, indice, saida, ctx); // ponteiro pra espaço: o elemento é o corpo inteiro, não um valor de 8 bytes
 
     int slot = ctx.variaveisLocais.proximoSlot++;
     ComandoIR comandoIR;

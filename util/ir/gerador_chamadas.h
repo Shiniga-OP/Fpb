@@ -115,7 +115,10 @@ inline void GeradorIR::resolverArgumentosChamada(const char* nome, const Vetor<E
     corposFuncoesUsuario.buscar(nome, &declaracao);
     for(int j = 0; j < fixos; j++) {
         ArgumentoIR arg = resolverExpressao(argumentos[j], saida, ctx);
-        if(declaracao) arg = converterParaTipo(arg, tipoEhFlutuante(declaracao->parametros[j].tipo), larguraDoTipo(declaracao->parametros[j].tipo), saida, ctx);
+        if(declaracao) {
+            arg = valorRepresentante(arg, declaracao->parametros[j].tipo, saida, ctx);
+            arg = converterParaTipo(arg, tipoEhFlutuante(declaracao->parametros[j].tipo), larguraDoTipo(declaracao->parametros[j].tipo), saida, ctx);
+        }
         if(declaracao && declaracao->parametros[j].tipo == TipoVariavel::ESPACO) {
             // parâmetro "Nome x"(por valor, como em C): a função recebe o endereço de uma CÓPIA no frame de quem chama.
             int idParametro = obterIdEspaco(declaracao->parametros[j].nomeEspaco);

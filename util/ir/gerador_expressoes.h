@@ -1,11 +1,102 @@
 // util/ir/gerador_expressoes.h
 #pragma once
 #include "geradorir.h"
+#include <limits.h>
 
+// calcula "esq OP dir" em tempo de compilação quando os dois lados são IMEDIATO. Devolve false se não dá pra dobrar(divisão por zero, deslocamento fora da largura, ponteiro...): aí a operação segue pro tempo de execução como antes
+// Usa a mesma regra de largura do resultado de resolverExpressao: a maior dos dois(a do esquerdo no deslocamento), no mínimo 4
+inline bool dobrarConstantes(OperadorAritmetico op, const ArgumentoIR& esq, const ArgumentoIR& dir, ArgumentoIR& resultado) {
+    if(esq.tipo != ArgumentoIR::Tipo::IMEDIATO || dir.tipo != ArgumentoIR::Tipo::IMEDIATO) return false;
+    if(esq.ehPonteiro || dir.ehPonteiro) return false;
+    if(esq.ehFlutuante != dir.ehFlutuante) return false;
+    ArgumentoIR r;
+    r.tipo = ArgumentoIR::Tipo::IMEDIATO;
+    r.simbolo = nullptr;
+    if(esq.ehFlutuante) {
+        if(esq.larguraBytes != dir.larguraBytes) return false;
+        double a, b;
+        if(esq.larguraBytes == 4) {
+            unsigned int bitsA = (unsigned int)esq.imediato;
+            unsigned int bitsB = (unsigned int)dir.imediato;
+            float fa, fb;
+            memcpy(&fa, &bitsA, 4);
+            memcpy(&fb, &bitsB, 4);
+            a = fa;
+            b = fb;
+        } else {
+            memcpy(&a, &esq.imediato, 8);
+            memcpy(&b, &dir.imediato, 8);
+        }
+        double c;
+        if(op == OperadorAritmetico::SOMA) c = a + b;
+        else if(op == OperadorAritmetico::SUBTRACAO) c = a - b;
+        else if(op == OperadorAritmetico::MULTIPLICACAO) c = a * b;
+        else if(op == OperadorAritmetico::DIVISAO) c = a / b;
+        else return false;
+        if(esq.larguraBytes == 4) {
+            float f = (float)c;
+            unsigned int bits;
+            memcpy(&bits, &f, 4);
+            r.imediato = (long)bits;
+        } else {
+            memcpy(&r.imediato, &c, 8);
+        }
+        r.larguraBytes = esq.larguraBytes;
+        r.ehFlutuante = true;
+        resultado = r;
+        return true;
+    }
+    long a = esq.imediato;
+    long b = dir.imediato;
+    bool deslocamento = op == OperadorAritmetico::DESL_ESQ || op == OperadorAritmetico::DESL_DIR;
+    int largura = deslocamento ? esq.larguraBytes : (esq.larguraBytes > dir.larguraBytes ? esq.larguraBytes : dir.larguraBytes);
+    if(largura < 4) largura = 4;
+    if(largura == 4) {
+        // em largura 4 a arquitetura opera em w: o imediato de 4 bytes (guardado sem sinal) vale como int. Em deslocamento a quantidade (dir) não é normalizada
+        a = (long)(int)a;
+        if(!deslocamento) b = (long)(int)b;
+    }
+    long c;
+    switch(op) {
+        case OperadorAritmetico::SOMA: c = (long)((unsigned long)a + (unsigned long)b); break;
+        case OperadorAritmetico::SUBTRACAO: c = (long)((unsigned long)a - (unsigned long)b); break;
+        case OperadorAritmetico::MULTIPLICACAO: c = (long)((unsigned long)a * (unsigned long)b); break;
+        case OperadorAritmetico::DIVISAO:
+            if(b == 0 || (b == -1 && a == LONG_MIN)) return false;
+            c = a / b;
+            break;
+        case OperadorAritmetico::MODULO:
+            if(b == 0 || (b == -1 && a == LONG_MIN)) return false;
+            c = a % b;
+            break;
+        case OperadorAritmetico::E_BIT: c = a & b; break;
+        case OperadorAritmetico::OU_BIT: c = a | b; break;
+        case OperadorAritmetico::XOU: c = a ^ b; break;
+        case OperadorAritmetico::DESL_ESQ:
+            if(b < 0 || b >= largura * 8) return false;
+            c = (long)((unsigned long)a << b);
+            break;
+        case OperadorAritmetico::DESL_DIR:
+            if(b < 0 || b >= largura * 8) return false;
+            // mesma regra da arquitetura: esquerda com sinal faz deslocamento aritmético(asr), sem sinal(car, bool) faz lógico(lsr)
+            if(esq.sinalizado) c = a >> b;
+            else c = (largura == 4) ? (long)((unsigned int)a >> b) : (long)((unsigned long)a >> b);
+            break;
+        default: return false;
+    }
+    if(largura == 4) c = (long)(int)c; // trunca em 32 bits com sinal, como a operação faria em w
+    r.imediato = c;
+    r.larguraBytes = largura;
+    resultado = r;
+    return true;
+}
 // resolve qualquer Expressao (literal, identificador, chamada de função, conversão, indexação, bytes ou binária) pra um
 // ArgumentoIR com seu valor final. "saida" recebe as instruções auxiliares que a resolução precisar emitir ANTES do
 // valor ficar pronto. É a ÚNICA rota de resolução de expressão do gerador.
 inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(expressao.tipo == Expressao::Tipo::LISTA) {
+        throw std::runtime_error("Lista '{ ... }' só vale na inicialização de uma variável de espaço que tenha um método '@lista'");
+    }
     if(expressao.tipo == Expressao::Tipo::NOVO) {
         // "novo Nome(args)": malocar do corpo, depois "Nome_.criar(objeto, args...)". Sem construtor, zera os campos.
         // Não é temporário: quem recebe o ponteiro é o dono e libera com "apagar".
@@ -81,6 +172,9 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
     }
     if(expressao.tipo == Expressao::Tipo::CHAMADA_SISTEMA) {
         return resolverChamadaSistemaComoValor(expressao, saida, ctx);
+    }
+    if(expressao.tipo == Expressao::Tipo::REGISTRADOR_SISTEMA) {
+        return resolverRegistradorSistema(expressao, saida, ctx);
     }
     if(expressao.tipo == Expressao::Tipo::BYTES) {
         return resolverBytes(expressao, ctx.variaveisLocais);
@@ -175,6 +269,9 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
             throw std::runtime_error("Operador não suportado para flu/dobro (só +, -, * e /)");
         }
     }
+    ArgumentoIR dobrado;
+    if(dobrarConstantes(expressao.operadorAritmetico, esquerda, direita, dobrado)) return dobrado;
+    
     int slot = ctx.variaveisLocais.proximoSlot++;
     ComandoIR comandoIR;
     comandoIR.tipo = ComandoIR::Tipo::OPERACAO_ARITMETICA;
@@ -313,7 +410,7 @@ inline ArgumentoIR GeradorIR::resolverBytes(const Expressao& expressao, TabelaVa
         ArgumentoIR encontrado;
         if(variaveisLocais.buscar(expressao.bytesNomeVariavel, &encontrado, nullptr)) {
             // espaço por valor: o tamanho do corpo, não os 8 bytes do slot que guarda o endereço
-            if(encontrado.espacoPorValor && encontrado.idEspaco >= 0) tamanho = tamanhoDoEspaco(encontrado.idEspaco);
+            if(encontrado.espacoPorValor && encontrado.idEspaco >= 0) tamanho = tamDoEspaco(encontrado.idEspaco);
             else tamanho = encontrado.larguraBytes;
         } else {
             // nome de espaço/classe: "bytes(Texto)"
@@ -322,7 +419,7 @@ inline ArgumentoIR GeradorIR::resolverBytes(const Expressao& expressao, TabelaVa
                 std::string nomeStr = expressao.bytesNomeVariavel;
                 throw std::runtime_error("'" + nomeStr + "' não é uma variável nem um espaço (usado em 'bytes(...)')");
             }
-            tamanho = tamanhoDoEspaco(idEspaco);
+            tamanho = tamDoEspaco(idEspaco);
         }
     }
     ArgumentoIR arg;
@@ -522,4 +619,30 @@ inline ArgumentoIR GeradorIR::resolverAtribuicao(const Expressao& expressao, Vet
     // ACESSO_CAMPO("nome.campo" ou "Classe.estatico")
     ArgumentoIR valor = congelarValor(resolverExpressao(*expressao.direita, saida, ctx), saida, ctx);
     return gravarEmCampo(destino.esquerda->valor, destino.valor, valor, saida, ctx);
+}
+
+// resolve "#ler_reg<NOME>"(devolve um slot de 8 bytes com o valor) e "#escrever_reg<NOME, valor>"(grava o valor de 64 bits no registrador e devolve 0).
+inline ArgumentoIR GeradorIR::resolverRegistradorSistema(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(strcmp(expressao.valor, "TLS") != 0) {
+        std::string nomeStr = expressao.valor;
+        throw std::runtime_error("Registrador de sistema '" + nomeStr + "' desconhecido (só existe TLS)");
+    }
+    ComandoIR comandoIR;
+    comandoIR.tipo = ComandoIR::Tipo::REGISTRADOR_SISTEMA;
+    comandoIR.instrucaoRegistradorSistema.registrador = RegistradorSistemaId::TLS;
+    comandoIR.instrucaoRegistradorSistema.slotDestino = -1;
+    if(expressao.esquerda) {
+        ArgumentoIR valor = resolverExpressao(*expressao.esquerda, saida, ctx);
+        valor = converterParaTipo(valor, false, 8, saida, ctx);
+        if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = 8;
+        comandoIR.instrucaoRegistradorSistema.escrever = true;
+        comandoIR.instrucaoRegistradorSistema.valor = valor;
+        saida.empurrar(comandoIR);
+        return imediatoInt(0);
+    }
+    int slot = ctx.variaveisLocais.proximoSlot++;
+    comandoIR.instrucaoRegistradorSistema.escrever = false;
+    comandoIR.instrucaoRegistradorSistema.slotDestino = slot;
+    saida.empurrar(comandoIR);
+    return argumentoSlotLargura(slot, 8);
 }

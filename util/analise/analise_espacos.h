@@ -76,17 +76,25 @@ inline void Analisador::analisarClasse(Programa& programa) {
     while(!verificar(TipoToken::FECHA_CHAVE)) {
         bool ehEstatico = false;
         bool ehSobrepor = false;
+        bool ehLista = false;
         bool ehFinal = false;
+        bool ehRepresentante = false;
         while(true) {
             if(verificar(TipoToken::ARROBA) && tokens[pos + 1].tipo == TipoToken::IDENTIFICADOR && strcmp(tokens[pos + 1].valor, "sobrepor") == 0) {
                 pos += 2;
                 ehSobrepor = true;
+            } else if(verificar(TipoToken::ARROBA) && tokens[pos + 1].tipo == TipoToken::IDENTIFICADOR && strcmp(tokens[pos + 1].valor, "lista") == 0) {
+                pos += 2;
+                ehLista = true;
             } else if(verificar(TipoToken::ESTATICO)) {
                 pos++;
                 ehEstatico = true;
             } else if(verificar(TipoToken::FINAL)) {
                 pos++;
                 ehFinal = true;
+            } else if(verificar(TipoToken::REPRESENTANTE)) {
+                pos++;
+                ehRepresentante = true;
             } else {
                 break;
             }
@@ -117,11 +125,14 @@ inline void Analisador::analisarClasse(Programa& programa) {
         if(verificar(TipoToken::ABRE_PARENTESE)) {
             if((ehConstrutor || ehDestrutor) && (ehEstatico || ehSobrepor || ehFinal)) erro("construtor e destrutor não aceitam 'estatico', 'final' nem '@sobrepor'");
             if(ehSobrepor && ehEstatico) erro("'@sobrepor' não vale para método estatico");
+            if(ehLista && (ehConstrutor || ehDestrutor || ehEstatico)) erro("'@lista' só vale para método comum(não estatico, construtor nem destrutor)");
             if(ehFinal) erro("'final' não vale para método");
+            if(ehRepresentante) erro("'representante' só vale para campo");
             if(!ehEstatico) {
                 MetodoDeclarado metodo;
                 metodo.nome = strdup(nomeMembro.c_str());
                 metodo.ehSobrepor = ehSobrepor;
+                metodo.ehLista = ehLista;
                 espaco.metodos.empurrar(metodo);
             }
             DeclaracaoFuncao funcao;
@@ -138,10 +149,12 @@ inline void Analisador::analisarClasse(Programa& programa) {
                 funcao.parametros.empurrar(este);
             }
             analisarParametrosECorpo(funcao);
+            if(ehLista && funcao.parametros.tam != 2) erro("'@lista' exige exatamente 1 parâmetro além de 'este'");
             if(ehDestrutor && funcao.parametros.tam != 1) erro("destrutor não recebe parâmetros");
             programa.funcoes.empurrar(funcao);
         } else if(ehEstatico) {
-            if(ehSobrepor) erro("'@sobrepor' só vale para método");
+            if(ehSobrepor || ehLista) erro("'@sobrepor' e '@lista' só valem para método");
+            if(ehRepresentante) erro("'representante' não vale para campo estatico");
             if(tipo.ehNulo) erro("campo estatico não pode ser 'nulo'");
             bool ehFlu = tipo.tipo == TipoVariavel::FLUTUANTE || tipo.tipo == TipoVariavel::DOBRO;
             if(ehFlu && !ehFinal) erro("campo estatico só aceita flu/dobro com 'final'");
@@ -180,12 +193,19 @@ inline void Analisador::analisarClasse(Programa& programa) {
             espaco.estaticos.empurrar(estatico);
             consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após campo estatico");
         } else {
-            if(ehSobrepor) erro("'@sobrepor' só vale para método");
+            if(ehSobrepor || ehLista) erro("'@sobrepor' e '@lista' só valem para método");
             if(ehFinal) erro("'final' em campo de instância não é suportado: use 'estatico final'");
             CampoEspaco campo;
             campo.tipo = tipo.tipo;
             campo.nomeEspaco = tipo.nomeEspaco;
             campo.nome = strdup(nomeMembro.c_str());
+            if(ehRepresentante) {
+                if(!tipoEhPonteiro(tipo.tipo)) erro("'representante' exige um campo ponteiro(T*)");
+                for(int i = 0; i < espaco.campos.tam; i++) {
+                    if(espaco.campos[i].ehRepresentante) erro("a classe já tem um campo 'representante'");
+                }
+                campo.ehRepresentante = true;
+            }
             espaco.campos.empurrar(campo);
 
             while(verificar(TipoToken::VIRGULA)) {

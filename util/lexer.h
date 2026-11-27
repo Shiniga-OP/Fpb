@@ -72,6 +72,8 @@ static const PalavraReservada DIRETIVAS[] = {
     {"#chamada_sistema", TipoToken::CHAMADA_SISTEMA},
     {"#ligar", TipoToken::LIGAR},
     {"#alvo", TipoToken::ALVO},
+    {"#ler_reg", TipoToken::LER_REG},
+    {"#escrever_reg", TipoToken::ESCREVER_REG},
 };
 
 // "verdade"/"falso" não estão aqui: viram NUMERO(1/0) direto em lerIdentificadorOuPalavraChave.
@@ -98,6 +100,8 @@ static const PalavraReservada PALAVRAS_CHAVE[] = {
     {"novo", TipoToken::NOVO},
     {"estatico", TipoToken::ESTATICO},
     {"final", TipoToken::FINAL},
+    {"resolvec", TipoToken::RESOLVEC},
+    {"representante", TipoToken::REPRESENTANTE},
 };
 
 // procura "buf" em "tabela"(de "tam" entradas). Devolve true e preenche *saida se achar.

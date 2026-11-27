@@ -105,7 +105,9 @@ struct Expressao {
         INDEXACAO, CHAMADA_SISTEMA,
         ACESSO_CAMPO, ENDERECO,
         TERNARIA, ATRIBUICAO,
-        NOVO // "novo Nome(args)": nomeFuncao = nome da classe, argumentosFuncao = argumentos do construtor
+        NOVO, // "novo Nome(args)": nomeFuncao = nome da classe, argumentosFuncao = argumentos do construtor
+        REGISTRADOR_SISTEMA, // "#ler_reg<NOME>" (esquerda == nullptr) ou "#escrever_reg<NOME, valor>" (esquerda = valor). valor = nome do registrador
+        LISTA // "{ a, b, c }": argumentosFuncao = itens(cada item pode ser outra LISTA). Só vale na inicialização de variável de espaço com método "@lista"
     } tipo;
     char* valor; // dono: quem criou a expressao(strdup). usado quando tipo != BINARIA e tipo != CONVERSAO e tipo != CHAMADA_FUNCAO e tipo != BYTES e tipo != INDEXACAO e tipo != CHAMADA_SISTEMA
     OperadorAritmetico operadorAritmetico; // usado quando tipo == BINARIA
@@ -142,7 +144,7 @@ struct Expressao {
             direita->liberar();
             delete direita;
             direita = nullptr;
-        } else if(tipo == Tipo::CHAMADA_FUNCAO || tipo == Tipo::NOVO) {
+        } else if(tipo == Tipo::CHAMADA_FUNCAO || tipo == Tipo::NOVO || tipo == Tipo::LISTA) {
             free(nomeFuncao);
             nomeFuncao = nullptr;
             for(int i = 0; i < argumentosFuncao->tam; i++) (*argumentosFuncao)[i].liberar();
@@ -154,6 +156,12 @@ struct Expressao {
             bytesNomeVariavel = nullptr;
         } else if(tipo == Tipo::CHAMADA_SISTEMA) {
             liberarChamadaSistemaDeExpressao();
+        } else if(tipo == Tipo::REGISTRADOR_SISTEMA) {
+            if(esquerda) {
+                esquerda->liberar();
+                delete esquerda;
+                esquerda = nullptr;
+            }
         } else if(tipo == Tipo::TERNARIA) {
             liberarCondicaoTernaria();
             esquerda->liberar();
@@ -547,6 +555,7 @@ struct CampoEspaco {
     TipoVariavel tipo;
     char* nome; // dono: quem criou o campo(strdup)
     char* nomeEspaco;
+    bool ehRepresentante = false; // true se declarado com "representante": é o campo que "xs[i]" indexa
 
     void liberar() {
         free(nome);
@@ -571,6 +580,7 @@ struct CampoEstatico {
 struct MetodoDeclarado {
     char* nome; // dono: quem criou o método(strdup)
     bool ehSobrepor;
+    bool ehLista = false; // true se veio marcado com "@lista": é o método que recebe cada item de "Nome x = { a, b };"
 
     void liberar() {
         free(nome);

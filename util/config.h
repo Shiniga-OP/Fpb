@@ -37,7 +37,9 @@ enum class TipoToken {
     ENQUANTO, POR, APAGAR,
     // definição:
     RETORNE, SEM_SINAL, HERDA, ESTATICO, FINAL,
-    NOVO,
+    NOVO, RESOLVEC, REPRESENTANTE,
+    // assembly:
+    LER_REG, ESCREVER_REG,
     // fim:
     FIM_ARQUIVO
 };

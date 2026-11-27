@@ -56,6 +56,7 @@ public:
     ChamadaSistemaCrua analisarChamadaSistemaComDestino();
     ChamadaFuncao analisarChamadaFuncao();
     bool ehChamadaMetodo();
+    bool ehIndexacaoSeguidaDePonto();
     ChamadaFuncao analisarChamadaMetodo();
     ComandoApagar analisarApagar();
     Expressao montarOperacaoComposta(TipoToken op, const Expressao& lido);

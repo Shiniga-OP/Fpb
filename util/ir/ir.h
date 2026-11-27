@@ -238,13 +238,29 @@ struct InstrucaoEscritaIndexada {
     }
 };
 
+// registrador de sistema da arquitetura(cada arquitetura traduz pro registrador real: TLS = tpidr_el0 no ARM64).
+enum class RegistradorSistemaId { TLS };
+
+// le o registrador de sistema pro slotDestino, ou escreve "valor" nele(escrever == true).
+struct InstrucaoRegistradorSistema {
+    RegistradorSistemaId registrador;
+    bool escrever = false;
+    int slotDestino = -1; // so na leitura
+    ArgumentoIR valor; // so na escrita
+
+    void liberar() {
+        if(escrever) valor.liberar();
+    }
+};
+
 // um comando no nivel de IR: chamada de sistema crua(#chamada_sistema direto no corpo), chamada a uma função de usuario(bl), desvio condicional(se), laço(enquanto), reatribuição de variável, operação aritméticas, leitura/escrita indexada(ponteiro[indice]) ou conversão numérica.
 struct ComandoIR {
     enum class Tipo {
         CHAMADA_SISTEMA_CRUA, CHAMADA_FUNCAO_USUARIO,
         SE, ENQUANTO, REATRIBUICAO, OPERACAO_ARITMETICA,
         RETORNE, LEITURA_INDEXADA, ESCRITA_INDEXADA,
-        ENDERECO_FRAME, ENDERECO_SLOT, CONVERSAO_NUMERICA
+        ENDERECO_FRAME, ENDERECO_SLOT, CONVERSAO_NUMERICA,
+        REGISTRADOR_SISTEMA
     } tipo;
     InstrucaoChamadaSistemaCrua chamadaSistemaCrua;
     InstrucaoChamadaFuncaoUsuario chamadaFuncaoUsuario;
@@ -258,6 +274,7 @@ struct ComandoIR {
     InstrucaoEnderecoFrame instrucaoEnderecoFrame;
     InstrucaoEnderecoSlot instrucaoEnderecoSlot;
     InstrucaoConversaoNumerica instrucaoConversaoNumerica;
+    InstrucaoRegistradorSistema instrucaoRegistradorSistema;
 
     void liberar() {
         if(tipo == Tipo::CHAMADA_SISTEMA_CRUA) chamadaSistemaCrua.liberar();
@@ -272,6 +289,7 @@ struct ComandoIR {
         else if(tipo == Tipo::ENDERECO_FRAME) instrucaoEnderecoFrame.liberar();
         else if(tipo == Tipo::ENDERECO_SLOT) instrucaoEnderecoSlot.liberar();
         else if(tipo == Tipo::CONVERSAO_NUMERICA) instrucaoConversaoNumerica.liberar();
+        else if(tipo == Tipo::REGISTRADOR_SISTEMA) instrucaoRegistradorSistema.liberar();
     }
 };
 
@@ -344,6 +362,8 @@ inline void paraCadaOperando(const ComandoIR& c, void (*fn)(const ArgumentoIR&, 
         fn(c.instrucaoEnquanto.direita, ctx);
     } else if(c.tipo == ComandoIR::Tipo::CONVERSAO_NUMERICA) {
         fn(c.instrucaoConversaoNumerica.origem, ctx);
+    } else if(c.tipo == ComandoIR::Tipo::REGISTRADOR_SISTEMA) {
+        if(c.instrucaoRegistradorSistema.escrever) fn(c.instrucaoRegistradorSistema.valor, ctx);
     }
 }
 
@@ -357,6 +377,7 @@ inline int slotDefinidoPor(const ComandoIR& c) {
     if(c.tipo == ComandoIR::Tipo::ENDERECO_FRAME) return c.instrucaoEnderecoFrame.slotDestino;
     if(c.tipo == ComandoIR::Tipo::ENDERECO_SLOT) return c.instrucaoEnderecoSlot.slotDestino;
     if(c.tipo == ComandoIR::Tipo::CONVERSAO_NUMERICA) return c.instrucaoConversaoNumerica.slotDestino;
+    if(c.tipo == ComandoIR::Tipo::REGISTRADOR_SISTEMA) return c.instrucaoRegistradorSistema.escrever ? -1 : c.instrucaoRegistradorSistema.slotDestino;
     return -1;
 }
 

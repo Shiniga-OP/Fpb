@@ -127,7 +127,7 @@ inline void GeradorIR::zerarEspaco(const ArgumentoIR& destino, int idEspaco, Vet
 // texto literal (ou car*) usado onde se espera um espaço: constrói um espaço temporário no frame via "Nome_criar" e agenda o "liberar" dele pro fim do comando.
 inline ArgumentoIR GeradorIR::criarTemporarioDeValor(int idEspaco, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     int slot = ctx.variaveisLocais.proximoSlot++;
-    reservarNoFrame(tamanhoDoEspaco(idEspaco), slot, saida);
+    reservarNoFrame(tamDoEspaco(idEspaco), slot, saida);
     ArgumentoIR temp = argumentoEspaco(slot, idEspaco);
     temp.espacoPorValor = true;
     emitirCriar(temp, valor, idEspaco, saida);
@@ -205,7 +205,7 @@ inline void GeradorIR::emitirAlocar(int slot, int idEspaco, Vetor<ComandoIR>& sa
     if(!funcoesUsuario.buscar("malocar", &totalParametros)) {
         throw std::runtime_error("Objeto no heap exige 'malocar' (faltou #incluir a biblioteca de memória?)");
     }
-    ArgumentoIR tamanho = imediatoInt(tamanhoDoEspaco(idEspaco));
+    ArgumentoIR tamanho = imediatoInt(tamDoEspaco(idEspaco));
     tamanho.larguraBytes = 8;
     ComandoIR comando = montarChamada("malocar", {tamanho});
     comando.chamadaFuncaoUsuario.capturaResultado = true;
@@ -260,11 +260,86 @@ inline void GeradorIR::copiarEspaco(const ArgumentoIR& origem, const ArgumentoIR
 // copia o conteúdo de "origem" pra lá e devolve o argumento com o endereço base da cópia. É o que o "Nome x" por valor recebe.
 inline ArgumentoIR GeradorIR::criarCopiaEspaco(const ArgumentoIR& origem, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     int slot = ctx.variaveisLocais.proximoSlot++;
-    reservarNoFrame(tamanhoDoEspaco(idEspaco), slot, saida);
+    reservarNoFrame(tamDoEspaco(idEspaco), slot, saida);
 
     ArgumentoIR copia = copiarArgumento(origem);
     copia.registrador = slot;
     copia.espacoPorValor = true;
     copiarObjeto(origem, copia, idEspaco, saida, ctx);
     return copia;
+}
+
+// método marcado "@lista" da classe(ou de uma base). "nomeMetodo" recebe o nome dele(sem o prefixo da classe).
+inline bool GeradorIR::buscarMetodoLista(int idEspaco, std::string& nomeMetodo) {
+    for(int id = idEspaco; id >= 0; id = baseDoEspaco(id)) {
+        const DeclaracaoEspaco& espaco = *espacos.declaracoes[id];
+        for(int i = 0; i < espaco.metodos.tam; i++) {
+            if(!espaco.metodos[i].ehLista) continue;
+            nomeMetodo = espaco.metodos[i].nome;
+            return true;
+        }
+    }
+    return false;
+}
+
+// "Nome x = { a, b };" vale como lista de elementos quando a classe(ou uma base) tem um método "@lista". Senão continua sendo construtor ou um valor por campo.
+inline bool GeradorIR::aceitaListaDeElementos(int idEspaco) {
+    std::string nomeMetodo;
+    return buscarMetodoLista(idEspaco, nomeMetodo);
+}
+
+// começa o espaço como em "Nome x;"(construtor sem argumentos, se existir, senão zera os campos) e emite "nome.metodoLista(item)" por item.
+// Item "{...}" vira uma variável oculta do tipo do parâmetro do método, construída do mesmo jeito(recursivo).
+inline void GeradorIR::emitirListaElementos(const char* nome, const Vetor<Expressao>& itens, int idEspaco, const ArgumentoIR& destino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    int totalParametrosCriar = 0;
+    std::string nomeCriar = std::string(espacos.declaracoes[idEspaco]->nome) + "_.criar";
+    if(funcoesUsuario.buscar(nomeCriar.c_str(), &totalParametrosCriar) && totalParametrosCriar == 1) {
+        DeclaracaoVariavel semArgumentos;
+        semArgumentos.iniciar();
+        semArgumentos.nome = strdup(nome);
+        emitirConstrutor(semArgumentos, idEspaco, saida, ctx);
+        free(semArgumentos.nome);
+        semArgumentos.listaInicial.liberar();
+    } else {
+        zerarEspaco(destino, idEspaco, saida);
+    }
+    std::string nomeMetodo;
+    buscarMetodoLista(idEspaco, nomeMetodo);
+    std::string nomeFuncao;
+    buscarMetodo(idEspaco, nomeMetodo.c_str(), nomeFuncao);
+    const DeclaracaoFuncao* declaracao = nullptr;
+    corposFuncoesUsuario.buscar(nomeFuncao.c_str(), &declaracao);
+    std::string nomeChamada = std::string(nome) + "." + nomeMetodo;
+    for(int i = 0; i < itens.tam; i++) {
+        ChamadaFuncao chamada;
+        chamada.iniciar();
+        chamada.nome = strdup(nomeChamada.c_str());
+        Expressao identificador;
+        bool oculto = itens[i].tipo == Expressao::Tipo::LISTA;
+        if(oculto) {
+            if(!declaracao || declaracao->parametros[1].tipo != TipoVariavel::ESPACO || !declaracao->parametros[1].nomeEspaco) {
+                throw std::runtime_error("Item '{ ... }' só vale quando o parâmetro de '" + nomeFuncao + "' é um espaço por valor");
+            }
+            std::string nomeOculto = "#lista" + std::to_string(contadorSimbolos++);
+            DeclaracaoVariavel oculta;
+            oculta.iniciar();
+            oculta.tipo = TipoVariavel::ESPACO;
+            oculta.nome = strdup(nomeOculto.c_str());
+            oculta.nomeEspaco = strdup(declaracao->parametros[1].nomeEspaco);
+            oculta.listaInicial = *itens[i].argumentosFuncao;
+            oculta.temLista = true;
+            gerarDeclaracaoVariavel(oculta, saida, ctx);
+            free(oculta.nome);
+            free(oculta.nomeEspaco);
+            identificador.tipo = Expressao::Tipo::IDENTIFICADOR;
+            identificador.valor = strdup(nomeOculto.c_str());
+            chamada.argumentos.empurrar(identificador);
+        } else {
+            chamada.argumentos.empurrar(itens[i]);
+        }
+        gerarChamadaFuncao(chamada, saida, ctx);
+        free(chamada.nome);
+        if(oculto) free(identificador.valor);
+        chamada.argumentos.liberar();
+    }
 }

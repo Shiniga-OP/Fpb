@@ -65,6 +65,35 @@ inline bool GeradorIR::existeCampo(int idEspaco, const char* campo) {
     return false;
 }
 
+// campo "representante" da classe ou de uma base(o que "xs[i]" indexa), ou nullptr.
+inline const CampoEspaco* GeradorIR::campoRepresentante(int idEspaco) {
+    int total = totalCampos(idEspaco);
+    for(int i = 0; i < total; i++) {
+        const CampoEspaco& atual = campoDoIndice(idEspaco, i);
+        if(atual.ehRepresentante) return &atual;
+    }
+    return nullptr;
+}
+
+// objeto de classe com "representante" usado onde se espera o tipo do representante(ex: Texto onde se espera car*): vale o campo, não o objeto.
+inline ArgumentoIR GeradorIR::valorRepresentante(ArgumentoIR valor, TipoVariavel tipoDestino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(valor.tipo != ArgumentoIR::Tipo::REGISTRADOR || valor.idEspaco < 0) return valor;
+    const CampoEspaco* representante = campoRepresentante(valor.idEspaco);
+    if(!representante || representante->tipo != tipoDestino) return valor;
+    return lerCampoDeBase(valor, representante->nome, saida, ctx);
+}
+
+// mesma regra, com o destino já resolvido(variável existente na reatribuição, onde a tabela só guarda o ArgumentoIR).
+inline ArgumentoIR GeradorIR::valorRepresentante(ArgumentoIR valor, const ArgumentoIR& destino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(valor.tipo != ArgumentoIR::Tipo::REGISTRADOR || valor.idEspaco < 0) return valor;
+    if(!destino.ehPonteiro || destino.idEspaco >= 0) return valor;
+    const CampoEspaco* representante = campoRepresentante(valor.idEspaco);
+    if(!representante) return valor;
+    ArgumentoIR modelo = argumentoSlot(0, representante->tipo);
+    if(modelo.larguraElemento != destino.larguraElemento || modelo.elementoSinalizado != destino.elementoSinalizado || modelo.elementoFlutuante != destino.elementoFlutuante) return valor;
+    return lerCampoDeBase(valor, representante->nome, saida, ctx);
+}
+
 // true se "idEspaco" é "idBase" ou herda dele(direta ou indiretamente): um Derivada* serve onde se espera Base*.
 inline bool GeradorIR::ehSubespaco(int idEspaco, int idBase) {
     int id = idEspaco;
@@ -265,7 +294,7 @@ inline void GeradorIR::posicaoDoCampo(int idEspaco, const char* campo, int* posS
 }
 
 // tamanho total em bytes do espaço(com os campos da base), arredondado pro maior alinhamento entre os campos.
-inline int GeradorIR::tamanhoDoEspaco(int idEspaco) {
+inline int GeradorIR::tamDoEspaco(int idEspaco) {
     int total = totalCampos(idEspaco);
     int pos = 0;
     int maiorLargura = 1;
@@ -411,6 +440,7 @@ inline ArgumentoIR GeradorIR::gravarEmCampoBase(const ArgumentoIR& base, const c
     int posCampo;
     TipoVariavel tipoCampo;
     posicaoDoCampo(base.idEspaco, campo, &posCampo, &tipoCampo);
+    valor = valorRepresentante(valor, tipoCampo, saida, ctx);
     valor = converterParaTipo(valor, tipoEhFlutuante(tipoCampo), larguraDoTipo(tipoCampo), saida, ctx);
     if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = larguraDoTipo(tipoCampo);
     emitirEscritaCampo(base, posCampo, tipoCampo, valor, saida);

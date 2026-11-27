@@ -3,7 +3,7 @@
 #macro THPILHA 0x200000 #macrofim
 #macro THBLOCO 128 #macrofim
 #macro THMARGEM 1152 #macrofim
-#macro THFLAGS 0x350F00 #macrofim
+#macro THMARCAS 0x350F00 #macrofim
 
 #espaco Thread {
     longo funcao;
@@ -20,34 +20,48 @@
     int tid;
 }
 
-// bloco da thread que está executando. Só vale em threads criadas por thcriar.
-Thread* thatual() {
+// acha o bloco pelo endereço da pilha. Só vale logo na entrada do filho,
+// antes do registrador TLS ser gravado(depois disso use thatual)
+Thread* thpelapilha() {
     longo ancora = 0;
     longo m = (longo)@ancora;
     retorne (Thread*)(m / THPILHA * THPILHA + THPILHA - THBLOCO);
 }
 
+// bloco da thread que está executando, lido do registrador TLS
+// Na thread principal(ou em qualquer thread não criada por thcriar) devolve 0
+Thread* thatual() {
+    retorne (Thread*)#ler_reg<TLS>;
+}
+
 // slots de TLS da thread atual: 8 slots (0..7), todos começam em zero.
+// Fora de uma thread criada por thcriar, devolve 0
 longo thtlsler(int indice) {
     se(indice < 0) retorne 0;
     se(indice >= 8) retorne 0;
     Thread* b = thatual();
+    longo ender = (longo)b;
+    se(ender == 0) retorne 0;
     longo* slots = (longo*)@b.tls0;
     retorne slots[indice];
 }
 
+// fora de uma thread criada por thcriar, não faz nada
 nulo thtlsgravar(int indice, longo valor) {
     se(indice < 0) retorne;
     se(indice >= 8) retorne;
     Thread* b = thatual();
+    longo ender = (longo)b;
+    se(ender == 0) retorne;
     longo* slots = (longo*)@b.tls0;
     slots[indice] = valor;
 }
 
-// ponto de entrada do filho: roda a função e encerra SÓ esta thread
-// (SAIR = chamada 93 = exit, não exit_group).
+// ponto de entrada do filho: grava o bloco no registrador TLS, roda a função
+// e encerra SÓ esta thread
 nulo thentrada() {
-    Thread* b = thatual();
+    Thread* b = thpelapilha();
+    #escrever_reg<TLS, (longo)b>;
     nulo* f = @(b.funcao);
     f(b.arg);
     #chamada_sistema SAIR, 0;
@@ -62,8 +76,8 @@ Thread* thcriar(nulo* funcao, longo arg) {
     b.arg = arg;
     b.bruto = bruto;
     b.tid = 0;
-    // ordem do clone no ARM64: flags, pilha, tid_pai, tls, tid_filho
-    longo r = #chamada_sistema CLONE, THFLAGS, base + THPILHA - THMARGEM, @b.tid, 0, @b.tid;
+    // marcas, pilha, tid_pai, tls, tid_filho
+    longo r = #chamada_sistema CLONE, THMARCAS, base + THPILHA - THMARGEM, @b.tid, 0, @b.tid;
     se(r == 0) {
         thentrada();
     }
@@ -78,13 +92,22 @@ int thid(Thread* th) {
     retorne th.tid;
 }
 
-// espera a thread terminar (o núcleo zera tid e acorda o futex ao sair)
-// e devolve a memória dela. Só chame uma vez por thread.
-nulo thjuntar(Thread* th) {
+// espera a thread terminar, sem liberar nada
+nulo thesperar(Thread* th) {
     int v = th.tid;
     enquanto(v != 0) {
         #chamada_sistema FUTEX, @th.tid, 0, v, 0, 0, 0;
         v = th.tid;
     }
+}
+
+// libera a memória. Só depois de thesperar
+nulo thliberar(Thread* th) {
     #chamada_sistema LIBERAR, th.bruto, THPILHA * 2;
+}
+
+// mantém o comportamento antigo
+nulo thjuntar(Thread* th) {
+    thesperar(th);
+    thliberar(th);
 }

@@ -2,7 +2,7 @@
 #incluir "mem.fpb";
 
 #classe Texto {
-    car* txt;
+    representante car* txt;
     longo tam;
 
     Texto(car* lit) {

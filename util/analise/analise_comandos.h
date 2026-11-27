@@ -76,6 +76,12 @@ inline Comando Analisador::analisarComando() {
         comando.comandoApagar = analisarApagar();
         return comando;
     }
+    if(verificar(TipoToken::ESCREVER_REG)) {
+        comando.tipo = Comando::Tipo::EXPRESSAO;
+        comando.expressao = analisarPrimariaSemPosfixo();
+        if(verificar(TipoToken::PONTO_VIRGULA)) pos++;
+        return comando;
+    }
     if(verificar(TipoToken::RETORNE)) {
         comando.tipo = Comando::Tipo::RETORNE;
         comando.comandoRetorne = analisarRetorne();
@@ -98,6 +104,9 @@ inline Comando Analisador::analisarComando() {
         comando.tipo = Comando::Tipo::CHAMADA_FUNCAO;
         comando.chamadaFuncao = analisarChamadaMetodo();
         return comando;
+    }
+    if(ehIndexacaoSeguidaDePonto()) {
+        return analisarComandoCadeia();
     }
     if(pos + 3 < (size_t)tokens.tam && verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::PONTO && tokens[pos + 2].tipo == TipoToken::IDENTIFICADOR && tokens[pos + 3].tipo == TipoToken::ABRE_COLCHETE) {
         comando.tipo = Comando::Tipo::ATRIBUICAO_INDEXADA;
@@ -161,6 +170,22 @@ inline Comando Analisador::analisarComandoCadeia() {
     }
     if(verificar(TipoToken::PONTO_VIRGULA)) consumir(TipoToken::PONTO_VIRGULA, "esperado ';' após o comando");
     return comando;
+}
+
+// true se o comando atual é "nome[i]" ou "nome.campo[i]" seguido de '.': "a.b[i].metodo();" e "a[i].campo = e;". Isso não é atribuição indexada(que só aceita
+// '=' ou operador composto depois do ']'): vai pela cadeia.
+inline bool Analisador::ehIndexacaoSeguidaDePonto() {
+    size_t i = pos;
+    if(tokens[i].tipo != TipoToken::IDENTIFICADOR) return false;
+    i++;
+    if(i < (size_t)tokens.tam && tokens[i].tipo == TipoToken::PONTO) i += 2;
+    if(i >= (size_t)tokens.tam || tokens[i].tipo != TipoToken::ABRE_COLCHETE) return false;
+    int profundidade = 0;
+    for(; i < (size_t)tokens.tam; i++) {
+        if(tokens[i].tipo == TipoToken::ABRE_COLCHETE) profundidade++;
+        else if(tokens[i].tipo == TipoToken::FECHA_COLCHETE && --profundidade == 0) break;
+    }
+    return i + 1 < (size_t)tokens.tam && (tokens[i + 1].tipo == TipoToken::PONTO || tokens[i + 1].tipo == TipoToken::ABRE_COLCHETE);
 }
 
 // analisa: nome[indice] = expressao;

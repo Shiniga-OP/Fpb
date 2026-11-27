@@ -113,7 +113,7 @@ public:
     void registrarEspacos(const Programa& programa, const std::string& origem = "programa principal");
     int obterIdEspaco(const char* nome);
     void posicaoDoCampo(int idEspaco, const char* campo, int* posSaida, TipoVariavel* tipoSaida);
-    int tamanhoDoEspaco(int idEspaco);
+    int tamDoEspaco(int idEspaco);
     ArgumentoIR resolverAcessoCampo(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void emitirEscritaCampo(const ArgumentoIR& base, int posCampo, TipoVariavel tipoCampo, ArgumentoIR valor, Vetor<ComandoIR>& saida);
     void gerarAtribuicaoCampo(const AtribuicaoCampo& atr, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
@@ -121,6 +121,7 @@ public:
     int totalCampos(int idEspaco);
     const CampoEspaco& campoDoIndice(int idEspaco, int indice);
     bool existeCampo(int idEspaco, const char* campo);
+    const CampoEspaco* campoRepresentante(int idEspaco);
     bool ehSubespaco(int idEspaco, int idBase);
     bool buscarMetodo(int idEspaco, const char* metodo, std::string& nomeFuncao);
     const CampoEstatico* buscarEstatico(int idEspaco, const char* campo, std::string& simbolo);
@@ -129,12 +130,15 @@ public:
     ArgumentoIR enderecoDeGlobal(const std::string& simbolo, const CampoEstatico& estatico, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverAcessoEstatico(const std::string& simbolo, const CampoEstatico& estatico, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void validarHeranca();
-
+    ArgumentoIR valorRepresentante(ArgumentoIR valor, TipoVariavel tipoDestino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR valorRepresentante(ArgumentoIR valor, const ArgumentoIR& destino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    
     // === gerador_expressoes.h ===
     ArgumentoIR resolverExpressao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverBytes(const Expressao& expressao, TabelaVariaveisLocais& variaveisLocais);
     ArgumentoIR resolverConversao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverChamadaSistemaComoValor(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR resolverRegistradorSistema(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR converterParaTipo(ArgumentoIR valor, bool destinoFlutuante, int larguraDestino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     void promoverFlutuantes(ArgumentoIR& esq, ArgumentoIR& dir, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverOperadorEspaco(OperadorAritmetico op, ArgumentoIR esquerda, ArgumentoIR direita, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
@@ -177,8 +181,10 @@ public:
     // === gerador_ponteiros.h ===
     ArgumentoIR resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverPonteiroDaExpressao(const Expressao& e, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR indexarRepresentante(const ArgumentoIR& ponteiro, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverIndexacao(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR resolverEndereco(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    ArgumentoIR enderecoDoElementoEspaco(const ArgumentoIR& ponteiro, const ArgumentoIR& indice, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
 
     // === gerador_vida.h ===
     ArgumentoIR argumentoEspaco(int slot, int idEspaco);
@@ -203,6 +209,9 @@ public:
     void reservarNoFrame(int bytes, int slot, Vetor<ComandoIR>& saida);
     void copiarEspaco(const ArgumentoIR& origem, const ArgumentoIR& destino, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     ArgumentoIR criarCopiaEspaco(const ArgumentoIR& origem, int idEspaco, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
+    bool buscarMetodoLista(int idEspaco, std::string& nomeMetodo);
+    bool aceitaListaDeElementos(int idEspaco);
+    void emitirListaElementos(const char* nome, const Vetor<Expressao>& itens, int idEspaco, const ArgumentoIR& destino, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
     
     // === gerador_globais.h ===
     void registrarGlobaisDeclaradas(const Programa& programa);

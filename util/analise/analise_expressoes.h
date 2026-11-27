@@ -276,21 +276,56 @@ inline Expressao Analisador::continuarCadeia(Expressao base) {
             e.direita = nullptr;
         }
         base = e;
-        if(!verificar(TipoToken::ABRE_COLCHETE)) continue;
-        pos++;
-        Expressao indice = analisarExpressaoAditiva();
-        consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
-        Expressao indexacao;
-        indexacao.tipo = Expressao::Tipo::INDEXACAO;
-        indexacao.valor = nullptr;
-        indexacao.esquerda = new Expressao(base);
-        indexacao.direita = new Expressao(indice);
-        base = indexacao;
+        while(verificar(TipoToken::ABRE_COLCHETE)) {
+            pos++;
+            Expressao indice = analisarExpressaoAditiva();
+            consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
+            Expressao indexacao;
+            indexacao.tipo = Expressao::Tipo::INDEXACAO;
+            indexacao.valor = nullptr;
+            indexacao.esquerda = new Expressao(base);
+            indexacao.direita = new Expressao(indice);
+            base = indexacao;
+        }
     }
     return base;
 }
 
 inline Expressao Analisador::analisarPrimariaSemPosfixo() {
+    if(verificar(TipoToken::LER_REG) || verificar(TipoToken::ESCREVER_REG)) {
+        // "#ler_reg<NOME>" ou "#escrever_reg<NOME, valor>". O valor é lido sem ternário pois o '>' que fecha seria tomado como comparação: use parênteses se precisar
+        bool escrever = verificar(TipoToken::ESCREVER_REG);
+        pos++;
+        consumir(TipoToken::MENOR, "esperado '<' após a diretiva de registrador");
+        const Token& nome = consumir(TipoToken::IDENTIFICADOR, "esperado nome do registrador");
+        Expressao e;
+        e.tipo = Expressao::Tipo::REGISTRADOR_SISTEMA;
+        e.valor = strdup(nome.valor);
+        e.esquerda = nullptr;
+        e.direita = nullptr;
+        if(escrever) {
+            consumir(TipoToken::VIRGULA, "esperado ',' e o valor em '#escrever_reg'");
+            e.esquerda = new Expressao(analisarExpressaoSemTernario());
+        }
+        consumir(TipoToken::MAIOR, "esperado '>' para fechar a diretiva de registrador");
+        return e;
+    }
+    if(verificar(TipoToken::ABRE_CHAVE)) {
+        // "{ a, b, c }": lista de elementos(itens podem ser outras listas)
+        pos++;
+        Expressao e;
+        e.tipo = Expressao::Tipo::LISTA;
+        e.valor = nullptr;
+        e.nomeFuncao = nullptr;
+        e.argumentosFuncao = new Vetor<Expressao>();
+        e.argumentosFuncao->iniciar();
+        while(!verificar(TipoToken::FECHA_CHAVE)) {
+            e.argumentosFuncao->empurrar(analisarExpressaoAditiva());
+            if(verificar(TipoToken::VIRGULA)) pos++;
+        }
+        consumir(TipoToken::FECHA_CHAVE, "esperado '}' para fechar a lista");
+        return e;
+    }
     if(verificar(TipoToken::NOVO)) {
         // "novo Nome(args)" ou "novo Nome": objeto no heap. O GeradorIR aloca e chama o construtor.
         pos++;
@@ -444,7 +479,7 @@ inline Expressao Analisador::analisarPrimariaSemPosfixo() {
         pos++; // consome '.'
         const Token& campo = consumir(TipoToken::IDENTIFICADOR, "esperado nome do campo após '.'");
         Expressao resultado = montarAcessoCampo(nome.valor, campo.valor);
-        if(verificar(TipoToken::ABRE_COLCHETE)) {
+        while(verificar(TipoToken::ABRE_COLCHETE)) {
             pos++;
             Expressao indice = analisarExpressaoAditiva();
             consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
@@ -461,7 +496,7 @@ inline Expressao Analisador::analisarPrimariaSemPosfixo() {
         return analisarChamadaFuncaoComoExpressao();
     }
     if(verificar(TipoToken::IDENTIFICADOR) && tokens[pos + 1].tipo == TipoToken::ABRE_COLCHETE) {
-        return analisarIndexacao();
+        return continuarCadeia(analisarIndexacao());
     }
     if(verificar(TipoToken::IDENTIFICADOR)) {
         const Token& t = tokens[pos++];
@@ -482,16 +517,21 @@ inline Expressao Analisador::analisarIndexacao() {
     ponteiro.tipo = Expressao::Tipo::IDENTIFICADOR;
     ponteiro.valor = strdup(nome.valor);
 
+    Expressao resultado = ponteiro;
     consumir(TipoToken::ABRE_COLCHETE, "esperado '[' apos nome do ponteiro");
-    Expressao indice = analisarExpressaoAditiva();
-    consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
-
-    Expressao e;
-    e.tipo = Expressao::Tipo::INDEXACAO;
-    e.valor = nullptr;
-    e.esquerda = new Expressao(ponteiro);
-    e.direita = new Expressao(indice);
-    return e;
+    while(true) {
+        Expressao indice = analisarExpressaoAditiva();
+        consumir(TipoToken::FECHA_COLCHETE, "esperado ']' apos indice");
+        Expressao e;
+        e.tipo = Expressao::Tipo::INDEXACAO;
+        e.valor = nullptr;
+        e.esquerda = new Expressao(resultado);
+        e.direita = new Expressao(indice);
+        resultado = e;
+        if(!verificar(TipoToken::ABRE_COLCHETE)) break;
+        pos++;
+    }
+    return resultado;
 }
 
 // analisa "nome(arg1, arg2, ...)" como expressao(nao consome ';': quem

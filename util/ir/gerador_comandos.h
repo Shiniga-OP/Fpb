@@ -23,6 +23,7 @@ inline void GeradorIR::gerarRetorne(const ComandoRetorne& comandoRetorne, Vetor<
     if(comandoRetorne.temValor) {
         ArgumentoIR valorRetorno = resolverExpressao(comandoRetorne.valor, saida, ctx);
         if(valorRetorno.ehTemporario) removerTemporario(valorRetorno.registrador, ctx); // quem recebe vira dono
+        valorRetorno = valorRepresentante(valorRetorno, ctx.funcao.tipoRetorno.tipo, saida, ctx);
         TipoVariavel tipoRetorno = ctx.funcao.tipoRetorno.tipo;
         comandoIR.instrucaoRetorne.valor = converterParaTipo(valorRetorno, tipoEhFlutuante(tipoRetorno), larguraDoTipo(tipoRetorno), saida, ctx);
     }
@@ -64,17 +65,22 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
     }
     if(decl.tipo == TipoVariavel::ESPACO) {
         // espaço por valor: o corpo mora na area de arrays do frame(mesmo mecanismo dos arrays locais) e o slot guarda o endereço base.
-        // Cada valor da lista vira uma escrita em base + posicao do campo.
+        // cada valor da lista vira uma escrita em base + posicao do campo.
         int id = referenciaSlot.idEspaco;
         const DeclaracaoEspaco& espaco = *espacos.declaracoes[id];
-        if(decl.temLista && !temConstrutor(id) && decl.listaInicial.tam != espaco.campos.tam) {
+        bool listaDeElementos = decl.temLista && aceitaListaDeElementos(id);
+        if(decl.temLista && !listaDeElementos && !temConstrutor(id) && decl.listaInicial.tam != espaco.campos.tam) {
             std::string nomeStr = espaco.nome;
             throw std::runtime_error("Espaço '" + nomeStr + "' tem " + std::to_string(espaco.campos.tam) + " campo(s), mas a lista de inicialização tem " + std::to_string(decl.listaInicial.tam) + " valor(es)");
         }
         referenciaSlot.espacoPorValor = true;
         ctx.variaveisLocais.definirComSlot(decl.nome, referenciaSlot, slot);
-        reservarNoFrame(tamanhoDoEspaco(id), slot, saida);
+        reservarNoFrame(tamDoEspaco(id), slot, saida);
         registrarLiberacaoAutomatica(slot, id, ctx);
+        if(listaDeElementos) {
+            emitirListaElementos(decl.nome, decl.listaInicial, id, referenciaSlot, saida, ctx);
+            return;
+        }
         if(decl.temLista && temConstrutor(id)) {
             emitirConstrutor(decl, id, saida, ctx);
             return;
@@ -164,6 +170,7 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
         return;
     }
     ArgumentoIR valor = resolverExpressao(decl.valorInicial, saida, ctx);
+    valor = valorRepresentante(valor, decl.tipo, saida, ctx);
     if(referenciaSlot.idEspaco >= 0 && valor.tipo == ArgumentoIR::Tipo::REGISTRADOR && valor.idEspaco >= 0 && !ehSubespaco(valor.idEspaco, referenciaSlot.idEspaco)) {
         std::string nomeStr = decl.nome;
         throw std::runtime_error("Variável '" + nomeStr + "' recebe um ponteiro de outro espaço");
@@ -233,6 +240,7 @@ inline ArgumentoIR GeradorIR::gravarEmVariavel(const char* nome, ArgumentoIR val
         emitirCriar(existente, valor, id, saida);
         return valor;
     }
+    valor = valorRepresentante(valor, existente, saida, ctx);
     valor = converterParaTipo(valor, existente.ehFlutuante, existente.larguraBytes, saida, ctx);
     if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = existente.larguraBytes; // a gravação segue o tipo do slot já declarado
 
@@ -253,6 +261,18 @@ inline void GeradorIR::gerarReatribuicao(const Reatribuicao& reat, Vetor<Comando
 
 // grava "valor"(já resolvido) em ponteiro[indice]: converte pro tipo do elemento e emite a escrita.
 inline ArgumentoIR GeradorIR::gravarEmIndexacao(const ArgumentoIR& ponteiro, const ArgumentoIR& indice, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    if(ponteiro.idEspaco >= 0) {
+        // "p[i] = valor" com "p" apontando pra espaço: copia o corpo pro elemento i. A memória do elemento ainda não tem conteúdo, então não há "liberar" do valor antigo.
+        int id = ponteiro.idEspaco;
+        if(valor.tipo != ArgumentoIR::Tipo::REGISTRADOR || valor.idEspaco < 0 || !ehSubespaco(valor.idEspaco, id)) {
+            std::string nomeStr = espacos.declaracoes[id]->nome;
+            throw std::runtime_error("O elemento de um vetor de '" + nomeStr + "' só pode receber um espaço do mesmo tipo");
+        }
+        ArgumentoIR destino = enderecoDoElementoEspaco(ponteiro, indice, saida, ctx);
+        if(valor.ehTemporario) moverEspaco(valor, destino, id, saida, ctx);
+        else copiarObjeto(valor, destino, id, saida, ctx);
+        return valor;
+    }
     valor = converterParaTipo(valor, ponteiro.elementoFlutuante, ponteiro.larguraElemento, saida, ctx);
     if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = ponteiro.larguraElemento;
 

@@ -1,5 +1,6 @@
 // biblis/graficos/opengl/egl.fpb
 #ligar "EGL"
+#incluir "~mem.fpb"
 
 nulo* eglGetDisplay(nulo* id);
 int eglInitialize(nulo* tela, int* maior, int* menor);
@@ -18,6 +19,7 @@ int eglQuerySurface(nulo* tela, nulo* superficie, int atrib, int* valor);
     estatico final int NENHUM = 0x3038;
     estatico final int TIPO_SUPERFICIE = 0x3033;
     estatico final int PBUFFER_BIT = 0x0001;
+    estatico final int JANELA_BIT = 0x0004;
     estatico final int TIPO_RENDER = 0x3040;
     estatico final int GLES2_BIT = 0x0004;
     estatico final int VERMELHO = 0x3024;
@@ -70,5 +72,92 @@ int eglQuerySurface(nulo* tela, nulo* superficie, int atrib, int* valor);
     
     estatico int consultarSuperficie(nulo* tela, nulo* superficie, int atrib, int* valor) {
         retorne eglQuerySurface(tela, superficie, atrib, valor);
+    }
+}
+
+#classe ContextoEGL {
+    nulo* tela;
+    nulo* superficie;
+    nulo* ctx;
+    int vermelho;
+    int verde;
+    int azul;
+    int profundidade;
+    int versao;
+
+    ContextoEGL() {
+        este.padrao();
+    }
+
+    nulo padrao() {
+        este.vermelho = 8;
+        este.verde = 8;
+        este.azul = 8;
+        este.profundidade = 16;
+        este.versao = 2;
+    }
+
+    bool iniciar(nulo* idTela, nulo* janelaNativa) {
+        nulo* t = EGL.obterTela(idTela);
+        int[1] maior;
+        int[1] menor;
+        EGL.iniciar(t, maior, menor);
+        EGL.vincularAPI(EGL.API_GLES);
+
+        int[13] atribs;
+        atribs[0] = EGL.TIPO_SUPERFICIE;
+        atribs[1] = EGL.JANELA_BIT;
+        atribs[2] = EGL.TIPO_RENDER;
+        atribs[3] = EGL.GLES2_BIT;
+        atribs[4] = EGL.VERMELHO;
+        atribs[5] = este.vermelho;
+        atribs[6] = EGL.VERDE;
+        atribs[7] = este.verde;
+        atribs[8] = EGL.AZUL;
+        atribs[9] = este.azul;
+        atribs[10] = EGL.PROFUNDIDADE;
+        atribs[11] = este.profundidade;
+        atribs[12] = EGL.NENHUM;
+
+        longo[1] config;
+        int[1] qtd;
+        EGL.escolherConfig(t, atribs, config, 1, qtd);
+        se(qtd[0] == 0) {
+            retorne falso;
+        }
+        int[1] semAtribs;
+        semAtribs[0] = EGL.NENHUM;
+        nulo* sup = EGL.criarSuperficieJanela(t, (nulo*)config[0], janelaNativa, semAtribs);
+
+        int[3] atribsCtx;
+        atribsCtx[0] = EGL.VERSAO_CLIENTE;
+        atribsCtx[1] = este.versao;
+        atribsCtx[2] = EGL.NENHUM;
+        nulo* c = EGL.criarCtx(t, (nulo*)config[0], (nulo*)0, atribsCtx);
+        EGL.defAtual(t, sup, sup, c);
+        EGL.trocarIntervalo(t, 1);
+
+        este.tela = t;
+        este.superficie = sup;
+        este.ctx = c;
+        retorne verdade;
+    }
+
+    int consultar(int atributo) {
+        int[1] v;
+        EGL.consultarSuperficie(este.tela, este.superficie, atributo, v);
+        retorne v[0];
+    }
+
+    int largura() {
+        retorne este.consultar(EGL.LARGURA);
+    }
+
+    int altura() {
+        retorne este.consultar(EGL.ALTURA);
+    }
+
+    nulo trocarBuffers() {
+        EGL.trocarBuffers(este.tela, este.superficie);
     }
 }

@@ -1,2 +1,2 @@
 #incluir "shaders.fpb"
-#incluir "janela.fpb"
+#incluir "plataforma.fpb"

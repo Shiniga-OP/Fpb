@@ -5,10 +5,8 @@
     flu* vertices;
     
     Modelo(flu* vertices) {
-        Modelo* m = malocar(bytes(Modelo));
-        m.liberado = falso;
-        m.vertices = vertices;
-        retorne m;
+        este.liberado = falso;
+        este.vertices = vertices;
     }
     
     ~Modelo() {

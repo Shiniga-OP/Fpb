@@ -203,6 +203,19 @@ inline void GeradorIR::gerarDeclaracaoVariavel(const DeclaracaoVariavel& decl, V
     saida.empurrar(comandoIR);
 }
 
+// grava "valor"(já resolvido) na global escalar "nome", direto na memória dela. Devolve false se "nome" não é global escalar.
+inline bool GeradorIR::gravarEmGlobalEscalar(const char* nome, ArgumentoIR& valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
+    CampoEstatico global;
+    std::string simbolo;
+    if(!buscarGlobalEscalar(nome, global, simbolo)) return false;
+    ArgumentoIR endereco = enderecoDeGlobal(simbolo, global, saida, ctx);
+    valor = valorRepresentante(valor, global.tipo, saida, ctx);
+    valor = converterParaTipo(valor, tipoEhFlutuante(global.tipo), larguraDoTipo(global.tipo), saida, ctx);
+    if(valor.tipo == ArgumentoIR::Tipo::IMEDIATO) valor.larguraBytes = larguraDoTipo(global.tipo);
+    emitirEscritaCampo(endereco, 0, global.tipo, copiarArgumento(valor), saida);
+    return true;
+}
+
 // grava "valor"(já resolvido) na variável local "nome". Miolo de "nome = expr;" e de "nome = expr" usado como valor.
 inline ArgumentoIR GeradorIR::gravarEmVariavel(const char* nome, ArgumentoIR valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     ArgumentoIR existente;
@@ -216,6 +229,7 @@ inline ArgumentoIR GeradorIR::gravarEmVariavel(const char* nome, ArgumentoIR val
                 return gravarEmCampo("este", nome, valor, saida, ctx);
             }
         }
+        if(gravarEmGlobalEscalar(nome, valor, saida, ctx)) return valor;
         std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
     }
@@ -309,6 +323,7 @@ inline void GeradorIR::gerarAtribuicaoIndexada(const AtribuicaoIndexada& atr, Ve
 // slot(memoria) tem que existir pra receber o valor). "saida" recebe
 // tanto os comandos auxiliares de cada argumento(ex: um "bl" se algum
 // identificador for uma chamada de função) quanto o proprio comando final.
+// Se "nome" é global escalar, x0 vai pra um slot temporário e dali pra memória da global.
 inline void GeradorIR::gerarChamadaSistemaCrua(const ChamadaSistemaCrua& chamada, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     if(chamada.identificadores.tam == 0) {
         throw std::runtime_error("#chamada_sistema precisa de ao menos o número da chamada de sistema");
@@ -324,6 +339,17 @@ inline void GeradorIR::gerarChamadaSistemaCrua(const ChamadaSistemaCrua& chamada
         ArgumentoIR existente;
         int slot;
         if(!ctx.variaveisLocais.buscar(chamada.nomeDestino, &existente, &slot)) {
+            CampoEstatico global;
+            std::string simbolo;
+            if(buscarGlobalEscalar(chamada.nomeDestino, global, simbolo)) {
+                int slotTemp = ctx.variaveisLocais.proximoSlot++;
+                comandoIR.chamadaSistemaCrua.capturaResultado = true;
+                comandoIR.chamadaSistemaCrua.slotDestino = slotTemp;
+                saida.empurrar(comandoIR);
+                ArgumentoIR resultado = argumentoSlotLargura(slotTemp, 8);
+                gravarEmGlobalEscalar(chamada.nomeDestino, resultado, saida, ctx);
+                return;
+            }
             std::string nomeStr = chamada.nomeDestino;
             throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
         }

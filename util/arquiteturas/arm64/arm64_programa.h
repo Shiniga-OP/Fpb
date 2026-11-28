@@ -31,6 +31,8 @@ inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
     for(int i = 0; i < programa.funcoes.tam; i++) {
         const FuncaoIR& f = programa.funcoes[i];
         if(programa.ehBibli || f.ehExportada || f.ehInicio) saida << ".global " << f.nome << "\n.type " << f.nome << ", %function\n";
+        // iniciador da biblioteca: escondido, senão a .init_array de uma .so poderia resolver pro _iniciar_globais de outra(ou do executável)
+        if(f.ehIniciador) saida << ".hidden " << f.nome << "\n";
     }
     saida << ".section .rodata\n";
     for(int i = 0; i < programa.dados.tam; i++) {
@@ -133,6 +135,14 @@ inline std::string ARM64::gerarAssembly(const ProgramaIR& programa) {
             saida << "ret\n\n";
         }
         funcaoAtual = nullptr;
+    }
+    // .init_array: o carregador dinâmico chama cada endereço daqui ao carregar a .so, antes de qualquer função exportada ser usada
+    for(int i = 0; i < programa.funcoes.tam; i++) {
+        const FuncaoIR& funcao = programa.funcoes[i];
+        if(!funcao.ehIniciador) continue;
+        saida << "\n.section .init_array,\"aw\"\n";
+        saida << ".balign 8\n";
+        saida << ".quad " << funcao.nome << "\n";
     }
     std::string resultado = saida.str();
     return otimizarMovsRedundantes(resultado);

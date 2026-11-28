@@ -217,6 +217,9 @@ public:
     void registrarGlobaisDeclaradas(const Programa& programa);
     void vincularGlobais(ContextoFuncao& ctx, Vetor<ComandoIR>& saida);
     FuncaoIR gerarIniciarGlobais(Vetor<DadoEstaticoIR>& dados);
+    long valorInicialGlobal(const DeclaracaoVariavel& g);
+    bool buscarGlobalEscalar(const char* nome, CampoEstatico& campo, std::string& simbolo);
+    bool gravarEmGlobalEscalar(const char* nome, ArgumentoIR& valor, Vetor<ComandoIR>& saida, ContextoFuncao& ctx);
 };
 
 // definições dos métodos(cada arquivo inclui este de volta; #pragma once evita ciclo)

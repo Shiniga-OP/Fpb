@@ -103,6 +103,12 @@ inline ProgramaIR GeradorIR::gerar(const Programa& programa) {
             if(strcmp(carregador.programas[i]->funcoes[j].nome, "inicio") == 0) ir.ehBibli = false;
         }
     }
+    // 6. biblioteca não tem "inicio" pra chamar o _iniciar_globais: ele vai pra .init_array e o carregador dinâmico chama ao carregar a .so.
+    if(ir.ehBibli) {
+        for(int i = 0; i < ir.funcoes.tam; i++) {
+            if(strcmp(ir.funcoes[i].nome, "_iniciar_globais") == 0) ir.funcoes[i].ehIniciador = true;
+        }
+    }
     if(ir.funcoes.tam == 0) {
         throw std::runtime_error("Nenhuma função raiz: o programa precisa de 'inicio' ou de uma função '@exportar'");
     }

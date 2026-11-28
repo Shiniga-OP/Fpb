@@ -20,6 +20,10 @@ inline ArgumentoIR GeradorIR::indexarRepresentante(const ArgumentoIR& ponteiro, 
 inline ArgumentoIR GeradorIR::resolverPonteiroIndexado(const char* nome, const char* campo, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     ArgumentoIR base;
     if(!ctx.variaveisLocais.buscar(nome, &base)) {
+        // "p[i]" com "p" global escalar(car*, int*...): lê o ponteiro da memória
+        CampoEstatico global;
+        std::string simbolo;
+        if(!campo && buscarGlobalEscalar(nome, global, simbolo)) return resolverAcessoEstatico(simbolo, global, saida, ctx);
         std::string nomeStr = nome;
         throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
     }
@@ -148,6 +152,7 @@ inline ArgumentoIR GeradorIR::resolverIndexacao(const Expressao& expressao, Veto
 // "@(expr)": o valor de expr passa a ser tratado como endereço(8 bytes), sem instrução nova: serve pra "nulo* f = @(0x1000);" e pra converter um número em endereço.
 // "@nome": se "nome" é ponteiro ou espaço, o slot dele já guarda um endereço, então o valor é o próprio conteúdo do slot. Se é escalar(int, car, longo...), o valor
 // é o endereço do slot na pilha: emite ENDERECO_SLOT, e o alocador de registradores deixa esse slot sempre na pilha(registrador físico não tem endereço).
+// Se "nome" é global escalar, o valor é o endereço dela no .data.
 inline ArgumentoIR GeradorIR::resolverEndereco(const Expressao& expressao, Vetor<ComandoIR>& saida, ContextoFuncao& ctx) {
     if(expressao.enderecoDeValor) {
         ArgumentoIR valor = resolverExpressao(*expressao.esquerda, saida, ctx);
@@ -206,6 +211,15 @@ inline ArgumentoIR GeradorIR::resolverEndereco(const Expressao& expressao, Vetor
     ArgumentoIR variavel;
     int slotVariavel;
     if(!ctx.variaveisLocais.buscar(expressao.esquerda->valor, &variavel, &slotVariavel)) {
+        CampoEstatico global;
+        std::string simbolo;
+        if(buscarGlobalEscalar(expressao.esquerda->valor, global, simbolo)) {
+            // "@global": endereço dela no .data, que "nome[i]" percorre de largura em largura do tipo dela
+            ArgumentoIR endereco = enderecoDeGlobal(simbolo, global, saida, ctx);
+            endereco.elementoSinalizado = tipoEhSinalizado(global.tipo);
+            endereco.elementoFlutuante = tipoEhFlutuante(global.tipo);
+            return endereco;
+        }
         int totalParametrosIgnorado;
         if(funcoesUsuario.buscar(expressao.esquerda->valor, &totalParametrosIgnorado)) {
             // "@funcao": endereço do símbolo da função(adrp/add, o mesmo caminho do endereço de um texto literal)

@@ -1,0 +1,46 @@
+// graficos/zukara/plataforma.fpb
+#incluir "~mem.fpb"
+#incluir "~threads.fpb"
+#incluir "~impressao.fpb"
+#incluir "janela.fpb"
+
+#se(__ANDROID__)
+
+// roda na thread de renderização, criada por thcriar
+nulo* corpoThread(Janela* j) {
+    principal(j);
+    retorne (nulo*)0;
+}
+
+nulo aoCriarJanela(nulo* atividade, nulo* janela) {
+    Janela* j = novo Janela((nulo*)0, janela);
+    Thread* th = thcriar(@corpoThread, (longo)j);
+    se(th == (Thread*)0) {
+        escrever("[ERRO]: não foi possível criar a thread de renderização\n");
+        sair(1);
+    }
+}
+
+@exportar
+nulo ANativeActivity_onCreate(nulo* atividade, nulo* estado, longo tam) {
+    longo* atv = (longo*)atividade;
+    longo* cb = (longo*)atv[0];
+    cb[7] = @aoCriarJanela;
+}
+#senaose(__LINUX__)
+#incluir "~linux/x11.fpb"
+
+nulo inicio() {
+    nulo* tela = X11.abrirTela((nulo*)0);
+    se(tela == (nulo*)0) {
+        escrever("[ERRO]: não foi possível abrir a tela\n");
+        sair(1);
+    }
+    longo raiz = X11.janelaRaizPadrao(tela);
+    longo janela = X11.criarJanelaSimples(tela, raiz, 0, 0, 640, 480, 0, 0, 0);
+    X11.mapaJanela(tela, janela);
+    X11.descarga(tela);
+    Janela* j = novo Janela(tela, (nulo*)janela);
+    principal(j);
+}
+#sefim

@@ -427,6 +427,7 @@ struct FuncaoIR {
     int bytesArrays = 0;
     
     bool ehExportada = false;
+    bool ehIniciador = false; // true só pro _iniciar_globais de uma biblioteca: vai pra .init_array e o carregador dinâmico chama ao carregar a .so(num executável quem chama é o "inicio")
 
     void iniciar() {
         nome = nullptr;
@@ -435,6 +436,7 @@ struct FuncaoIR {
         totalSlots = 0;
         bytesArrays = 0;
         ehInicio = false;
+        ehIniciador = false;
         parametrosLargura.iniciar();
         parametrosFlutuante.iniciar();
         retornoFlutuante = false;

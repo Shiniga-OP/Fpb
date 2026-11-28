@@ -225,7 +225,7 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
         return arg;
     }
     if(expressao.tipo == Expressao::Tipo::IDENTIFICADOR) {
-        // identificador: precisa ser uma variável local já declarada.
+        // identificador: variável local, campo de "este" ou global escalar.
         ArgumentoIR encontrado;
         if(!ctx.variaveisLocais.buscar(expressao.valor, &encontrado)) {
             // nome solto dentro de um método: campo de instância ou estatico da classe de "este"
@@ -236,6 +236,10 @@ inline ArgumentoIR GeradorIR::resolverExpressao(const Expressao& expressao, Veto
                 const CampoEstatico* estatico = buscarEstatico(este.idEspaco, expressao.valor, simbolo);
                 if(estatico) return resolverAcessoEstatico(simbolo, *estatico, saida, ctx);
             }
+            // global escalar: lida da memória a cada uso
+            CampoEstatico global;
+            std::string simboloGlobalStr;
+            if(buscarGlobalEscalar(expressao.valor, global, simboloGlobalStr)) return resolverAcessoEstatico(simboloGlobalStr, global, saida, ctx);
             std::string nomeStr = expressao.valor;
             throw std::runtime_error("Variável '" + nomeStr + "' não foi declarada");
         }
@@ -408,10 +412,14 @@ inline ArgumentoIR GeradorIR::resolverBytes(const Expressao& expressao, TabelaVa
         tamanho = larguraDoTipo(expressao.bytesTipoLiteral);
     } else {
         ArgumentoIR encontrado;
+        CampoEstatico global;
+        std::string simboloGlobalStr;
         if(variaveisLocais.buscar(expressao.bytesNomeVariavel, &encontrado, nullptr)) {
             // espaço por valor: o tamanho do corpo, não os 8 bytes do slot que guarda o endereço
             if(encontrado.espacoPorValor && encontrado.idEspaco >= 0) tamanho = tamDoEspaco(encontrado.idEspaco);
             else tamanho = encontrado.larguraBytes;
+        } else if(buscarGlobalEscalar(expressao.bytesNomeVariavel, global, simboloGlobalStr)) {
+            tamanho = larguraDoTipo(global.tipo);
         } else {
             // nome de espaço/classe: "bytes(Texto)"
             int idEspaco = espacos.buscar(expressao.bytesNomeVariavel);

@@ -14,12 +14,26 @@ inline CampoEstatico campoDoPonteiroGlobal() {
     return c;
 }
 
+// global escalar(int, car, flu, car*...): nem espaço nem final. Mora no .data e é lida/gravada direto na memória a cada uso, sem cache em slot.
+inline bool ehGlobalEscalar(const DeclaracaoVariavel& g) {
+    return g.tipo != TipoVariavel::ESPACO && !g.ehFinal;
+}
+
 inline void GeradorIR::registrarGlobaisDeclaradas(const Programa& programa) {
     for(int i = 0; i < programa.variaveisGlobais.tam; i++) {
         const DeclaracaoVariavel& decl = programa.variaveisGlobais[i];
         std::string nomeStr = decl.nome;
-        if(decl.tipo != TipoVariavel::ESPACO && !decl.ehFinal) {
-            throw std::runtime_error("Variável global '" + nomeStr + "': por enquanto só 'estatico Nome x' (espaço) ou 'estatico final'");
+        if(decl.ehArray) {
+            throw std::runtime_error("Variável global '" + nomeStr + "': array global ainda não é suportado");
+        }
+        if(decl.tipo == TipoVariavel::ESPACO_PONTEIRO && !decl.ehFinal) {
+            throw std::runtime_error("Variável global '" + nomeStr + "': 'estatico Nome* x' ainda não é suportado, use 'estatico Nome x'");
+        }
+        if(ehGlobalEscalar(decl)) {
+            bool numero = !decl.ehChamadaSistema && (decl.valorInicial.tipo == Expressao::Tipo::NUMERO_LITERAL || decl.valorInicial.tipo == Expressao::Tipo::DECIMAL_LITERAL);
+            bool texto = !decl.ehChamadaSistema && decl.valorInicial.tipo == Expressao::Tipo::TEXTO_LITERAL;
+            if(texto && !tipoEhPonteiro(decl.tipo)) throw std::runtime_error("Variável global '" + nomeStr + "': texto só pode inicializar um ponteiro(car*)");
+            if(!numero && !texto) throw std::runtime_error("Variável global '" + nomeStr + "': o valor inicial precisa ser um número ou um texto constante");
         }
         for(int k = 0; k < globaisDeclarados.tam; k++) {
             if(nomeStr == globaisDeclarados[k]->nome) throw std::runtime_error("Variável global '" + nomeStr + "' definida mais de uma vez");
@@ -28,10 +42,44 @@ inline void GeradorIR::registrarGlobaisDeclaradas(const Programa& programa) {
     }
 }
 
-// no começo de cada função: liga cada global a um slot local com o mesmo nome.
+// valor inicial de uma global escalar no formato do .data: inteiro, ou padrão de bits pra flu/dobro.
+// Texto vale 0 aqui: o endereço dele só é gravado em _iniciar_globais.
+inline long GeradorIR::valorInicialGlobal(const DeclaracaoVariavel& g) {
+    if(g.valorInicial.tipo == Expressao::Tipo::TEXTO_LITERAL) return 0;
+    const char* texto = g.valorInicial.valor;
+    if(!tipoEhFlutuante(g.tipo)) return atol(texto);
+    double d = strtod(texto, nullptr);
+    if(larguraDoTipo(g.tipo) == 4) {
+        float f = (float)d;
+        unsigned int bits;
+        memcpy(&bits, &f, 4);
+        return (long)bits;
+    }
+    long bits;
+    memcpy(&bits, &d, 8);
+    return bits;
+}
+
+// global escalar "nome" vista como campo estatico: leitura e escrita reaproveitam resolverAcessoEstatico/enderecoDeGlobal. "simbolo" recebe o nome no .data.
+inline bool GeradorIR::buscarGlobalEscalar(const char* nome, CampoEstatico& campo, std::string& simbolo) {
+    for(int i = 0; i < globaisDeclarados.tam; i++) {
+        const DeclaracaoVariavel& g = *globaisDeclarados[i];
+        if(!ehGlobalEscalar(g) || strcmp(g.nome, nome) != 0) continue;
+        campo.tipo = g.tipo;
+        campo.nome = g.nome;
+        campo.valorInicial = valorInicialGlobal(g);
+        campo.ehFinal = false;
+        simbolo = simboloGlobal(g.nome);
+        return true;
+    }
+    return false;
+}
+
+// no começo de cada função: liga cada global de espaço(ou final) a um slot local com o mesmo nome. Escalar fica de fora: é buscada por buscarGlobalEscalar a cada uso.
 inline void GeradorIR::vincularGlobais(ContextoFuncao& ctx, Vetor<ComandoIR>& saida) {
     for(int i = 0; i < globaisDeclarados.tam; i++) {
         const DeclaracaoVariavel& g = *globaisDeclarados[i];
+        if(ehGlobalEscalar(g)) continue;
         ArgumentoIR jaExiste;
         if(ctx.variaveisLocais.buscar(g.nome, &jaExiste)) continue; // parâmetro sombreia a global
         int slot = ctx.variaveisLocais.proximoSlot++;
@@ -58,7 +106,7 @@ inline void GeradorIR::vincularGlobais(ContextoFuncao& ctx, Vetor<ComandoIR>& sa
     }
 }
 
-// função sintética: aloca e constrói cada objeto global e guarda o ponteiro na variável global.
+// função sintética: aloca e constrói cada objeto global e guarda o ponteiro na variável global, e grava o endereço dos textos nas globais car*. Final e escalar numérica não passam por aqui.
 inline FuncaoIR GeradorIR::gerarIniciarGlobais(Vetor<DadoEstaticoIR>& dados) {
     DeclaracaoFuncao decl;
     decl.iniciar();
@@ -71,7 +119,17 @@ inline FuncaoIR GeradorIR::gerarIniciarGlobais(Vetor<DadoEstaticoIR>& dados) {
     ctx.variaveisLocais.iniciar(0);
     for(int i = 0; i < globaisDeclarados.tam; i++) {
         const DeclaracaoVariavel& g = *globaisDeclarados[i];
-        if(g.ehFinal) continue;
+        if(ehGlobalEscalar(g) && g.valorInicial.tipo == Expressao::Tipo::TEXTO_LITERAL) {
+            // "estatico car* x = "texto";": o endereço do texto não é constante no .data(PIE), então é gravado aqui
+            CampoEstatico global;
+            std::string simbolo;
+            buscarGlobalEscalar(g.nome, global, simbolo);
+            ArgumentoIR endereco = enderecoDeGlobal(simbolo, global, f.instrucoes, ctx);
+            ArgumentoIR texto = resolverExpressao(g.valorInicial, f.instrucoes, ctx);
+            emitirEscritaCampo(endereco, 0, g.tipo, texto, f.instrucoes);
+            continue;
+        }
+        if(g.tipo != TipoVariavel::ESPACO) continue;
         int marcaTemp = ctx.tempSlot.tam;
         int id = obterIdEspaco(g.nomeEspaco);
         int slot = ctx.variaveisLocais.proximoSlot++;
